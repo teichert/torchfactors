@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "python-project"
+version = "0.0.1"
+description = "starter python project"
+authors = ["Adam Teichert"]
+license = "MIT"
+packages = [
+    {include="python_project", from="src"}
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.2"
+pytest-cov = "^2.11.1"
+pytest-mock = "^3.5.1"
+pdoc = "^6.3.1"
+flake8 = "^3.8.4"
+mypy = "^0.800"
+autopep8 = "^1.5.5"
+
+
+[build-system]
+requires = ["poetry-core>=1.0.2"]
+build-backend = "poetry.core.masonry.api"
