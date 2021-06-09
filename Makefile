@@ -1,5 +1,6 @@
-.PHONY: all
-all: install
+.PHONY: check
+check:
+	make test type lint --keep-going
 
 .PHONY: install
 install: pyproject.lock
@@ -12,7 +13,7 @@ pyproject.lock: pyproject.toml
 .PHONY: test
 test: pyproject.lock
 	@echo "running tests..."
-	poetry run python -m pytest --cov=src --cov-report term-missing:skip-covered --cov-report html
+	poetry run python -m pytest --cov=src --cov-report term-missing:skip-covered --cov-report html --codeblocks
 
 .PHONY: lint
 lint: pyproject.lock
@@ -23,10 +24,6 @@ lint: pyproject.lock
 type: pyproject.lock
 	@echo "running type checker..."
 	poetry run python -m mypy . --check-untyped-defs
-
-.PHONY: check
-check:
-	make test type lint --keep-going
 
 .PHONY: doc
 doc: pyproject.lock
