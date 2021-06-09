@@ -34,8 +34,8 @@ class Domain(TensorDetail):
         return bool((tensor < len(self.range)).all() and (tensor >= 0).all())
 
 
-@object.__new__
-class Range:
+# should have been able to do @object.__new__ but mypy doesn't get it
+class _Range:
     r"""
     Factory for an integer domain with a lower and upper bound.
     e.g.
@@ -62,6 +62,7 @@ class Range:
     def __call__(*args: int) -> Domain:
         return Domain(range(*args))
 
+Range = _Range()
 
 class VariableType(Enum):
     r"""
@@ -95,7 +96,6 @@ class VariableType(Enum):
     # def replace(variable: 'VariableTensor', original: 'VariableMode', substitution: 'VariableMode'):
     #     variable.tensor[variable.tensor == original] = substitution
     #     return variable
-
 
 
 NDSlice = Union[None, int, slice, Tensor, List[Any], Tuple[Any, ...]]
@@ -164,8 +164,8 @@ class VariableTensor(_VariableBase, TensorTypeMixin):
     # ndslice: NDSlice
     # key: Hashable
 
-    # def __new__(cls, *args, **kwargs):
-    #     return object.__new__(cls)
+    def __new__(cls, *args, **kwargs):
+        return object.__new__(cls)
 
     # def __init__(self, tensor: TensorType, usage: UsageParam = VariableMode.FREE_WITH_MARK, domain: Domain = Domain.OPEN,
     #              key: Hashable = TENSOR_AS_KEY):
@@ -486,34 +486,36 @@ class Model(Generic[T]):
 
     
 
-# import math
+import math
+from functools import lru_cache
 
+cache = lru_cache(maxsize=None)
 
-# @dataclass
-# class LinearFactor(Factor):
-#     variables: List[VariableTensor]
-#     params: ParamNamespace
-#     input: Optional[Tensor] = torch.tensor([1.])
-#     bias: bool = True
-#     input_dimensions: int = 1
+@dataclass
+class LinearFactor(Factor):
+    variables: List[VariableTensor]
+    params: ParamNamespace
+    input: Tensor = torch.tensor([1.])
+    bias: bool = True
+    input_dimensions: int = 1
 
-#     def log_einsum(self, equation):
-#         pass
+    def log_einsum(self, equation):
+        pass
 
-#     def compile_equation(self, others, queries):
-#         return None
+    def compile_equation(self, others, queries):
+        return None
     
-#     @cache
-#     def dense(self) -> Tensor:
-#         """returns a dense version"""
-#         in_shapes = tuple(self.input.shape[-self.input_dimensions:])
-#         out_shapes = tuple([len(t.domain) for t in self.variables])
-#         m = self.params.cache_module(lambda: 
-#             torch.nn.Linear(
-#                 in_features=math.prod(in_shapes),
-#                 out_features=math.prod(out_shapes),
-#                 bias=self.bias))
-#         return m(self.input)
+    @cache
+    def dense(self) -> Tensor:
+        """returns a dense version"""
+        in_shapes = tuple(self.input.shape[-self.input_dimensions:])
+        out_shapes = tuple([len(t.domain) for t in self.variables])
+        m = self.params.cache_module(lambda: 
+            torch.nn.Linear(
+                in_features=math.prod(in_shapes),
+                out_features=math.prod(out_shapes),
+                bias=self.bias))
+        return m(self.input)
 
 
 from itertools import zip_longest
