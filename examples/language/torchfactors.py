@@ -2,12 +2,13 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from typing import (Any, Callable, ClassVar, Final, Generic, Hashable,
-                    Iterable, List, Optional, Sequence, Tuple, Type, TypeVar, Union,
-                    get_type_hints)
+                    Iterable, Iterator, List, Optional, Sequence, Tuple, Type, TypeVar,
+                    Union, get_type_hints)
 
 import torch
 from torch import Tensor
-from torch._C import Value
+from torch.nn import ModuleDict, ParameterDict, Module
+from torch.nn.parameter import Parameter
 from torchtyping import TensorDetail, TensorType  # type: ignore
 from torchtyping.tensor_type import TensorTypeMixin  # type: ignore
 
@@ -229,8 +230,9 @@ class VariableTensor(_VariableBase, TensorTypeMixin):
     #         ndslice=ndslice,
     #         key=self.key)
 
-from torch import Size
 from typing import cast
+
+from torch import Size
 
 SliceType = Union[slice, int]
 ShapeType = Union[Size, Tuple[int]]
@@ -309,6 +311,38 @@ class Variable(VariableTensor):
         return self._domain
 
 
+from abc import ABC, abstractmethod
+
+# import torch
+
+
+class Factors(ABC, Iterable['Factor']):
+    
+    def __iter__(self) -> Iterator['Factor']:
+        return self.factors()
+
+    @abstractmethod
+    def factors(self) -> Iterator['Factor']:
+        pass
+
+
+class Factor(Factors):
+
+    def factors(self):
+        return [self]
+    
+    # a factor needs to know how to:
+    # take in additional factors and queries;
+    # how to iterate over the product of
+    def log_einsum(self, equation):
+        pass
+
+    def compile_equation(self, others, queries):
+        return None
+    
+    def dense(self) -> Tensor:
+        """returns a dense version"""
+        pass
 
 
 # class Variable(Annotated[TensorType, Domain]):
@@ -330,40 +364,79 @@ class Variable(VariableTensor):
 # from typing import get_type_hints
 # print(Variable.domain(u, 'items'))
 
+class ParamNamespace:
+    """
+    associated with a single model and (should-be)
+    unique key; parameters are 
+    """
 
-# T = TypeVar('T')
+    def __init__(self, model: 'Model', key: Hashable):
+        self.model = model
+        self.key = key
+        self.cached_parameter: Optional[Parameter] = None
+        self.cached_module: Optional[torch.nn.Module] = None
 
-# class Model(Generic[T]):
+    def namespace(self, key: Hashable) -> 'ParamNamespace':
+        return ParamNamespace(
+            model=self.model, key=(self.key, key))
 
-#     _factor_generators: List[Callable[[T], Iterable[Factor]]]
-#     # TODO: add in ParamsDict
-#     def __init__(self):
-#         self._factor_generators = []
-#         self._domains = {}
-#         self._parameters = ParameterDict()
-#         self._modules = ModuleDict()
-
-#     def domain(self, key: Hashable) -> Domain:
-#         return self._domains.setdefault(key, Domain([]))
-
-#     def params(self, key) -> ModelParameters:
-#         return ModelParameters(self, key)
-
-#     def factors_from(self, factor_generator: Callable[[T], Iterable[Factor]]) -> None:
-#         self._factor_generators.append(factor_generator)
-
-#     def factors(self, subject: T) -> Iterable[Factor]:
-#         for gen in self._factor_generators:
-#             yield from gen(subject)
-
-#     def set_param(self, key: Hashable, value: Tensor) -> None:
-#         self._parameters[f'{key}:{hash(key)}'] = Parameter(value)
+    def cache_parameter(self, shape: ShapeType, initialization: Optional[Callable[[Tensor], None]]= None) -> Tensor:
+        if self.cached_module is not None:
+            raise ValueError("already cached a model in this namespace")
+        elif self.cached_parameter is not None:
+            if self.cached_parameter.shape != shape:
+                raise ValueError("already cached a parameter with different shape in this namespace")
+            else:
+                return self.cached_parameter
+        tensor = torch.zeros(shape)
+        if initialization is not None:
+            initialization(tensor)
+        self.cached_parameter = Parameter(tensor)
+        self.model.set_param(self.key, self.cached_parameter)
+        return self.cached_parameter
     
-#     def set_model(self, key: Hashable, value: Tensor) -> None:
-#         self._parameters[f'{key}:{hash(key)}'] = Parameter(value)
+    def cache_module(self, constructor: Callable[[], torch.nn.Module]):
+        if self.cached_module is not None:
+            return self.cached_module
+        else:
+            self.cached_module = constructor()
+            self.model.set_module(self.key, self.cached_module)
+    
 
-#     def __call__(self, subject: T) -> List[Factor]:
-#         return list(self.factors(subject))
+
+T = TypeVar('T')
+
+class Model(Generic[T]):
+
+    _factor_generators: List[Callable[[T], Iterable[Factor]]]
+    # TODO: add in ParamsDict
+    def __init__(self):
+        self._factor_generators = []
+        self._domains = {}
+        self._parameters = ParameterDict()
+        self._modules = ModuleDict()
+
+    def domain(self, key: Hashable) -> Domain:
+        return self._domains.setdefault(key, Domain([]))
+
+    def params(self, key) -> ParamNamespace:
+        return ParamNamespace(self, key)
+
+    def factors_from(self, factor_generator: Callable[[T], Iterable[Factor]]) -> None:
+        self._factor_generators.append(factor_generator)
+
+    def factors(self, subject: T) -> Iterable[Factor]:
+        for gen in self._factor_generators:
+            yield from gen(subject)
+
+    def set_param(self, key: Hashable, value: Parameter) -> None:
+        self._parameters[f'{key}:{hash(key)}'] = value
+    
+    def set_module(self, key: Hashable, value: Module) -> None:
+        self._modules[f'{key}:{hash(key)}'] = value
+
+    def __call__(self, subject: T) -> List[Factor]:
+        return list(self.factors(subject))
 
 
 
@@ -402,38 +475,6 @@ class Variable(VariableTensor):
 
 
     
-# from abc import ABC, abstractmethod
-
-# import torch
-
-
-# class Factors(ABC, Iterable['Factor']):
-    
-#     def __iter__(self) -> Iterator['Factor']:
-#         return self.factors()
-
-#     @abstractmethod
-#     def factors(self) -> Iterator['Factor']:
-#         pass
-
-
-# class Factor(Factors):
-
-#     def factors(self):
-#         return [self]
-    
-#     # a factor needs to know how to:
-#     # take in additional factors and queries;
-#     # how to iterate over the product of
-#     def log_einsum(self, equation):
-#         pass
-
-#     def compile_equation(self, others, queries):
-#         return None
-    
-#     def dense(self) -> Tensor:
-#         """returns a dense version"""
-#         pass
 
 # class ExactlyOneFactor(Factor):
 
@@ -443,32 +484,6 @@ class Variable(VariableTensor):
 # ShapeType = Union[torch.Size, Tuple[int,...], int]
 
 
-# class ModelParameters:
-#     """
-#     associated with a single model and (should-be)
-#     unique key; parameters are 
-#     """
-
-#     def __init__(self, model: 'Model', key: Hashable):
-#         self.model = model
-#         self.key = key
-#         self.cached_tensor = None
-#         self.cached_model = None
-
-#     def namespace(self, key: Hashable) -> 'ModelParameters':
-#         return ModelParameters(
-#             model=self.model, key=(self.key, key))
-
-#     def cache_tensor(self, shape: ShapeType, initialization: Optional[Callable[[Tensor], None]]= None) -> Tensor:
-#         if 
-#         out = torch.zeros(shape, requires_grad=True)
-#         if initialization is not None:
-#             initialization(out)
-#         self.model.set_param(self.key, out)
-#         return out
-    
-#     def cach_model(self, f: )
-    
     
 
 # import math
@@ -477,7 +492,7 @@ class Variable(VariableTensor):
 # @dataclass
 # class LinearFactor(Factor):
 #     variables: List[VariableTensor]
-#     params: ModelParameters
+#     params: ParamNamespace
 #     input: Optional[Tensor] = torch.tensor([1.])
 #     bias: bool = True
 #     input_dimensions: int = 1
@@ -493,7 +508,7 @@ class Variable(VariableTensor):
 #         """returns a dense version"""
 #         in_shapes = tuple(self.input.shape[-self.input_dimensions:])
 #         out_shapes = tuple([len(t.domain) for t in self.variables])
-#         m = self.params.cache_model(lambda: 
+#         m = self.params.cache_module(lambda: 
 #             torch.nn.Linear(
 #                 in_features=math.prod(in_shapes),
 #                 out_features=math.prod(out_shapes),
@@ -545,4 +560,3 @@ from itertools import zip_longest
     #         lhs.start + rhs.start * lhs.step,
     #         min(lhs.end, lhs.start + (rhs.stop - rhs.start),
     #         lhs.step * rhs.step)
-
