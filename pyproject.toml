@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "python-project"
-version = "0.0.1"
-description = "starter python project"
+name = "torchfactors"
+version = "0.0.2"
+description = "differentiable generalized belief propagation with pytorch"
 authors = ["Adam Teichert"]
 license = "MIT"
 packages = [
-    {include="python_project", from="src"}
+    {include="torchfactors", from="src"}
 ]
 
 
