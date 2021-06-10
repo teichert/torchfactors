@@ -1,10 +1,11 @@
 import math
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache, singledispatch, singledispatchmethod
+from functools import lru_cache, singledispatchmethod
 from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, Iterator,
-                    List, Optional, Sequence, Tuple, TypeVar, Union, cast)
+                    List, Optional, Sequence, Tuple, TypeVar, Union,
+                    cast)
 
 import torch
 import typing_extensions
@@ -28,6 +29,10 @@ class Domain(ABC):
     def __iter__(self):
         pass
 
+    @abstractmethod
+    def __len__(self):
+        pass
+
 
 @dataclass(frozen=True)
 class SeqDomain(Domain):
@@ -38,6 +43,9 @@ class SeqDomain(Domain):
 
     def __iter__(self):
         return iter(self.range)
+
+    def __len__(self):
+        return len(self.range)
 
     def __repr__(self):
         return f"Domain[{self.range}]"
@@ -54,6 +62,9 @@ class SeqDomain(Domain):
 class _OpenDomain(Domain):
     def __iter__(self):
         raise ValueError("cannot iterate over open domain")
+
+    def __len__(self):
+        raise ValueError("no size for open domain")
 
 
 OPEN_DOMAIN = _OpenDomain()
@@ -123,7 +134,7 @@ class VarUsage(Enum):
 #
 
 
-class Variable(ABC):
+class VarBase(ABC):
     """
     Represents a set of variables arranged in an n-dimensional grid. Each
     variable includes a placeholder for a value, an indicator for how the
@@ -169,17 +180,45 @@ class Variable(ABC):
        those could, in principle, be accessible via the resulting factor graph.
     """
 
-    @abstractproperty
+    @property
     def tensor(self) -> Tensor:
-        pass  # raise ValueError("Unsupported Operation")
+        return self._get_tensor()
+
+    @tensor.setter
+    def tensor(self, value: Tensor):
+        self._set_tensor(value)
 
     @property
-    def type(self) -> Tensor:
-        pass  # raise ValueError("Unsupported Operation")
+    def usage(self) -> Tensor:
+        return self._get_usage()
+
+    @usage.setter
+    def usage(self, value: Union[Tensor, VarUsage]):
+        self._set_usage(value)
 
     @property
     def domain(self) -> Domain:
-        pass  # raise ValueError("Unsupported Operation")
+        return self._get_domain()
+
+    @abstractmethod
+    def _get_tensor(self) -> Tensor:
+        pass
+
+    @abstractmethod
+    def _set_tensor(self, value: Tensor):
+        pass
+
+    @abstractmethod
+    def _get_usage(self) -> Tensor:
+        pass
+
+    @abstractmethod
+    def _set_usage(self, value: Union[Tensor, VarUsage]):
+        pass
+
+    @abstractmethod
+    def _get_domain(self) -> Domain:
+        pass
 
 
 def compose_single(lhs: SliceType, rhs: SliceType, length: int):
@@ -201,25 +240,31 @@ def compose(shape: ShapeType, first: NDSlice, second: NDSlice):
     return tuple(out)
 
 
-class VarBranch(Variable):
+class VarBranch(VarBase):
 
-    def __init__(self, root: 'VarTensor', ndslice: NDSlice):
+    def __init__(self, root: 'Var', ndslice: NDSlice):
         self.root = root
         self.ndslice = ndslice
 
-    def __getitem__(self, ndslice: NDSlice) -> 'Variable':
+    def __getitem__(self, ndslice: NDSlice) -> 'VarBase':
         return VarBranch(self.root, compose(self.root.tensor.shape, self.ndslice, ndslice))
 
-    @property
-    def tensor(self):
+    def _get_tensor(self) -> Tensor:
         return self.root.tensor[self.ndslice]
 
-    @property
-    def type(self):
-        return self.root.type[self.ndslice]
+    def _set_tensor(self, value: Tensor):
+        self.root.tensor[self.ndslice] = value
 
-    @property
-    def domain(self):
+    def _get_usage(self) -> Tensor:
+        return self.root.usage[self.ndslice]
+
+    def _set_usage(self, value: Union[Tensor, VarUsage]):
+        if isinstance(value, VarUsage):
+            self.usage = torch.full_like(self.tensor, value.value)
+        else:
+            self.root.usage[self.ndslice] = cast(Tensor, value)
+
+    def _get_domain(self) -> Domain:
         return self.root.domain
 
     def __eq__(self, other) -> bool:
@@ -232,7 +277,7 @@ class VarBranch(Variable):
         return hash(self.hash_key())
 
 
-class VarTensor(Variable):
+class Var(VarBase):
     """
     Represents a tensor wrapped with domain and usage information.
 
@@ -243,40 +288,49 @@ class VarTensor(Variable):
 
     """
 
-    @singledispatchmethod # type: ignore[misc]
+    @singledispatchmethod  # type: ignore[misc]
     def __init__(self, domain: Domain = OPEN_DOMAIN,
                  usage: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED,
                  tensor: Optional[Tensor] = None,
                  info: typing_extensions._AnnotatedAlias = None):
-        self._tensor = tensor
+        if tensor is not None:
+            self.tensor = tensor
         self._domain = domain
-        if tensor is not None and usage is not None and isinstance(usage, VarUsage):
-            usage = torch.full_like(self.tensor, usage.value)
-        self._usage: Optional[Tensor] = cast(Optional[Tensor], usage)
+        if tensor is not None:
+            if usage is not None and isinstance(usage, VarUsage):
+                usage = torch.full_like(self.tensor, usage.value)
+            self._usage: Tensor = cast(Tensor, usage)
         self._info = info
 
     @__init__.register
     def from_tensor(self, tensor: Tensor, domain: Domain = OPEN_DOMAIN,
-          type: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED):
-        self.__init__(domain, type=type, tensor=tensor)
+                    usage: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED):
+        self.__init__(domain, usage=usage, tensor=tensor)  # type: ignore[misc]
 
     @__init__.register
-    def from_usage(self, type: VarUsage, domain: Domain = OPEN_DOMAIN, tensor: Optional[Tensor] = None):
-        self.__init__(domain, type=type, tensor=tensor)
+    def from_usage(self, usage: VarUsage, domain: Domain = OPEN_DOMAIN,
+                   tensor: Optional[Tensor] = None):
+        self.__init__(domain, usage=usage, tensor=tensor)  # type: ignore[misc]
 
-    def __getitem__(self, ndslice: NDSlice) -> Variable:
+    def __getitem__(self, ndslice: NDSlice) -> VarBase:
         return VarBranch(root=self, ndslice=ndslice)
 
-    @property
-    def tensor(self):
+    def _get_tensor(self) -> Tensor:
         return self._tensor
 
-    @property
-    def type(self):
+    def _set_tensor(self, value: Tensor):
+        self._tensor = value
+
+    def _get_usage(self) -> Tensor:
         return self._usage
 
-    @property
-    def domain(self):
+    def _set_usage(self, value: Union[Tensor, VarUsage]):
+        if isinstance(value, VarUsage):
+            self._usage = torch.full_like(self.tensor, value.value)
+        else:
+            self._usage = cast(Tensor, value)
+
+    def _get_domain(self) -> Domain:
         return self._domain
 
 
@@ -310,7 +364,7 @@ class Factor(Factors):
     @abstractmethod
     def log_einsum(self,
                    others: Sequence['DensableFactor'],
-                   queries: Sequence[Tuple[Variable, ...]]) -> Sequence[Tensor]:
+                   queries: Sequence[Tuple[VarBase, ...]]) -> Sequence[Tensor]:
         pass
 
 
@@ -322,7 +376,7 @@ class DensableFactor(Factor):
 
     def log_einsum(self,
                    others: Sequence['DensableFactor'],
-                   queries: Sequence[Tuple[Variable, ...]]) -> Sequence[Tensor]:
+                   queries: Sequence[Tuple[VarBase, ...]]) -> Sequence[Tensor]:
         # eq = compile_equation([self.variables] + [f.variables for f in others], queries)
         # return log_einsum(eq, [f.dense() for f in others])
         pass
@@ -378,7 +432,7 @@ class Model(Generic[T]):
         self._modules = ModuleDict()
 
     def domain(self, key: Hashable) -> Domain:
-        return self._domains.setdefault(key, Domain([]))
+        return self._domains.setdefault(key, SeqDomain([]))
 
     def params(self, key) -> ParamNamespace:
         return ParamNamespace(self, key)
@@ -406,31 +460,62 @@ class Model(Generic[T]):
         return list(self.factors(subject))
 
 
-@singledispatch
-def subject(stackable: bool = False):
-    def wrapped(cls: type):
-        cls = subject(cls)
-        # do other stuff
-        return cls
-    return wrapped
+# dataclass_transform worked for VSCode autocomplete without single dispatch, 
+# but didn't work with single dispatch nor was it recognized by mypy;
+# see:  
+#
+# _T = TypeVar("_T")
+
+# def __dataclass_transform__(
+#     *,
+#     eq_default: bool = True,
+#     order_default: bool = False,
+#     kw_only_default: bool = False,
+#     field_descriptors: Tuple[Union[type, Callable[..., Any]], ...] = (()),
+# ) -> Callable[[_T], _T]:
+#     # If used within a stub file, the following implementation can be
+#     # replaced with "...".
+#     return lambda a: a
+
+# # @singledispatch
+# # # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
+# # def subject(stackable: bool = False):
+# #     def wrapped(cls: type):
+# #         cls = subject(cls)
+# #         # do other stuff
+# #         return cls
+# #     return wrapped
 
 
-@subject.register
-def _(cls: type):
-    def post_init(self):
-        for k in dir(cls):
-            attr = getattr(cls, k)
-            if isinstance(attr, Variable):
-                property = cast(Variable, getattr(self, attr))
+# # @subject.register
+# # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
+# @__dataclass_transform__(order_default=True, field_descriptors=(Var,))
+# def subject(cls: type):
+#     setattr(cls, '__post_init__', Subject.init_variables)
+#     return dataclass(cls)
+
+
+class Subject:
+    @staticmethod
+    def init_variables(obj):
+        cls = type(obj)
+        for attr_name in dir(cls):
+            attr = getattr(cls, attr_name)
+            if isinstance(attr, Var):
+                property = cast(Var, getattr(obj, attr_name))
                 if property.tensor is None:
                     raise ValueError(
                         "need to specify an actual tensor for every variable in the subject")
                 if property.domain is OPEN_DOMAIN:
-                    property.domain = attr.domain
-                if property.type is None:
-                    property.type = torch.full_like(property.tensor, attr.type.value)
-    cls.__post_init__ = post_init
-    return dataclass(cls)
+                    property._domain = attr.domain
+                if property.usage is None:
+                    property.usage = torch.full_like(property.tensor, attr.usage.value)
+
+    def __post_init__(self):
+        Subject.init_variables(self)
+
+    def __init__(self):
+        print('hi')
 
 
 # def subject(cls):
@@ -461,7 +546,7 @@ def _(cls: type):
 
 @dataclass
 class LinearFactor(Factor):
-    variables: List[Variable]
+    variables: List[VarBase]
     params: ParamNamespace
     input: Tensor = torch.tensor([1.])
     bias: bool = True
