@@ -566,9 +566,13 @@ class FactorGraph:
     # TODO: handle queries that are not in the graph
     def query(self, *queries: Union[VarBase, Sequence[VarBase]],
               strategy=None, force_multi=False) -> Union[Sequence[Tensor], Tensor]:
+        if strategy is None:
+            strategy = BetheTree(self)
         if not queries:
             queries = ((),)
         # query_list = [(q,) if isinstance(q, VarBase) else q for q in queries]
+        bp = BPInference(self, strategy)
+        bp.run()
         responses: Sequence[Tensor] = []
         if len(responses) == 1 and not force_multi:
             return responses[0]
@@ -617,6 +621,15 @@ def BetheTree(graph: FactorGraph) -> Strategy:
             Region((variable_node,), 1 - len(graph.neighbors[variable_node]))
             for variable_node in graph.variable_nodes],
         edges=[(i, j) for i in range(graph.num_nodes) for j in graph.neighbors[i]])
+
+
+class BPInference:
+    def __init__(self, graph: FactorGraph, strategy: Strategy):
+        self.graph = FactorGraph
+        self.strategy = strategy
+
+    def run(self):
+        pass
 
 
 class Subject:
