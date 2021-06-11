@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from functools import lru_cache
+from itertools import chain
 from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, Iterator,
                     List, Optional, Sequence, Tuple, TypeVar, Union, cast)
 
@@ -427,6 +428,14 @@ class DensableFactor(Factor):
         return f
 
 
+@dataclass
+class TensorFactor(DensableFactor):
+    tensor: Tensor
+
+    def dense(self):
+        return self.tensor
+
+
 class ParamNamespace:
     """
     Corresponds to a particular model parameter or module which is associated
@@ -540,6 +549,10 @@ class Strategy(object):
     regions: List[Region]
     edges: List[Tuple[int, int]]
 
+    def __iter__(self) -> Iterator[Tuple[int, int]]:
+        # naive default for now is to pass everything twice
+        return iter(chain(self.edges, self.edges))
+
 
 class FactorGraph:
     def __init__(self, factors: List[Factor]):
@@ -625,11 +638,15 @@ def BetheTree(graph: FactorGraph) -> Strategy:
 
 class BPInference:
     def __init__(self, graph: FactorGraph, strategy: Strategy):
-        self.graph = FactorGraph
+        self.graph = graph
         self.strategy = strategy
+        # self.messages: List[TensorFactor] = [TensorFactor(
+        #     graph.
+        # )]
 
     def run(self):
-        pass
+        for s, t in self.strategy:
+            pass
 
 
 class Subject:
@@ -684,7 +701,6 @@ class Subject:
 
 @dataclass
 class LinearFactor(DensableFactor):
-    variables: List[VarBase]
     params: ParamNamespace
     input: Tensor = torch.tensor([1.])
     bias: bool = True
