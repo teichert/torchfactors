@@ -378,10 +378,14 @@ class Factor(Factors):
         return [self]
 
     @abstractmethod
-    def log_einsum(self,
-                   others: Sequence['DensableFactor'],
-                   queries: Sequence[Tuple[VarBase, ...]]) -> Sequence[Tensor]:
+    def query(self, others: Sequence[Factors], *queries: Sequence[VarBase]):
+        # def log_einsum(self,
+        #                others: Sequence['DensableFactor'],
+        #                queries: Sequence[Tuple[VarBase, ...]]) -> Sequence[Tensor]:
         pass
+
+    def dense(self) -> Tensor:
+        raise NotImplementedError("don't know how to give a dense version of this")
 
 
 class DensableFactor(Factor):
@@ -390,11 +394,12 @@ class DensableFactor(Factor):
     def dense(self) -> Tensor:
         pass
 
-    def log_einsum(self,
-                   others: Sequence['DensableFactor'],
-                   queries: Sequence[Tuple[VarBase, ...]]) -> Sequence[Tensor]:
-        # eq = compile_equation([self.variables] + [f.variables for f in others], queries)
-        # return log_einsum(eq, [f.dense() for f in others])
+    def query(self, others: Sequence[Factors], *queries: Sequence[VarBase]):
+        # def log_einsum(self,
+        #                others: Sequence['DensableFactor'],
+        #                queries: Sequence[Tuple[VarBase, ...]]) -> Sequence[Tensor]:
+        #     # eq = compile_equation([self.variables] + [f.variables for f in others], queries)
+        #     # return log_einsum(eq, [f.dense() for f in others])
         pass
 
 
@@ -412,19 +417,19 @@ class ParamNamespace:
         return ParamNamespace(
             model=self.model, key=(self.key, key))
 
-    def cache_parameter(self, shape: ShapeType,
-                        initialization: Optional[Callable[[Tensor], None]]
-                        = torch.nn.init.kaiming_uniform_
-                        ) -> Tensor:
+    def parameter(self, shape: ShapeType,
+                  initialization: Optional[Callable[[Tensor], None]]
+                  = torch.nn.init.kaiming_uniform_
+                  ) -> Tensor:
         def gen_param():
             tensor = torch.zeros(shape)
             if initialization is not None:
                 initialization(tensor)
             return Parameter(tensor)
-        return self.model.get_param(self.key, check_shape=shape, default_factory=gen_param)
+        return self.model._get_param(self.key, check_shape=shape, default_factory=gen_param)
 
-    def cache_module(self, constructor: Optional[Callable[[], torch.nn.Module]] = None):
-        return self.model.get_module(self.key, default_factory=constructor)
+    def module(self, constructor: Optional[Callable[[], torch.nn.Module]] = None):
+        return self.model._get_module(self.key, default_factory=constructor)
 
 
 class Model(torch.nn.Module, Generic[T]):
@@ -439,7 +444,7 @@ class Model(torch.nn.Module, Generic[T]):
     def domain(self, key: Hashable) -> Domain:
         return self._model_domains.setdefault(key, SeqDomain([]))
 
-    def params(self, key) -> ParamNamespace:
+    def namespace(self, key) -> ParamNamespace:
         return ParamNamespace(self, key)
 
     def factors_from(self, factor_generator: Callable[[T], Iterable[Factor]]) -> None:
@@ -449,9 +454,9 @@ class Model(torch.nn.Module, Generic[T]):
         for gen in self._model_factor_generators:
             yield from gen(subject)
 
-    def get_param(self, key: Hashable, check_shape: Optional[ShapeType] = None,
-                  default_factory: Optional[Callable[[], Parameter]] = None
-                  ) -> Parameter:
+    def _get_param(self, key: Hashable, check_shape: Optional[ShapeType] = None,
+                   default_factory: Optional[Callable[[], Parameter]] = None
+                   ) -> Parameter:
         repr = f'{key}:{hash(key)}'
         if repr in self._model_modules:
             raise KeyError(
@@ -478,9 +483,9 @@ class Model(torch.nn.Module, Generic[T]):
     #         raise ValueError(f"This key has already been used!: {repr}")
     #     self._model_parameters[repr] = value
 
-    def get_module(self, key: Hashable,
-                   default_factory: Optional[Callable[[], Module]] = None
-                   ) -> Module:
+    def _get_module(self, key: Hashable,
+                    default_factory: Optional[Callable[[], Module]] = None
+                    ) -> Module:
         repr = f'{key}:{hash(key)}'
         if repr in self._model_parameters:
             raise KeyError(
@@ -500,39 +505,47 @@ class Model(torch.nn.Module, Generic[T]):
         return list(self.factors(subject))
 
 
-# dataclass_transform worked for VSCode autocomplete without single dispatch,
-# but didn't work with single dispatch nor was it recognized by mypy;
-# see:
-#
-# _T = TypeVar("_T")
+class FactorGraph:
+    def __init__(self, factors: List[Factor]):
+        self. factors = factors
 
-# def __dataclass_transform__(
-#     *,
-#     eq_default: bool = True,
-#     order_default: bool = False,
-#     kw_only_default: bool = False,
-#     field_descriptors: Tuple[Union[type, Callable[..., Any]], ...] = (()),
-# ) -> Callable[[_T], _T]:
-#     # If used within a stub file, the following implementation can be
-#     # replaced with "...".
-#     return lambda a: a
+    def query(self, *groups: Sequence[VarBase], strategy=None) -> Sequence[Tensor]:
+        if not groups:
+            groups = ((),)
+        return []
 
-# # @singledispatch
-# # # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
-# # def subject(stackable: bool = False):
-# #     def wrapped(cls: type):
-# #         cls = subject(cls)
-# #         # do other stuff
-# #         return cls
-# #     return wrapped
+        # dataclass_transform worked for VSCode autocomplete without single dispatch,
+        # but didn't work with single dispatch nor was it recognized by mypy;
+        # see:
+        #
+        # _T = TypeVar("_T")
 
+        # def __dataclass_transform__(
+        #     *,
+        #     eq_default: bool = True,
+        #     order_default: bool = False,
+        #     kw_only_default: bool = False,
+        #     field_descriptors: Tuple[Union[type, Callable[..., Any]], ...] = (()),
+        # ) -> Callable[[_T], _T]:
+        #     # If used within a stub file, the following implementation can be
+        #     # replaced with "...".
+        #     return lambda a: a
 
-# # @subject.register
-# # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
-# @__dataclass_transform__(order_default=True, field_descriptors=(Var,))
-# def subject(cls: type):
-#     setattr(cls, '__post_init__', Subject.init_variables)
-#     return dataclass(cls)
+        # # @singledispatch
+        # # # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
+        # # def subject(stackable: bool = False):
+        # #     def wrapped(cls: type):
+        # #         cls = subject(cls)
+        # #         # do other stuff
+        # #         return cls
+        # #     return wrapped
+
+        # # @subject.register
+        # # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
+        # @__dataclass_transform__(order_default=True, field_descriptors=(Var,))
+        # def subject(cls: type):
+        #     setattr(cls, '__post_init__', Subject.init_variables)
+        #     return dataclass(cls)
 
 
 class Subject:
@@ -586,26 +599,24 @@ class Subject:
 
 
 @dataclass
-class LinearFactor(Factor):
+class LinearFactor(DensableFactor):
     variables: List[VarBase]
     params: ParamNamespace
     input: Tensor = torch.tensor([1.])
     bias: bool = True
     input_dimensions: int = 1
 
-    def log_einsum(self, equation):
-        pass
-
-    def compile_equation(self, others, queries):
-        return None
+    def query(self, others: Sequence[Factors], *queries: Sequence[VarBase]):
+        # going to do the naive thing
+        return []
 
     def dense(self) -> Tensor:
         """returns a dense version"""
         in_shapes = tuple(self.input.shape[-self.input_dimensions:])
         out_shapes = tuple([len(t.domain) for t in self.variables])
-        m = self.params.cache_module(lambda:
-                                     torch.nn.Linear(
-                                         in_features=math.prod(in_shapes),
-                                         out_features=math.prod(out_shapes),
-                                         bias=self.bias))
+        m = self.params.module(lambda:
+                               torch.nn.Linear(
+                                   in_features=math.prod(in_shapes),
+                                   out_features=math.prod(out_shapes),
+                                   bias=self.bias))
         return m(self.input)
