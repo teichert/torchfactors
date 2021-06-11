@@ -2,13 +2,13 @@ import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache, singledispatchmethod
+from functools import lru_cache
 from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, Iterator,
-                    List, Optional, Sequence, Tuple, TypeVar, Union,
-                    cast)
+                    List, Optional, Sequence, Tuple, TypeVar, Union, cast)
 
 import torch
 import typing_extensions
+from multimethod import multidispatch as overload
 from torch import Size, Tensor
 from torch.nn import Module, ModuleDict, ParameterDict
 from torch.nn.parameter import Parameter
@@ -288,7 +288,7 @@ class Var(VarBase):
 
     """
 
-    @singledispatchmethod  # type: ignore[misc]
+    @overload  # type: ignore[misc]
     def __init__(self, domain: Domain = OPEN_DOMAIN,
                  usage: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED,
                  tensor: Optional[Tensor] = None,
@@ -303,14 +303,30 @@ class Var(VarBase):
         self._info = info
 
     @__init__.register
-    def from_tensor(self, tensor: Tensor, domain: Domain = OPEN_DOMAIN,
-                    usage: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED):
-        self.__init__(domain, usage=usage, tensor=tensor)  # type: ignore[misc]
+    def _dom_tensor_usage(self, domain: Domain,
+                          tensor: Tensor,
+                          usage: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED):
+        self.__init__(domain, usage, tensor)  # type: ignore[misc]
 
     @__init__.register
-    def from_usage(self, usage: VarUsage, domain: Domain = OPEN_DOMAIN,
-                   tensor: Optional[Tensor] = None):
-        self.__init__(domain, usage=usage, tensor=tensor)  # type: ignore[misc]
+    def _tensor_dom_usage(self, tensor: Tensor, domain: Domain = OPEN_DOMAIN,
+                          usage: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED):
+        self.__init__(domain, usage, tensor)  # type: ignore[misc]
+
+    @__init__.register
+    def _tensor_usage_dom(self, tensor: Tensor, usage: Union[VarUsage, Tensor],
+                          domain: Domain = OPEN_DOMAIN):
+        self.__init__(domain, usage, tensor)  # type: ignore[misc]
+
+    @__init__.register
+    def _usage_dom_tensor(self, usage: VarUsage, domain: Domain = OPEN_DOMAIN,
+                          tensor: Optional[Tensor] = None):
+        self.__init__(domain, usage, tensor)  # type: ignore[misc]
+
+    @__init__.register
+    def _usage_tensor_dom(self, usage: VarUsage, tensor: Tensor,
+                          domain: Domain = OPEN_DOMAIN):
+        self.__init__(domain, usage, tensor)  # type: ignore[misc]
 
     def __getitem__(self, ndslice: NDSlice) -> VarBase:
         return VarBranch(root=self, ndslice=ndslice)
@@ -416,53 +432,53 @@ class ParamNamespace:
         return self.cached_parameter
 
     def cache_module(self, constructor: Callable[[], torch.nn.Module]):
-        if self.cached_module is not None:
-            return self.cached_module
-        else:
+        if self.cached_module is None:
             self.cached_module = constructor()
             self.model.set_module(self.key, self.cached_module)
+        return self.cached_module
 
 
-class Model(Generic[T]):
+class Model(torch.nn.Module, Generic[T]):
 
     def __init__(self):
-        self._factor_generators: List[Callable[[T], Iterable[Factor]]] = []
-        self._domains: Dict[Hashable, Domain] = {}
-        self._parameters = ParameterDict()
-        self._modules = ModuleDict()
+        super(Model, self).__init__()
+        self._model_factor_generators: List[Callable[[T], Iterable[Factor]]] = []
+        self._model_domains: Dict[Hashable, Domain] = {}
+        self._model_parameters = ParameterDict()
+        self._model_modules = ModuleDict()
 
     def domain(self, key: Hashable) -> Domain:
-        return self._domains.setdefault(key, SeqDomain([]))
+        return self._model_domains.setdefault(key, SeqDomain([]))
 
     def params(self, key) -> ParamNamespace:
         return ParamNamespace(self, key)
 
     def factors_from(self, factor_generator: Callable[[T], Iterable[Factor]]) -> None:
-        self._factor_generators.append(factor_generator)
+        self._model_factor_generators.append(factor_generator)
 
     def factors(self, subject: T) -> Iterable[Factor]:
-        for gen in self._factor_generators:
+        for gen in self._model_factor_generators:
             yield from gen(subject)
 
     def set_param(self, key: Hashable, value: Parameter, first=True) -> None:
         repr = f'{key}:{hash(key)}'
-        if first and repr in self._parameters:
+        if first and repr in self._model_parameters:
             raise ValueError(f"This key has already been used!: {repr}")
-        self._parameters[repr] = value
+        self._model_parameters[repr] = value
 
     def set_module(self, key: Hashable, value: Module, first=True) -> None:
         repr = f'{key}:{hash(key)}'
-        if first and repr in self._modules:
+        if first and repr in self._model_modules:
             raise ValueError(f"This key has already been used!: {repr}")
-        self._modules[repr] = value
+        self._model_modules[repr] = value
 
     def __call__(self, subject: T) -> List[Factor]:
         return list(self.factors(subject))
 
 
-# dataclass_transform worked for VSCode autocomplete without single dispatch, 
+# dataclass_transform worked for VSCode autocomplete without single dispatch,
 # but didn't work with single dispatch nor was it recognized by mypy;
-# see:  
+# see:
 #
 # _T = TypeVar("_T")
 
@@ -514,8 +530,9 @@ class Subject:
     def __post_init__(self):
         Subject.init_variables(self)
 
-    def __init__(self):
-        print('hi')
+    def __init__(self, *args, **kwargs):
+        raise ValueError(
+            "shouldn't call this initializer: subclass Subject and use @dataclass decorator")
 
 
 # def subject(cls):
@@ -558,7 +575,6 @@ class LinearFactor(Factor):
     def compile_equation(self, others, queries):
         return None
 
-    @cache
     def dense(self) -> Tensor:
         """returns a dense version"""
         in_shapes = tuple(self.input.shape[-self.input_dimensions:])

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 
@@ -26,6 +27,11 @@ class MyModel(tx.Model[Utterance]):
 
 
 u = Utterance(items=tx.Var(torch.ones(10)))
-print(u.items)
+model = MyModel()
+grounded = model(u)
+for t in grounded:
+    print(cast(tx.DensableFactor, t).dense())
+print(list(model.parameters()))
+print('hi')
 # u2 = Utterance2(items=tx.VarTensor(torch.ones(10)))
 # print(u2.items)
