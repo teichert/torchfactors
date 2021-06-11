@@ -13,6 +13,8 @@ from torch import Size, Tensor
 from torch.nn import Module, ModuleDict, ParameterDict
 from torch.nn.parameter import Parameter
 
+from torchfactors import einsum
+
 cache = lru_cache(maxsize=None)
 
 FULL_SLICE = slice(None, None, None)
@@ -188,13 +190,13 @@ class VarBase(ABC):
     def tensor(self, value: Tensor):
         self._set_tensor(value)
 
-    @property
-    def usage(self) -> Tensor:
-        return self._get_usage()
+    # @property
+    # def usage(self) -> Tensor:
+    #     return self._get_usage()
 
-    @usage.setter
-    def usage(self, value: Union[Tensor, VarUsage]):
-        self._set_usage(value)
+    # @usage.setter
+    # def usage(self, value: Union[Tensor, VarUsage]):
+    #     self._set_usage(value)
 
     @property
     def domain(self) -> Domain:
@@ -219,6 +221,15 @@ class VarBase(ABC):
     @abstractmethod
     def _get_domain(self) -> Domain:
         pass
+
+    def _get_usage_(self) -> Tensor:
+        return self._get_usage()
+
+    def _set_usage_(self, value: Union[Tensor, VarUsage]):
+        self._set_usage(value)
+
+    # I wasn't allowed to make property from abstract methods
+    usage = property(_get_usage_, _set_usage_)
 
 
 def compose_single(lhs: SliceType, rhs: SliceType, length: int):
@@ -364,7 +375,8 @@ class Factors(ABC, Iterable['Factor']):
         pass
 
 
-class Factor(Factors):
+@dataclass
+class Factor:
     r"""
     A Factor has a domain which is defined by the set of variables it is
     concerned with. It is a function from any configuration of those variables
@@ -373,16 +385,23 @@ class Factor(Factors):
     factor need to know how to answer queries given other "denseable" factors
     as input and a set of (einsum style) queries to respond to.
     """
+    variables: List[VarBase]
 
-    def factors(self):
-        return [self]
+    def __iter__(self) -> Iterator[VarBase]:
+        return iter(self.variables)
 
-    @abstractmethod
-    def query(self, others: Sequence[Factors], *queries: Sequence[VarBase]):
-        # def log_einsum(self,
-        #                others: Sequence['DensableFactor'],
-        #                queries: Sequence[Tuple[VarBase, ...]]) -> Sequence[Tensor]:
-        pass
+    def __len__(self) -> int:
+        return len(self.variables)
+
+    def query(self, others: Sequence['Factor'], *queries: Sequence[VarBase]
+              ) -> Sequence[Tensor]:
+        return self.queryf([f.variables for f in others], *queries)(
+            others)
+
+    # @abstractmethod
+    def queryf(self, others: Sequence[Sequence[VarBase]], *queries: Sequence[VarBase]
+               ) -> Callable[[Sequence['Factor']], Sequence[Tensor]]:
+        raise NotImplementedError("don't know how to do queries on this")
 
     def dense(self) -> Tensor:
         raise NotImplementedError("don't know how to give a dense version of this")
@@ -394,13 +413,18 @@ class DensableFactor(Factor):
     def dense(self) -> Tensor:
         pass
 
-    def query(self, others: Sequence[Factors], *queries: Sequence[VarBase]):
-        # def log_einsum(self,
-        #                others: Sequence['DensableFactor'],
-        #                queries: Sequence[Tuple[VarBase, ...]]) -> Sequence[Tensor]:
-        #     # eq = compile_equation([self.variables] + [f.variables for f in others], queries)
-        #     # return log_einsum(eq, [f.dense() for f in others])
-        pass
+    def queryf(self, others: Sequence[Sequence[VarBase]], *queries: Sequence[VarBase]
+               ) -> Callable[[Sequence[Factor]], Sequence[Tensor]]:
+        equation = einsum.compile_generic_equation(cast(List[Sequence[VarBase]], [self.variables]) +
+                                                   list(others),
+                                                   queries, force_multi=True)
+
+        def f(others: Sequence[Factor]) -> Sequence[Tensor]:
+            # might be able to pull this out, but I want to make
+            # sure that changes in e.g. usage are reflected
+            dense = [self.dense()]
+            return einsum.log_einsum(equation, dense + [f.dense() for f in others])
+        return f
 
 
 class ParamNamespace:
@@ -505,14 +529,50 @@ class Model(torch.nn.Module, Generic[T]):
         return list(self.factors(subject))
 
 
+@dataclass
+class Region(object):
+    factor_graph_nodes: Tuple[int, ...]
+    counting_number: float
+
+
+@dataclass
+class Strategy(object):
+    regions: List[Region]
+    edges: List[Tuple[int, int]]
+
+
 class FactorGraph:
     def __init__(self, factors: List[Factor]):
-        self. factors = factors
+        self.factors = factors
+        num_factors = len(factors)
+        variables = list(set(v for factor in factors for v in factor))
+        # self.nodes = list(factors) + variables
+        self.num_nodes = len(factors) + len(variables)
+        self.factor_nodes = range(num_factors)
+        self.variable_nodes = range(num_factors, self.num_nodes)
+        self.varids = dict((v, num_factors + varid) for varid, v in enumerate(variables))
+        self.neighbors: List[List[int]] = [list() for _ in range(self.num_nodes)]
+        self.num_edges = 0
+        for factorid, factor in enumerate(factors):
+            self.num_edges += len(factor)
+            for v in factor:
+                varid = self.varids[v]
+                self.neighbors[factorid].append(varid)
+                self.neighbors[varid].append(factorid)
 
-    def query(self, *groups: Sequence[VarBase], strategy=None) -> Sequence[Tensor]:
-        if not groups:
-            groups = ((),)
-        return []
+    def __iter__(self) -> Iterator[Factor]:
+        return iter(self.factors)
+
+    # TODO: handle queries that are not in the graph
+    def query(self, *queries: Union[VarBase, Sequence[VarBase]],
+              strategy=None, force_multi=False) -> Union[Sequence[Tensor], Tensor]:
+        if not queries:
+            queries = ((),)
+        # query_list = [(q,) if isinstance(q, VarBase) else q for q in queries]
+        responses: Sequence[Tensor] = []
+        if len(responses) == 1 and not force_multi:
+            return responses[0]
+        return responses
 
         # dataclass_transform worked for VSCode autocomplete without single dispatch,
         # but didn't work with single dispatch nor was it recognized by mypy;
@@ -546,6 +606,17 @@ class FactorGraph:
         # def subject(cls: type):
         #     setattr(cls, '__post_init__', Subject.init_variables)
         #     return dataclass(cls)
+
+
+def BetheTree(graph: FactorGraph) -> Strategy:
+    # TODO: add in blank factors for queries if necessary
+    return Strategy(
+        regions=[
+            Region((factor_node, *graph.neighbors[factor_node]), 1.0)
+            for factor_node in graph.factor_nodes] + [
+            Region((variable_node,), 1 - len(graph.neighbors[variable_node]))
+            for variable_node in graph.variable_nodes],
+        edges=[(i, j) for i in range(graph.num_nodes) for j in graph.neighbors[i]])
 
 
 class Subject:
@@ -605,10 +676,6 @@ class LinearFactor(DensableFactor):
     input: Tensor = torch.tensor([1.])
     bias: bool = True
     input_dimensions: int = 1
-
-    def query(self, others: Sequence[Factors], *queries: Sequence[VarBase]):
-        # going to do the naive thing
-        return []
 
     def dense(self) -> Tensor:
         """returns a dense version"""

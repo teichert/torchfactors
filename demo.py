@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import torch
 
 import torchfactors as tx
 
@@ -20,19 +21,19 @@ class MyModel(tx.Model[Utterance]):
             yield tx.LinearFactor([hidden[i], items[i]], self.namespace('emission'))
 
 
-# u = Utterance(items=tx.Var(torch.ones(10)))
-# model = MyModel()
-# grounded = tx.FactorGraph(model(u))
-# u.items[[3, 4, 5]].usage = tx.VarUsage.CLAMPED
-# u.items[[3, 4, 5]].usage = tx.VarUsage.ANNOTATED
-# grounded.query()
-# # logz = log_einsum(grounded, [()])
-# # all_log_probs = log_einsum(grounded, u.items)
-# # one_log_probs = log_einsum(grounded, u.items[0])
+u = Utterance(items=tx.Var(torch.ones(10)))
+model = MyModel()
+grounded = tx.FactorGraph(model(u))
+u.items[[3, 4, 5]].usage = tx.VarUsage.CLAMPED
+u.items[[3, 4, 5]].usage = tx.VarUsage.ANNOTATED
+grounded.query()
+# logz = log_einsum(grounded, [()])
+# all_log_probs = log_einsum(grounded, u.items)
+# one_log_probs = log_einsum(grounded, u.items[0])
 
-# grounded2 = model(u)
-# print((list(grounded)[0].dense() == list(grounded2)[0].dense()).all())
-# # print(list(model.parameters()))
-# print('hi')
-# # u2 = Utterance2(items=tx.VarTensor(torch.ones(10)))
-# # print(u2.items)
+grounded2 = model(u)
+print((list(grounded)[0].dense() == list(grounded2)[0].dense()).all())
+# print(list(model.parameters()))
+print('hi')
+# u2 = Utterance2(items=tx.VarTensor(torch.ones(10)))
+# print(u2.items)
