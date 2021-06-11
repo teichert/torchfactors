@@ -407,35 +407,24 @@ class ParamNamespace:
     def __init__(self, model: 'Model', key: Hashable):
         self.model = model
         self.key = key
-        self.cached_parameter: Optional[Parameter] = None
-        self.cached_module: Optional[torch.nn.Module] = None
 
     def namespace(self, key: Hashable) -> 'ParamNamespace':
         return ParamNamespace(
             model=self.model, key=(self.key, key))
 
     def cache_parameter(self, shape: ShapeType,
-                        initialization: Optional[Callable[[Tensor], None]] = None) -> Tensor:
-        if self.cached_module is not None:
-            raise ValueError("already cached a model in this namespace")
-        elif self.cached_parameter is not None:
-            if self.cached_parameter.shape != shape:
-                raise ValueError(
-                    "already cached a parameter with different shape in this namespace")
-            else:
-                return self.cached_parameter
-        tensor = torch.zeros(shape)
-        if initialization is not None:
-            initialization(tensor)
-        self.cached_parameter = Parameter(tensor)
-        self.model.set_param(self.key, self.cached_parameter)
-        return self.cached_parameter
+                        initialization: Optional[Callable[[Tensor], None]]
+                        = torch.nn.init.kaiming_uniform_
+                        ) -> Tensor:
+        def gen_param():
+            tensor = torch.zeros(shape)
+            if initialization is not None:
+                initialization(tensor)
+            return Parameter(tensor)
+        return self.model.get_param(self.key, check_shape=shape, default_factory=gen_param)
 
-    def cache_module(self, constructor: Callable[[], torch.nn.Module]):
-        if self.cached_module is None:
-            self.cached_module = constructor()
-            self.model.set_module(self.key, self.cached_module)
-        return self.cached_module
+    def cache_module(self, constructor: Optional[Callable[[], torch.nn.Module]] = None):
+        return self.model.get_module(self.key, default_factory=constructor)
 
 
 class Model(torch.nn.Module, Generic[T]):
@@ -460,17 +449,52 @@ class Model(torch.nn.Module, Generic[T]):
         for gen in self._model_factor_generators:
             yield from gen(subject)
 
-    def set_param(self, key: Hashable, value: Parameter, first=True) -> None:
+    def get_param(self, key: Hashable, check_shape: Optional[ShapeType] = None,
+                  default_factory: Optional[Callable[[], Parameter]] = None
+                  ) -> Parameter:
         repr = f'{key}:{hash(key)}'
-        if first and repr in self._model_parameters:
-            raise ValueError(f"This key has already been used!: {repr}")
-        self._model_parameters[repr] = value
+        if repr in self._model_modules:
+            raise KeyError(
+                "trying to get a parameter with a key "
+                f"already used for a module: {repr}")
+        if repr not in self._model_parameters:
+            if default_factory is not None:
+                param = default_factory()
+                self._model_parameters[repr] = param
+                return param
+            else:
+                raise KeyError("no param at that key and no default factory given")
+        else:
+            param = self._model_parameters[repr]
+            if check_shape is not None and check_shape != param.shape:
+                raise ValueError(
+                    f"This key has already been used with different shape: "
+                    f"{check_shape} vs {param.shape}")
+            return param
 
-    def set_module(self, key: Hashable, value: Module, first=True) -> None:
+    # def set_param(self, key: Hashable, value: Parameter, first=True) -> None:
+    #     repr = f'{key}:{hash(key)}'
+    #     if first and repr in self._model_parameters:
+    #         raise ValueError(f"This key has already been used!: {repr}")
+    #     self._model_parameters[repr] = value
+
+    def get_module(self, key: Hashable,
+                   default_factory: Optional[Callable[[], Module]] = None
+                   ) -> Module:
         repr = f'{key}:{hash(key)}'
-        if first and repr in self._model_modules:
-            raise ValueError(f"This key has already been used!: {repr}")
-        self._model_modules[repr] = value
+        if repr in self._model_parameters:
+            raise KeyError(
+                "trying to get a module with a key "
+                f"already used for a paramter: {repr}")
+        if repr not in self._model_modules:
+            if default_factory is not None:
+                module = default_factory()
+                self._model_modules[repr] = module
+                return module
+            else:
+                raise KeyError("no module at that key and no default factory given")
+        else:
+            return self._model_modules[repr]
 
     def __call__(self, subject: T) -> List[Factor]:
         return list(self.factors(subject))
