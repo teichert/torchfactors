@@ -2,7 +2,7 @@ import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from itertools import chain
 from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, Iterator,
                     List, Optional, Sequence, Tuple, TypeVar, Union, cast)
@@ -538,32 +538,20 @@ class Model(torch.nn.Module, Generic[T]):
         return list(self.factors(subject))
 
 
-@dataclass
-class Region(object):
-    factor_graph_nodes: Tuple[int, ...]
-    counting_number: float
-
-
-@dataclass
-class Strategy(object):
-    regions: List[Region]
-    edges: List[Tuple[int, int]]
-
-    def __iter__(self) -> Iterator[Tuple[int, int]]:
-        # naive default for now is to pass everything twice
-        return iter(chain(self.edges, self.edges))
-
-
 class FactorGraph:
+    """
+    """
+
     def __init__(self, factors: List[Factor]):
+        # factors come first, then variables
         self.factors = factors
-        num_factors = len(factors)
-        variables = list(set(v for factor in factors for v in factor))
+        self.num_factors = len(factors)
+        self.variables = list(set(v for factor in factors for v in factor))
         # self.nodes = list(factors) + variables
         self.num_nodes = len(factors) + len(variables)
-        self.factor_nodes = range(num_factors)
-        self.variable_nodes = range(num_factors, self.num_nodes)
-        self.varids = dict((v, num_factors + varid) for varid, v in enumerate(variables))
+        self.factor_nodes = range(self.num_factors)
+        self.variable_nodes = range(self.num_factors, self.num_nodes)
+        self.varids = dict((v, self.num_factors + varid) for varid, v in enumerate(self.variables))
         self.neighbors: List[List[int]] = [list() for _ in range(self.num_nodes)]
         self.num_edges = 0
         for factorid, factor in enumerate(factors):
@@ -575,6 +563,33 @@ class FactorGraph:
 
     def __iter__(self) -> Iterator[Factor]:
         return iter(self.factors)
+
+    def full_region(self, node_ids: Sequence[int]
+                    ) -> List[int]:
+        return list(set([
+            node_id
+            for node_id in node_ids
+            if node_id >= self.num_factors
+        ] + [
+            v
+            for node_id in node_ids if node_id < self.num_factors
+            for v in self.neighbors[node_id]
+        ]))
+
+    def region_factors(self, node_ids: Sequence[int]
+                       ) -> List[Factor]:
+        return [
+            self.factors[node_id]
+            for node_id in node_ids
+            if node_id < self.num_factors
+        ]
+
+    def region_variables(self, node_ids: Sequence[int]
+                         ) -> List[VarBase]:
+        return [
+            self.variables[node_id - self.num_factors]
+            for node_id in self.full_region(node_ids)
+        ]
 
     # TODO: handle queries that are not in the graph
     def query(self, *queries: Union[VarBase, Sequence[VarBase]],
@@ -625,6 +640,34 @@ class FactorGraph:
         #     return dataclass(cls)
 
 
+@dataclass
+class Region(object):
+    factor_graph: FactorGraph
+    factor_graph_nodes: Tuple[int, ...]
+    counting_number: float
+
+    @cached_property
+    def variables(self) -> Sequence[VarBase]:
+        return self.factor_graph.region_variables(self.factor_graph_nodes)
+
+    @cached_property
+    def factors(self) -> Sequence[Factor]:
+        return self.factor_graph.region_factors(self.factor_graph_nodes)
+
+
+@dataclass
+class Strategy(object):
+    regions: List[Region]
+    edges: List[Tuple[int, int]]
+
+    def __iter__(self) -> Iterator[Tuple[int, int]]:
+        # naive default for now is to pass everything twice
+        return iter(chain(self.edges, self.edges))
+
+    # def __post_init__(self):
+    #     self.
+
+
 def BetheTree(graph: FactorGraph) -> Strategy:
     # TODO: add in blank factors for queries if necessary
     return Strategy(
@@ -640,9 +683,31 @@ class BPInference:
     def __init__(self, graph: FactorGraph, strategy: Strategy):
         self.graph = graph
         self.strategy = strategy
-        # self.messages: List[TensorFactor] = [TensorFactor(
-        #     graph.
-        # )]
+        # the message from one region to another will be a factor dealing with the
+        # variables of the target after excluding those of the source
+        #
+
+        self.messages: List[TensorFactor] = [
+
+        ]
+        # these will be the queryf functions
+        # self.message_functions: List[Callable[[Sequence[Factor]], Sequence[Factor]]] = []
+        self.update_message_functions: List[Callable[[], None]] = []
+        self.message_outputs: List[List[TensorFactor]] = []
+        self.message_inputs: List[List[Factor]] = []
+
+        )]
+        
+        
+    def update_messages_from_regionf(self, source: int, targets: List[int]
+                                     ) -> Callable[[Sequence['Factor']], Sequence[Tensor]]:
+        r"""
+        we are going to multiply everything in and then divide out?
+        returns a function that will take in factors and return the tensors corresponding
+        to the cavity
+        """
+        raise NotImplementedError("don't know how to do queries on this")
+
 
     def run(self):
         for s, t in self.strategy:
@@ -650,20 +715,20 @@ class BPInference:
 
 
 class Subject:
-    @staticmethod
+    @ staticmethod
     def init_variables(obj):
-        cls = type(obj)
+        cls=type(obj)
         for attr_name in dir(cls):
-            attr = getattr(cls, attr_name)
+            attr=getattr(cls, attr_name)
             if isinstance(attr, Var):
-                property = cast(Var, getattr(obj, attr_name))
+                property=cast(Var, getattr(obj, attr_name))
                 if property.tensor is None:
                     raise ValueError(
                         "need to specify an actual tensor for every variable in the subject")
                 if property.domain is OPEN_DOMAIN:
-                    property._domain = attr.domain
+                    property._domain=attr.domain
                 if property.usage is None:
-                    property.usage = torch.full_like(property.tensor, attr.usage.value)
+                    property.usage=torch.full_like(property.tensor, attr.usage.value)
 
     def __post_init__(self):
         Subject.init_variables(self)
@@ -699,20 +764,20 @@ class Subject:
 #         pass
 
 
-@dataclass
+@ dataclass
 class LinearFactor(DensableFactor):
     params: ParamNamespace
-    input: Tensor = torch.tensor([1.])
-    bias: bool = True
-    input_dimensions: int = 1
+    input: Tensor=torch.tensor([1.])
+    bias: bool=True
+    input_dimensions: int=1
 
     def dense(self) -> Tensor:
         """returns a dense version"""
         in_shapes = tuple(self.input.shape[-self.input_dimensions:])
-        out_shapes = tuple([len(t.domain) for t in self.variables])
-        m = self.params.module(lambda:
+        out_shapes=tuple([len(t.domain) for t in self.variables])
+        m=self.params.module(lambda:
                                torch.nn.Linear(
-                                   in_features=math.prod(in_shapes),
-                                   out_features=math.prod(out_shapes),
-                                   bias=self.bias))
+                                   in_features = math.prod(in_shapes),
+                                   out_features = math.prod(out_shapes),
+                                   bias = self.bias))
         return m(self.input)
