@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property, lru_cache
 from itertools import chain
-from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, Iterator,
-                    List, Optional, Sequence, Tuple, TypeVar, Union, cast)
+from typing import (Any, Callable, Dict, FrozenSet, Generic, Hashable,
+                    Iterable, Iterator, List, Optional, Sequence, Tuple,
+                    TypeVar, Union, cast)
 
 import torch
 import typing_extensions
@@ -430,10 +431,15 @@ class DensableFactor(Factor):
 
 @dataclass
 class TensorFactor(DensableFactor):
-    tensor: Tensor
+    tensor: Tensor = None
 
     def dense(self):
         return self.tensor
+
+    def __post_init__(self):
+        if self.tensor is None:
+            self.tensor = torch.zeros(
+                *[len(v.domain) for v in self.variables])
 
 
 class ParamNamespace:
@@ -654,6 +660,26 @@ class Region(object):
     def factors(self) -> Sequence[Factor]:
         return self.factor_graph.region_factors(self.factor_graph_nodes)
 
+    @cached_property
+    def factor_set(self) -> FrozenSet[Factor]:
+        return frozenset(self.factors)
+
+    def queryf(self, others: Sequence[Factor], exclude: 'Region',
+               *queries: Sequence[VarBase]
+               ) -> Callable[[], Sequence[Tensor]]:
+        # factors appearing in the excluded region are excluded note that the
+        # first factor (in the region) touching the most variables determines
+        # how the inference is done (if this needs to be modified, then have
+        # your strategy create subclasses of region that override this behavior)
+        surviving_factors = list(self.factor_set - exclude.factor_set)
+        _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(surviving_factors))
+        input_factors = list(surviving_factors[:ix]) + list(surviving_factors[ix:]) + others
+        wrapped = controller.queryf([f.variables for f in input_factors], *queries)
+
+        def f():
+            return wrapped(input_factors)
+        return f
+
 
 @dataclass
 class Strategy(object):
@@ -664,8 +690,27 @@ class Strategy(object):
         # naive default for now is to pass everything twice
         return iter(chain(self.edges, self.edges))
 
-    # def __post_init__(self):
-    #     self.
+    def __post_init__(self):
+        self.into = [list() for _ in self.regions]
+        self.outfrom = [list() for _ in self.regions]
+        for s, t in self.edges:
+            # TODO: ensure that t is a strict subset of s
+            self.into[t].append(s)
+            self.outfrom[s].append(t)
+
+    @property
+    def reachable_from(self, i) -> Iterable[int]:
+        yield i
+        for t in self.outfrom(i):
+            yield self.reachable_from(t)
+
+    @property
+    def penetrating_edges(self, i) -> Iterable[Tuple[int, int]]:
+        r"""
+        returns the set of edges s->t such that s is not reachable from i,
+        but t is. (i.e. the set of edges that poke into the region of i)
+        """
+        return [(s, t) for t in self.reachable_from(i) for s in self.into(t)]
 
 
 def BetheTree(graph: FactorGraph) -> Strategy:
@@ -686,49 +731,72 @@ class BPInference:
         # the message from one region to another will be a factor dealing with the
         # variables of the target after excluding those of the source
         #
-
-        self.messages: List[TensorFactor] = [
-
-        ]
+        self.messages: Dict[Tuple[int, int], TensorFactor] = {}
         # these will be the queryf functions
         # self.message_functions: List[Callable[[Sequence[Factor]], Sequence[Factor]]] = []
-        self.update_message_functions: List[Callable[[], None]] = []
-        self.message_outputs: List[List[TensorFactor]] = []
-        self.message_inputs: List[List[Factor]] = []
+        # self.update_message_functions: List[Callable[[], None]] = []
+        # self.message_outputs: List[List[TensorFactor]] = []
+        # self.message_inputs: List[List[Factor]] = []
+        # )]
 
-        )]
-        
-        
-    def update_messages_from_regionf(self, source: int, targets: List[int]
-                                     ) -> Callable[[Sequence['Factor']], Sequence[Tensor]]:
-        r"""
-        we are going to multiply everything in and then divide out?
-        returns a function that will take in factors and return the tensors corresponding
-        to the cavity
-        """
-        raise NotImplementedError("don't know how to do queries on this")
+    def message(self, key: Tuple[int, int]) -> TensorFactor:
+        try:
+            return self.messages[key]
+        except KeyError:
+            _, t = key
+            return self.messages.setdefault(key, TensorFactor([self.strategy.regions[t].variables]))
 
+    @ cache
+    def update_messages_from_regionf(self, source_id: int, target_ids: Tuple[int, ...]
+                                     ) -> Callable[[], None]:
+        source = self.strategy.regions[source_id]
+        targets = [self.strategy.regions[target_id] for target_id in target_ids]
+        out_messages = [self.messages[source_id, target_id] for target_id in target_ids]
+
+        pokes_s = self.strategy.penetrating_edges(source_id)
+        set_pokes_s = set(pokes_s)
+
+        in_messages = [self.messages[m] for m in pokes_s]
+        compute_numerators = source.queryf(in_messages, *[out.variables for out in out_messages])
+
+        divide_out_messages = [
+            [self.messages[m]
+                for m in self.strategy.penetrating_edges(target_id) if m not in set_pokes_s]
+            for target_id in target_ids
+        ]
+        compute_denominators = [target.queryf(terms + [out], source, out.variables)
+                                for target, out, terms in zip(targets, divide_out_messages, out_messages)]
+
+        # I want to cache the setup here, but I want it to be flexible??
+        def f():
+            # compute numerators
+            numerators = compute_numerators()
+            for numerator, out, compute_denominator, terms in zip(
+                    numerators, out_messages, compute_denominators):
+                denominator = compute_denominator()
+                out.tensor = numerator.tensor / (out.tensor * denominator.tensor)
+        return f
 
     def run(self):
-        for s, t in self.strategy:
-            pass
+        for s, ts in self.strategy:
+            self.update_messages_from_regionf(s, tuple(ts))()
 
 
 class Subject:
     @ staticmethod
     def init_variables(obj):
-        cls=type(obj)
+        cls = type(obj)
         for attr_name in dir(cls):
-            attr=getattr(cls, attr_name)
+            attr = getattr(cls, attr_name)
             if isinstance(attr, Var):
-                property=cast(Var, getattr(obj, attr_name))
+                property = cast(Var, getattr(obj, attr_name))
                 if property.tensor is None:
                     raise ValueError(
                         "need to specify an actual tensor for every variable in the subject")
                 if property.domain is OPEN_DOMAIN:
-                    property._domain=attr.domain
+                    property._domain = attr.domain
                 if property.usage is None:
-                    property.usage=torch.full_like(property.tensor, attr.usage.value)
+                    property.usage = torch.full_like(property.tensor, attr.usage.value)
 
     def __post_init__(self):
         Subject.init_variables(self)
@@ -767,17 +835,17 @@ class Subject:
 @ dataclass
 class LinearFactor(DensableFactor):
     params: ParamNamespace
-    input: Tensor=torch.tensor([1.])
-    bias: bool=True
-    input_dimensions: int=1
+    input: Tensor = torch.tensor([1.])
+    bias: bool = True
+    input_dimensions: int = 1
 
     def dense(self) -> Tensor:
         """returns a dense version"""
         in_shapes = tuple(self.input.shape[-self.input_dimensions:])
-        out_shapes=tuple([len(t.domain) for t in self.variables])
-        m=self.params.module(lambda:
+        out_shapes = tuple([len(t.domain) for t in self.variables])
+        m = self.params.module(lambda:
                                torch.nn.Linear(
-                                   in_features = math.prod(in_shapes),
-                                   out_features = math.prod(out_shapes),
-                                   bias = self.bias))
+                                   in_features=math.prod(in_shapes),
+                                   out_features=math.prod(out_shapes),
+                                   bias=self.bias))
         return m(self.input)
