@@ -21,13 +21,19 @@ class MyModel(tx.Model[Utterance]):
             yield tx.LinearFactor([hidden[i], items[i]], self.namespace('emission'))
 
 
-u = Utterance(items=tx.Var(torch.ones(10)))
+loader = Utterance.data_loader(batch_size=3, data=[
+    Utterance(items=tx.Var(torch.ones(n)))
+    for n in range(4, 10)
+])
 model = MyModel()
-grounded = tx.FactorGraph(model(u))
-u.items[[3, 4, 5]].usage = tx.VarUsage.CLAMPED
-u.items[[3, 4, 5]].usage = tx.VarUsage.ANNOTATED
-logz = grounded.query()
-print(logz)
+for u in loader:
+    grounded = tx.FactorGraph(model(u))
+    # u.items[[3, 4, 5]].usage = tx.VarUsage.CLAMPED
+    # u.items[[3, 4, 5]].usage = tx.VarUsage.ANNOTATED
+    u.clamp_annotated()
+    u.unclamp_annotated()
+    logz = grounded.query()
+    print(logz)
 # logz = log_einsum(grounded, [()])
 # all_log_probs = log_einsum(grounded, u.items)
 # one_log_probs = log_einsum(grounded, u.items[0])

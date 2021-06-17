@@ -1,12 +1,13 @@
+import copy
 import math
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import InitVar, dataclass, field, fields
 from enum import Enum
 from functools import cached_property, lru_cache
 from itertools import chain
-from typing import (Any, Callable, Dict, FrozenSet, Generic, Hashable,
-                    Iterable, Iterator, List, Optional, Sequence, Tuple,
-                    TypeVar, Union, cast)
+from typing import (Any, Callable, ClassVar, Dict, FrozenSet, Generic,
+                    Hashable, Iterable, Iterator, List, Optional, Sequence,
+                    Tuple, TypeVar, Union, cast)
 
 import torch
 import typing_extensions
@@ -14,6 +15,7 @@ from multimethod import multidispatch as overload
 from torch import Size, Tensor
 from torch.nn import Module, ModuleDict, ParameterDict
 from torch.nn.parameter import Parameter
+from torch.utils.data import DataLoader, Dataset
 
 from torchfactors import einsum
 
@@ -129,8 +131,10 @@ class VarUsage(Enum):
     # mode[observe] = CLAMPED
     # mode[observe] = LATENT
     # mode[observe] = ANNOTATED
-    CLAMPED = 2   # only current value should be used
-
+    # only current value should be used (but called clamped to make it easy to change back)
+    CLAMPED = 2
+    OBSERVED = 3  # should always be clamped
+    DEFAULT = OBSERVED
 
 # variables have a
 # tensor a reference to the base-most tensor; a variable
@@ -233,6 +237,12 @@ class VarBase(ABC):
     # I wasn't allowed to make property from abstract methods
     usage = property(_get_usage_, _set_usage_)
 
+    def clamp_annotated(self) -> None:
+        self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
+
+    def unclamp_annotated(self) -> None:
+        self.usage[self.usage == VarUsage.CLAMPED] = VarUsage.ANNOTATED
+
 
 def compose_single(lhs: SliceType, rhs: SliceType, length: int):
     out = range(length)[cast(slice, lhs)][rhs]
@@ -303,7 +313,7 @@ class Var(VarBase):
 
     @overload  # type: ignore[misc]
     def __init__(self, domain: Domain = OPEN_DOMAIN,
-                 usage: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED,
+                 usage: Union[VarUsage, Tensor, None] = VarUsage.DEFAULT,
                  tensor: Optional[Tensor] = None,
                  info: typing_extensions._AnnotatedAlias = None):
         if tensor is not None:
@@ -318,12 +328,12 @@ class Var(VarBase):
     @__init__.register
     def _dom_tensor_usage(self, domain: Domain,
                           tensor: Tensor,
-                          usage: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED):
+                          usage: Union[VarUsage, Tensor, None] = VarUsage.DEFAULT):
         self.__init__(domain, usage, tensor)  # type: ignore[misc]
 
     @__init__.register
     def _tensor_dom_usage(self, tensor: Tensor, domain: Domain = OPEN_DOMAIN,
-                          usage: Union[VarUsage, Tensor, None] = VarUsage.ANNOTATED):
+                          usage: Union[VarUsage, Tensor, None] = VarUsage.DEFAULT):
         self.__init__(domain, usage, tensor)  # type: ignore[misc]
 
     @__init__.register
@@ -361,6 +371,39 @@ class Var(VarBase):
 
     def _get_domain(self) -> Domain:
         return self._domain
+
+    @staticmethod
+    def pad_and_stack(batch: List['Var'], pad_value=float('nan')
+                      ) -> 'Var':
+        """
+        given a list of tensors with same number of dimensions but possibly different shapes returns:
+        (stacked, shapes) defined as follows:
+        stacked:
+        - a single Tensor
+        - `len(stacked.shape) == 1 + len(batch[0].shape)`
+        - `stacked.shape[0] == len(batch)`
+        - it is the result of:
+            1) padding all tensors in `batch` with `pad_value` out to the smallest shape that can contain each element of batch
+            2) stacking the resulting padded tensors
+        """
+        batch_size = len(batch)
+        first = batch[0]
+        first_tensor = first.tensor
+        dtype = first_tensor.dtype
+        shapes = torch.vstack([torch.tensor(x.shape) for x in batch])
+        max_shape = torch.max(shapes, 0).values
+        stacked_tensors = first_tensor.new_full(
+            (batch_size, *max_shape), fill_value=pad_value, dtype=dtype)
+        stacked_usages = first_tensor.new_full(
+            (batch_size, *max_shape), fill_value=VarUsage.PADDING, dtype=dtype)
+        # mask = first_tensor.new_full((batch_size, *max_shape), fill_value=False, dtype=torch.bool)
+        for i, x in enumerate(batch):
+            x_indexs = [slice(None, s) for s in x.tensor.shape]
+            stacked_tensors[[i, *x_indexs]] = x.tensor
+            stacked_usages[[i, *x_indexs]] = x.usage
+            # mask[[i, *x_indexs]] = tensor.new_ones(tensor.shape)
+        # Var(stacked, )
+        return Var(first.domain, tensor=stacked_tensors, usage=stacked_usages)
 
 
 class Factors(ABC, Iterable['Factor']):
@@ -405,15 +448,58 @@ class Factor:
                ) -> Callable[[Sequence['Factor']], Sequence[Tensor]]:
         raise NotImplementedError("don't know how to do queries on this")
 
+    def free_energy(self, other_energy: Sequence['Factor'], messages: Sequence['Factor']
+                    ) -> Tensor:
+        """
+        an estimate of the contribution of this factor to the -log z;
+        it is the entropy minus the average energy
+        under a distribution given by the normalized product of all energy
+        factors and all messages
+        """
+        raise NotImplementedError("don't know how to do queries on this")
+
     def dense(self) -> Tensor:
         raise NotImplementedError("don't know how to give a dense version of this")
+
+    @cached_property
+    def out_shape(self):
+        return tuple([len(t.domain) for t in self.variables])
+
+    @cached_property
+    def shape(self):
+        return tuple(*self.batches_shape, *self.out_shape)
+
+    @cached_property
+    def cells(self):
+        return math.prod(self.shape)
+
+    @cached_property
+    def batches_shape(self):
+        # should be the same for all variables (maybe worth checking?)
+        first = self.variables[0]
+        return tuple(first.tensor.shape[:-1])
 
 
 class DensableFactor(Factor):
 
     @abstractmethod
-    def dense(self) -> Tensor:
+    def dense_(self) -> Tensor:
         pass
+
+    @property
+    def dense(self) -> Tensor:
+        d = self.dense_()
+        # I only care about fixing the output here (don't care about observed
+        # inputs since those have already been clamped and set to nan)
+        # excluded_mask is anything that is clamped or observed and not the
+        # current value as well as anything that is padded and not 0
+        # TODO: finish this
+        d[excluded_mask] = float('-inf')
+        # clamped_mask is anything that is clamped or observed and is the target
+        d[clamped_mask] = 0.0
+        # padded_mask is anything that is padded and is 0
+        d[padded_mask] = float('nan')
+        return d
 
     def queryf(self, others: Sequence[Sequence[VarBase]], *queries: Sequence[VarBase]
                ) -> Callable[[Sequence[Factor]], Sequence[Tensor]]:
@@ -425,21 +511,67 @@ class DensableFactor(Factor):
             # might be able to pull this out, but I want to make
             # sure that changes in e.g. usage are reflected
             dense = [self.dense()]
+            # any nans in any factor should be treated as a log(1)
+            # meaning that it doesn't impact the product
             return einsum.log_einsum(equation, dense + [f.dense() for f in others])
         return f
+
+    @staticmethod
+    def normalize(self, variables: Sequence[VarBase], tensor: Tensor) -> Tensor:
+        num_dims = len(tensor.shape)
+        num_batch_dims = len(tensor.shape) - len(variables)
+
+        # normalize by subtracting out the sum of the last |V| dimensions
+        variable_dims = list(range(num_batch_dims, num_dims))
+        normalizer = torch.logsumexp(tensor, dim=variable_dims)
+        tensor -= normalizer[[...] + [None] * (num_dims - num_batch_dims)]
+        return tensor
+
+    def free_energy(self, other_energy: Sequence['Factor'], messages: Sequence['Factor']
+                    ) -> Tensor:
+        # TODO?: there is a way to do this with expectation semiring that would be general to
+        # non-denseables
+        variables = list(set(v
+                             for f in [self, *other_energy]
+                             for v in f.variables))
+        log_belief = self.query([*other_energy, *messages], variables)[0]
+        log_belief = DensableFactor.normalize(variables, log_belief)
+        # positives = torch.logsumexp(log_belief.clamp_min(0) +
+        #                             torch.where(log_belief >= 0,log_belief.clamp_min(0).log(), 0.),
+        #                             dim=variable_dims)
+        # negatives = torch.logsumexp(-log_belief.clamp_max(0) +
+        #                             torch.where(log_belief < 0, (-log_belief.clamp_max(0)).log(), 0.),
+        #                             dim=variable_dims)
+        # entropy = torch.logsumexp(log_belief * log_belief.log(), dim=variable_dims)
+        log_potentials, = self.query(other_energy, variables)
+        belief = log_belief.exp()
+        entropy = torch.sum(belief * log_belief, dim=variable_dims)
+        avg_energy = torch.sum(belief * log_potentials)
+        return entropy - avg_energy
 
 
 @dataclass
 class TensorFactor(DensableFactor):
-    tensor: Tensor = None
+    _tensor: InitVar[Optional[Tensor]] = None
 
     def dense(self):
         return self.tensor
 
-    def __post_init__(self):
-        if self.tensor is None:
-            self.tensor = torch.zeros(
+    def __post_init__(self, tensor: Optional[Tensor]):
+        if tensor is not None:
+            self.__tensor = tensor
+        else:
+            self.__tensor = torch.zeros(
                 *[len(v.domain) for v in self.variables])
+
+    @property
+    def tensor(self):
+        # in here, we need to only allow the values consistent
+        # with clamped or observed variables (competitors go to log(0));
+        # and then we need to take any padded inputs
+        # as log(1)
+        #
+        return self.__tensor
 
 
 class ParamNamespace:
@@ -554,7 +686,7 @@ class FactorGraph:
         self.num_factors = len(factors)
         self.variables = list(set(v for factor in factors for v in factor))
         # self.nodes = list(factors) + variables
-        self.num_nodes = len(factors) + len(variables)
+        self.num_nodes = len(factors) + len(self.variables)
         self.factor_nodes = range(self.num_factors)
         self.variable_nodes = range(self.num_factors, self.num_nodes)
         self.varids = dict((v, self.num_factors + varid) for varid, v in enumerate(self.variables))
@@ -598,16 +730,18 @@ class FactorGraph:
         ]
 
     # TODO: handle queries that are not in the graph
-    def query(self, *queries: Union[VarBase, Sequence[VarBase]],
+    # should I be normalizing? probably
+    def query(self, *queries: Optional[VarBase],
               strategy=None, force_multi=False) -> Union[Sequence[Tensor], Tensor]:
         if strategy is None:
             strategy = BetheTree(self)
         if not queries:
-            queries = ((),)
+            queries = (None,)
         # query_list = [(q,) if isinstance(q, VarBase) else q for q in queries]
         bp = BPInference(self, strategy)
         bp.run()
-        responses: Sequence[Tensor] = []
+        responses: Sequence[Tensor] = tuple(
+            bp.belief(query) if query is not None else bp.logz() for query in queries)
         if len(responses) == 1 and not force_multi:
             return responses[0]
         return responses
@@ -664,21 +798,31 @@ class Region(object):
     def factor_set(self) -> FrozenSet[Factor]:
         return frozenset(self.factors)
 
-    def queryf(self, others: Sequence[Factor], exclude: 'Region',
+    def query(self, others: Sequence[Factor],
+              *queries: Sequence[VarBase], exclude: Optional['Region'] = None):
+        return self.queryf(others, *queries, exclude=exclude)
+
+    @cache
+    def queryf(self, others: Sequence[Factor], exclude: Optional['Region'],
                *queries: Sequence[VarBase]
                ) -> Callable[[], Sequence[Tensor]]:
         # factors appearing in the excluded region are excluded note that the
         # first factor (in the region) touching the most variables determines
         # how the inference is done (if this needs to be modified, then have
         # your strategy create subclasses of region that override this behavior)
-        surviving_factors = list(self.factor_set - exclude.factor_set)
+        surviving_factors = list((self.factor_set - exclude.factor_set)
+                                 if exclude is not None else self.factor_set)
         _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(surviving_factors))
-        input_factors = list(surviving_factors[:ix]) + list(surviving_factors[ix:]) + others
+        input_factors = list(surviving_factors[:ix]) + list(surviving_factors[ix:]) + list(others)
         wrapped = controller.queryf([f.variables for f in input_factors], *queries)
 
         def f():
             return wrapped(input_factors)
         return f
+
+    # TODO: here
+    # def free_energy(self, messages: Sequence['Factor']) -> Tensor:
+    #     _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(self.factors))
 
 
 @dataclass
@@ -697,6 +841,13 @@ class Strategy(object):
             # TODO: ensure that t is a strict subset of s
             self.into[t].append(s)
             self.outfrom[s].append(t)
+
+    def get_regions_with_var(self, variable) -> Iterable[Region]:
+        for r in regions:
+            for v in r.region_variables:
+                if variable.origin.overlaps(v):
+                    yield r
+                    break  # go to the next region
 
     @property
     def reachable_from(self, i) -> Iterable[int]:
@@ -739,6 +890,36 @@ class BPInference:
         # self.message_inputs: List[List[Factor]] = []
         # )]
 
+    def logz(self) -> Tensor:
+        region_free_energies = []
+        for rid, r in enumerate(self.strategy.regions):
+            region_free_energies.append(
+                r.counting_number * r.free_energy(self.in_messages(rid))
+            )
+        return -torch.sum(region_free_energies)
+
+    def belief(self, variable: VarBase) -> Tensor:
+        r"""
+        Each input variable has a tensor and an ndslice (or None to represent a
+        request for the estimate of log Z); for each, we will return a
+        tensor with one extra dimension; since there may be overlap in the model,
+        we will find all regions with the given variable and create a
+        final marginal as the average (in log space) of each cell.
+        1) find all regions using that variable (we can skip if they don't overlap with the slice of interest)
+        2) find belief of that variable according to each region
+        3) form a tensor that has the counts
+        4) create the average for just the ndslice we care about
+
+        Returns the
+        normalized belief corresponding to
+        """
+        t = torch.zeros(variable.original_tensor.shape + (len(variable.domain),))
+        bel = torch.zeros_like(t)
+        for region, v in self.strategy.get_regions_with_var(variable):
+            t[v.ndslice] += 1
+            bel[v.ndslice] += region.query(v)
+        return (bel / t)[variable.ndslice]
+
     def message(self, key: Tuple[int, int]) -> TensorFactor:
         try:
             return self.messages[key]
@@ -746,19 +927,21 @@ class BPInference:
             _, t = key
             return self.messages.setdefault(key, TensorFactor([self.strategy.regions[t].variables]))
 
+    def in_messages(self, region_id):
+        pokes_s = self.strategy.penetrating_edges(region_id)
+        return [self.message(m) for m in pokes_s]
+
     @ cache
     def update_messages_from_regionf(self, source_id: int, target_ids: Tuple[int, ...]
                                      ) -> Callable[[], None]:
         source = self.strategy.regions[source_id]
         targets = [self.strategy.regions[target_id] for target_id in target_ids]
         out_messages = [self.messages[source_id, target_id] for target_id in target_ids]
+        in_messages = self.in_messages(source_id)
+        compute_numerators = source.queryf(in_messages, *[out.variables for out in out_messages])
 
         pokes_s = self.strategy.penetrating_edges(source_id)
         set_pokes_s = set(pokes_s)
-
-        in_messages = [self.messages[m] for m in pokes_s]
-        compute_numerators = source.queryf(in_messages, *[out.variables for out in out_messages])
-
         divide_out_messages = [
             [self.messages[m]
                 for m in self.strategy.penetrating_edges(target_id) if m not in set_pokes_s]
@@ -774,7 +957,9 @@ class BPInference:
             for numerator, out, compute_denominator, terms in zip(
                     numerators, out_messages, compute_denominators):
                 denominator = compute_denominator()
-                out.tensor = numerator.tensor / (out.tensor * denominator.tensor)
+                # - and + rather than / and * since this is in log space
+                out.tensor = numerator.tensor - (out.tensor + denominator.tensor)
+                out.tensor = DensableFactor.normalize(out.variables, out.tensor)
         return f
 
     def run(self):
@@ -782,14 +967,37 @@ class BPInference:
             self.update_messages_from_regionf(s, tuple(ts))()
 
 
+SubjectType = TypeVar('SubjectType', bound='Subject')
+
+
+ExampleType = TypeVar('ExampleType')
+
+
+@dataclass
+class ListDataset(Dataset, Generic[ExampleType]):
+    examples: List[ExampleType]
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getitem__(self, index) -> ExampleType:
+        return self.examples[index]
+
+
+@dataclass
 class Subject:
-    @ staticmethod
-    def init_variables(obj):
-        cls = type(obj)
+    is_stacked: bool = field(init=False, default=False)
+    __lists: Dict[object, List[object]] = field(init=False, default_factory=dict)
+    __vars: FrozenSet = field(init=False, default=frozenset())
+
+    def init_variables(self):
+        cls = type(self)
+        vars = []
+        # TODO: should this just be fields?
         for attr_name in dir(cls):
             attr = getattr(cls, attr_name)
             if isinstance(attr, Var):
-                property = cast(Var, getattr(obj, attr_name))
+                property = cast(Var, getattr(self, attr_name))
                 if property.tensor is None:
                     raise ValueError(
                         "need to specify an actual tensor for every variable in the subject")
@@ -797,9 +1005,74 @@ class Subject:
                     property._domain = attr.domain
                 if property.usage is None:
                     property.usage = torch.full_like(property.tensor, attr.usage.value)
+            vars.append(attr)
+        self.__vars = frozenset(vars)
+
+    # if this object has been stacked, then:
+    # 1) (it will know it and not allow stacking again for now)
+    # 2) all variables will be replaced with stacked and padded variables
+    # 3) other values will take the value of the first object, but
+    #    --- the full list will be accessible via stacked.list(stacked.item)
+    #
+    @staticmethod
+    def stack(subjects: Sequence[SubjectType]) -> SubjectType:
+        if not subjects:
+            raise ValueError(
+                "Your list of subjects needs to have at least one in it")
+        first = subjects[0]
+        if first.is_stacked:
+            raise ValueError(
+                "Not allowed to stack already stacked subjects")
+        out = copy.deepcopy(first)
+        out.is_stacked = True
+        cls = type(out)
+        my_fields = set(field.name for field in fields(first)) - first.__vars
+        for attr_name in first.__vars:
+            attr = cast(Var, getattr(out, attr_name))
+            stacked = Var.pad_and_stack([
+                cast(Var, getattr(subject, attr_name))
+                for subject in subjects])
+            setattr(out, attr_name, stacked)
+        for attr_name in my_fields:
+            attr = getattr(out, attr_name)
+            out.__lists[attr] = [
+                getattr(subject, attr_name)
+                for subject in subjects]
+        return out
+
+    def data_loader(data: Union[List[ExampleType], Dataset], **kwargs) -> DataLoader:
+        if not isinstance(data, Dataset):
+            data = ListDataset(data)
+        return DataLoader(cast(Dataset, data), collate_fn=Subject.stack, **kwargs)
+        # def shapes(self):
+        #     cls = type(obj)
+        #     for attr_name in dir(cls):
+        #         attr = getattr(cls, attr_name)
+        #         if isinstance(attr, Var):
+        #             property = cast(Var, getattr(obj, attr_name))
+        #             if property.tensor is None:
+        #                 raise ValueError(
+        #                     "need to specify an actual tensor for every variable in the subject")
+        #             if property.domain is OPEN_DOMAIN:
+        #                 property._domain = attr.domain
+        #             if property.usage is None:
+        #                 property.usage = torch.full_like(property.tensor, attr.usage.value)
+
+        # @staticmethod
+        # def collate(subjects: Sequence[SubjectType]) -> SubjectType:
+
+        #     return
+
+    def clamp_annotated(self) -> None:
+        for attr_name in self.__vars:
+            cast(Var, getattr(self, attr_name)).clamp_annotated()
+
+    def unclamp_annotated(self) -> None:
+        for attr_name in self.__vars:
+            cast(Var, getattr(self, attr_name)).unclamp_annotated()
 
     def __post_init__(self):
-        Subject.init_variables(self)
+        self.init_variables()
 
     def __init__(self, *args, **kwargs):
         raise ValueError(
@@ -832,20 +1105,38 @@ class Subject:
 #         pass
 
 
-@ dataclass
+@dataclass
 class LinearFactor(DensableFactor):
+    __default: ClassVar[Tensor] = torch.tensor(0.0)
     params: ParamNamespace
-    input: Tensor = torch.tensor([1.])
+    input: Tensor = __default
     bias: bool = True
-    input_dimensions: int = 1
+    # input_dimensions: int = 1
 
-    def dense(self) -> Tensor:
-        """returns a dense version"""
-        in_shapes = tuple(self.input.shape[-self.input_dimensions:])
-        out_shapes = tuple([len(t.domain) for t in self.variables])
+    @cached_property
+    def in_shape(self):
+        return tuple(self.input.shape[len(self.batches_shape):])
+
+    @cached_property
+    def in_cells(self):
+        return math.prod(self.in_shape)
+
+    def dense_(self) -> Tensor:
+        r"""returns a tensor that characterizes this factor;
+
+        the factor's variable-domains dictate the number and
+        size of the final dimensions.
+        the variables themselves, then, know how many batch
+        dimensions there are.
+        """
         m = self.params.module(lambda:
                                torch.nn.Linear(
-                                   in_features=math.prod(in_shapes),
-                                   out_features=math.prod(out_shapes),
+                                   in_features=self.in_cells,
+                                   out_features=self.cells,
                                    bias=self.bias))
-        return m(self.input)
+        input = self.input
+        if not input.shape:
+            input = input.expand_as((*self.batches_shape, 1))
+        else:
+            input = input.reshape((*self.batches_shape, -1))
+        return m(input).reshape(self.shape)
