@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple, Union, cast
 import torch
 import typing_extensions
 from multimethod import multidispatch as overload
-from torch import Tensor
+from torch import Size, Tensor
 
 from .domain import Domain
 from .types import NDSlice, ShapeType, SliceType
@@ -88,6 +88,10 @@ class VarBase(ABC):
     """
 
     @property
+    def shape(self) -> Size:
+        return self.tensor.shape
+
+    @property
     def tensor(self) -> Tensor:
         return self._get_tensor()
 
@@ -128,11 +132,29 @@ class VarBase(ABC):
     # I wasn't allowed to make property from abstract methods
     usage = property(_get_usage_, _set_usage_)
 
+    @abstractmethod
+    def _get_original_tensor(self) -> Tensor:
+        pass
+
+    def _get_original_tensor_(self) -> Tensor:
+        return self._get_original_tensor()
+
+    original_tensor = property(_get_original_tensor_)
+
     def clamp_annotated(self) -> None:
         self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
 
     def unclamp_annotated(self) -> None:
         self.usage[self.usage == VarUsage.CLAMPED] = VarUsage.ANNOTATED
+
+    @abstractmethod
+    def _get_ndslice(self) -> NDSlice:
+        pass
+
+    def _get_ndslice_(self) -> NDSlice:
+        return self._get_ndslice()
+
+    ndslice = property(_get_ndslice_)
 
 
 def compose_single(lhs: SliceType, rhs: SliceType, length: int):
@@ -158,7 +180,7 @@ class VarBranch(VarBase):
 
     def __init__(self, root: Var, ndslice: NDSlice):
         self.root = root
-        self.ndslice = ndslice
+        self.__ndslice = ndslice
 
     def __getitem__(self, ndslice: NDSlice) -> VarBase:
         return VarBranch(self.root, compose(self.root.tensor.shape, self.ndslice, ndslice))
@@ -189,6 +211,12 @@ class VarBranch(VarBase):
 
     def __hash__(self) -> int:
         return hash(self.hash_key())
+
+    def _get_original_tensor(self) -> Tensor:
+        return self.root.tensor
+
+    def _get_ndslice(self) -> NDSlice:
+        return self.__ndslice
 
 
 class Var(VarBase):
@@ -267,14 +295,14 @@ class Var(VarBase):
     def pad_and_stack(batch: List['Var'], pad_value=float('nan')
                       ) -> 'Var':
         """
-        given a list of tensors with same number of dimensions but possibly different shapes returns:
-        (stacked, shapes) defined as follows:
-        stacked:
+        given a list of tensors with same number of dimensions but possibly
+        different shapes returns: (stacked, shapes) defined as follows: stacked:
         - a single Tensor
         - `len(stacked.shape) == 1 + len(batch[0].shape)`
         - `stacked.shape[0] == len(batch)`
         - it is the result of:
-            1) padding all tensors in `batch` with `pad_value` out to the smallest shape that can contain each element of batch
+            1) padding all tensors in `batch` with `pad_value` out to the
+               smallest shape that can contain each element of batch
             2) stacking the resulting padded tensors
         """
         batch_size = len(batch)
@@ -286,8 +314,9 @@ class Var(VarBase):
         stacked_tensors = first_tensor.new_full(
             (batch_size, *max_shape), fill_value=pad_value, dtype=dtype)
         stacked_usages = first_tensor.new_full(
-            (batch_size, *max_shape), fill_value=VarUsage.PADDING, dtype=dtype)
-        # mask = first_tensor.new_full((batch_size, *max_shape), fill_value=False, dtype=torch.bool)
+            (batch_size, *max_shape), fill_value=VarUsage.PADDING.value, dtype=dtype)
+        # mask = first_tensor.new_full((batch_size, *max_shape),
+        # fill_value=False, dtype=torch.bool)
         for i, x in enumerate(batch):
             x_indexs = [slice(None, s) for s in x.tensor.shape]
             stacked_tensors[[i, *x_indexs]] = x.tensor
@@ -295,3 +324,9 @@ class Var(VarBase):
             # mask[[i, *x_indexs]] = tensor.new_ones(tensor.shape)
         # Var(stacked, )
         return Var(first.domain, tensor=stacked_tensors, usage=stacked_usages)
+
+    def _get_original_tensor(self) -> Tensor:
+        return self.tensor
+
+    def _get_ndslice(self) -> NDSlice:
+        return (...,)

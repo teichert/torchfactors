@@ -26,13 +26,13 @@ def compile_equation(equation: str, force_multi: bool = False
     args_str, outputs_str = equation.split('->', 1)
     arg_strs = args_str.split(',')
     out_strs = outputs_str.split(',')
-    return compile_generic_equation(arg_strs, out_strs, repr=equation, force_multi=force_multi)
+    return compile_obj_equation(arg_strs, out_strs, repr=equation, force_multi=force_multi)
 
 
-def compile_generic_equation(arg_strs: Sequence[Sequence[Hashable]],
-                             out_strs: Sequence[Sequence[Hashable]],
-                             repr: str = '', force_multi: bool = False
-                             ) -> Union[tse.equation.Equation, MultiEquation]:
+def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
+                         out_strs: Sequence[Sequence[Hashable]],
+                         repr: str = '', force_multi: bool = False
+                         ) -> Union[tse.equation.Equation, MultiEquation]:
     r"""modified from: https://github.com/bdusell/semiring-einsum/blob/7fbebdddc70aab81ede5e7c086719bff700b3936/torch_semiring_einsum/equation.py#L63-L92
 
     Pre-compile an einsum equation for use with the einsum functions in

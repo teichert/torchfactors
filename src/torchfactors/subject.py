@@ -58,7 +58,7 @@ class Subject:
     # 3) other values will take the value of the first object, but
     #    --- the full list will be accessible via stacked.list(stacked.item)
     #
-    @ staticmethod
+    @staticmethod
     def stack(subjects: Sequence[SubjectType]) -> SubjectType:
         if not subjects:
             raise ValueError(
@@ -69,7 +69,7 @@ class Subject:
                 "Not allowed to stack already stacked subjects")
         out = copy.deepcopy(first)
         out.is_stacked = True
-        cls = type(out)
+        # cls = type(out)
         my_fields = set(field.name for field in fields(first)) - first.__vars
         for attr_name in first.__vars:
             attr = cast(Var, getattr(out, attr_name))
@@ -84,6 +84,7 @@ class Subject:
                 for subject in subjects]
         return out
 
+    @staticmethod
     def data_loader(data: Union[List[ExampleType], Dataset], **kwargs) -> DataLoader:
         if not isinstance(data, Dataset):
             data = ListDataset(data)

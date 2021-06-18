@@ -43,7 +43,7 @@ class LinearFactor(DensableFactor):
                                    bias=self.bias))
         input = self.input
         if not input.shape:
-            input = input.expand_as((*self.batches_shape, 1))
+            input = input.expand((*self.batches_shape, 1))
         else:
             input = input.reshape((*self.batches_shape, -1))
         return m(input).reshape(self.shape)

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
-                    Optional)
+                    Optional, TypeVar)
 
 import torch
 from torch import Tensor
 from torch.nn import Module, ModuleDict, ParameterDict
 from torch.nn.parameter import Parameter
 
+from .domain import Domain
+from .factor import Factor
+from .types import ShapeType
+
+T = TypeVar('T')
 
 
 class ParamNamespace:
@@ -49,7 +54,7 @@ class Model(torch.nn.Module, Generic[T]):
         self._model_modules = ModuleDict()
 
     def domain(self, key: Hashable) -> Domain:
-        return self._model_domains.setdefault(key, SeqDomain([]))
+        return self._model_domains.setdefault(key, Domain.OPEN)
 
     def namespace(self, key) -> ParamNamespace:
         return ParamNamespace(self, key)

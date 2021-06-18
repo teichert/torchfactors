@@ -24,7 +24,7 @@ class Factor:
     factor need to know how to answer queries given other "denseable" factors
     as input and a set of (einsum style) queries to respond to.
     """
-    variables: List[VarBase]
+    variables: Sequence[VarBase]
 
     def __iter__(self) -> Iterator[VarBase]:
         return iter(self.variables)
@@ -110,14 +110,14 @@ class DensableFactor(Factor):
 
     @property
     def dense(self) -> Tensor:
-        d = self.dense_()
+        return self.dense_()
         # I only care about fixing the output here (don't care about observed
         # inputs since those have already been clamped and set to nan)
         # excluded_mask is anything that is clamped or observed and not the
-        # current value as well as anything that is padded and not 0
-        # TODO: finish this
-        # I have a tensor where the value at position x,y is the index of the z coordinate that I want
-        #
+        # current value as well as anything that is padded and not 0 TODO:
+        # finish this I have a tensor where the value at position x,y is the
+        # index of the z coordinate that I want
+
         # import math
         # inp = torch.tensor([
         #     [  # b0
@@ -129,12 +129,14 @@ class DensableFactor(Factor):
         #         2,  # i2
         #     ],
         # ])
+
         # dims = (*inp.shape, 4)
-        t = torch.arange(math.prod(dims)).reshape(dims)
-        # t.reshape(-1, inp.numel())[range(inp.numel()), inp.reshape(inp.numel())]
-        mask = torch.ones_like(t).bool()
-        mask.reshape(-1, inp.numel())[range(inp.numel()), inp.reshape(inp.numel())] = 0
-        t[mask]
+        # t = torch.arange(math.prod(dims)).reshape(dims)
+        # # t.reshape(-1, inp.numel())[range(inp.numel()), inp.reshape(inp.numel())]
+        # mask = torch.ones_like(t).bool()
+        # mask.reshape(-1, inp.numel())[range(inp.numel()), inp.reshape(inp.numel())] = 0
+
+        # t[mask]
         # input[batch_row, batch_col, index]: (v: 5)
         # [ # br0
         #     [ # bc0
@@ -217,28 +219,28 @@ class DensableFactor(Factor):
 
     def queryf(self, others: Sequence[Sequence[VarBase]], *queries: Sequence[VarBase]
                ) -> Callable[[Sequence[Factor]], Sequence[Tensor]]:
-        equation = einsum.compile_generic_equation(cast(List[Sequence[VarBase]], [self.variables]) +
-                                                   list(others),
-                                                   queries, force_multi=True)
+        equation = einsum.compile_obj_equation(cast(List[Sequence[VarBase]], [self.variables]) +
+                                               list(others),
+                                               queries, force_multi=True)
 
         def f(others: Sequence[Factor]) -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make
             # sure that changes in e.g. usage are reflected
-            dense = [self.dense()]
+            dense = [self.dense]
             # any nans in any factor should be treated as a log(1)
             # meaning that it doesn't impact the product
             return einsum.log_einsum(equation, dense + [f.dense() for f in others])
         return f
 
     @ staticmethod
-    def normalize(self, variables: Sequence[VarBase], tensor: Tensor) -> Tensor:
+    def normalize(variables: Sequence[VarBase], tensor: Tensor) -> Tensor:
         num_dims = len(tensor.shape)
         num_batch_dims = len(tensor.shape) - len(variables)
 
         # normalize by subtracting out the sum of the last |V| dimensions
         variable_dims = list(range(num_batch_dims, num_dims))
         normalizer = torch.logsumexp(tensor, dim=variable_dims)
-        tensor -= normalizer[[...] + [None] * (num_dims - num_batch_dims)]
+        tensor -= normalizer[(...,) + (None,) * (num_dims - num_batch_dims)]
         return tensor
 
     def free_energy(self, other_energy: Sequence[Factor], messages: Sequence[Factor]
@@ -251,38 +253,21 @@ class DensableFactor(Factor):
         log_belief = self.query([*other_energy, *messages], variables)[0]
         log_belief = DensableFactor.normalize(variables, log_belief)
         # positives = torch.logsumexp(log_belief.clamp_min(0) +
-        #                             torch.where(log_belief >= 0,log_belief.clamp_min(0).log(), 0.),
+        #                             torch.where(log_belief >= 0,
+        #                             log_belief.clamp_min(0).log(), 0.),
         #                             dim=variable_dims)
         # negatives = torch.logsumexp(-log_belief.clamp_max(0) +
-        #                             torch.where(log_belief < 0, (-log_belief.clamp_max(0)).log(), 0.),
+        #                             torch.where(log_belief < 0,
+        #                             (-log_belief.clamp_max(0)).log(), 0.),
         #                             dim=variable_dims)
         # entropy = torch.logsumexp(log_belief * log_belief.log(), dim=variable_dims)
         log_potentials, = self.query(other_energy, variables)
         belief = log_belief.exp()
+        tensor = self.dense
+        num_dims = len(tensor.shape)
+        num_batch_dims = len(tensor.shape) - len(variables)
+        # normalize by subtracting out the sum of the last |V| dimensions
+        variable_dims = list(range(num_batch_dims, num_dims))
         entropy = torch.sum(belief * log_belief, dim=variable_dims)
         avg_energy = torch.sum(belief * log_potentials)
         return entropy - avg_energy
-
-
-# @ dataclass
-# class TensorFactor(DensableFactor):
-#     _tensor: InitVar[Optional[Tensor]] = None
-
-#     def dense(self):
-#         return self.tensor
-
-#     def __post_init__(self, tensor: Optional[Tensor]):
-#         if tensor is not None:
-#             self.__tensor = tensor
-#         else:
-#             self.__tensor = torch.zeros(
-#                 *[len(v.domain) for v in self.variables])
-
-#     @ property
-#     def tensor(self):
-#         # in here, we need to only allow the values consistent
-#         # with clamped or observed variables (competitors go to log(0));
-#         # and then we need to take any padded inputs
-#         # as log(1)
-#         #
-#         return self.__tensor

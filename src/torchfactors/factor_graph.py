@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import (Iterator, List, Optional, Sequence, Union)
+from typing import Iterator, List, Sequence
 
-from torch import Tensor
+
+from .factor import Factor
+from .variable import VarBase
 
 
 class FactorGraph:
@@ -57,53 +59,3 @@ class FactorGraph:
             self.variables[node_id - self.num_factors]
             for node_id in self.full_region(node_ids)
         ]
-
-    # TODO: handle queries that are not in the graph
-    # should I be normalizing? probably
-    def query(self, *queries: Optional[VarBase],
-              strategy=None, force_multi=False) -> Union[Sequence[Tensor], Tensor]:
-        if strategy is None:
-            strategy = BetheTree(self)
-        if not queries:
-            queries = (None,)
-        # query_list = [(q,) if isinstance(q, VarBase) else q for q in queries]
-        bp = BPInference(self, strategy)
-        bp.run()
-        responses: Sequence[Tensor] = tuple(
-            bp.belief(query) if query is not None else bp.logz() for query in queries)
-        if len(responses) == 1 and not force_multi:
-            return responses[0]
-        return responses
-
-        # dataclass_transform worked for VSCode autocomplete without single dispatch,
-        # but didn't work with single dispatch nor was it recognized by mypy;
-        # see:
-        #
-        # _T = TypeVar("_T")
-
-        # def __dataclass_transform__(
-        #     *,
-        #     eq_default: bool = True,
-        #     order_default: bool = False,
-        #     kw_only_default: bool = False,
-        #     field_descriptors: Tuple[Union[type, Callable[..., Any]], ...] = (()),
-        # ) -> Callable[[_T], _T]:
-        #     # If used within a stub file, the following implementation can be
-        #     # replaced with "...".
-        #     return lambda a: a
-
-        # # @singledispatch
-        # # # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
-        # # def subject(stackable: bool = False):
-        # #     def wrapped(cls: type):
-        # #         cls = subject(cls)
-        # #         # do other stuff
-        # #         return cls
-        # #     return wrapped
-
-        # # @subject.register
-        # # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
-        # @__dataclass_transform__(order_default=True, field_descriptors=(Var,))
-        # def subject(cls: type):
-        #     setattr(cls, '__post_init__', Subject.init_variables)
-        #     return dataclass(cls)

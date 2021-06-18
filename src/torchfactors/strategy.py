@@ -1,24 +1,18 @@
 from __future__ import annotations
 
-import copy
-import math
-from abc import ABC, abstractmethod
-from dataclasses import InitVar, dataclass, field, fields
-from enum import Enum
+from dataclasses import dataclass
 from functools import cached_property, lru_cache
 from itertools import chain
-from typing import (Any, Callable, ClassVar, Dict, FrozenSet, Generic,
-                    Hashable, Iterable, Iterator, List, Optional, Sequence,
-                    Tuple, TypeVar, Union, cast)
+from typing import (Callable, FrozenSet, Iterable, Iterator, List, Optional,
+                    Sequence, Tuple)
 
-import torch
-import typing_extensions
-from multimethod import multidispatch as overload
-from torch import Size, Tensor
-from torch.nn import Module, ModuleDict, ParameterDict
-from torch.nn.parameter import Parameter
-from torch.utils.data import DataLoader, Dataset
-from torchfactors import einsum
+from torch import Tensor
+
+from .factor import Factor
+from .factor_graph import FactorGraph
+from .variable import VarBase
+
+cache = lru_cache(maxsize=None)
 
 
 @ dataclass
@@ -62,8 +56,9 @@ class Region(object):
         return f
 
     # TODO: here
-    # def free_energy(self, messages: Sequence['Factor']) -> Tensor:
-    #     _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(self.factors))
+    def free_energy(self, messages: Sequence['Factor']) -> Tensor:
+        # _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(self.factors))
+        pass
 
 
 @ dataclass
@@ -71,35 +66,34 @@ class Strategy(object):
     regions: List[Region]
     edges: List[Tuple[int, int]]
 
-    def __iter__(self) -> Iterator[Tuple[int, int]]:
+    def __iter__(self) -> Iterator[Tuple[int, Tuple[int, ...]]]:
         # naive default for now is to pass everything twice
-        return iter(chain(self.edges, self.edges))
+        schedule = [(s, (t,)) for s, t in self.edges]
+        return iter(chain(schedule, schedule))
 
     def __post_init__(self):
-        self.into = [list() for _ in self.regions]
-        self.outfrom = [list() for _ in self.regions]
+        self.into: List[List[int]] = [list() for _ in self.regions]
+        self.outfrom: List[List[int]] = [list() for _ in self.regions]
         for s, t in self.edges:
             # TODO: ensure that t is a strict subset of s
             self.into[t].append(s)
             self.outfrom[s].append(t)
 
-    def get_regions_with_var(self, variable) -> Iterable[Region]:
-        for r in regions:
-            for v in r.region_variables:
+    def get_regions_with_var(self, variable) -> Iterable[Tuple[int, Region, VarBase]]:
+        for rid, r in enumerate(self.regions):
+            for v in r.variables:
                 if variable.origin.overlaps(v):
-                    yield r
+                    yield rid, r, v
                     break  # go to the next region
 
-    @ property
     def reachable_from(self, i) -> Iterable[int]:
         yield i
-        for t in self.outfrom(i):
-            yield self.reachable_from(t)
+        for t in self.outfrom[i]:
+            yield from self.reachable_from(t)
 
-    @ property
     def penetrating_edges(self, i) -> Iterable[Tuple[int, int]]:
         r"""
         returns the set of edges s->t such that s is not reachable from i,
         but t is. (i.e. the set of edges that poke into the region of i)
         """
-        return [(s, t) for t in self.reachable_from(i) for s in self.into(t)]
+        return [(s, t) for t in self.reachable_from(i) for s in self.into[t]]

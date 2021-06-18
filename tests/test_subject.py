@@ -9,12 +9,12 @@ def test_subject_nodataclass():
         class MySubject(Subject):
             pass
 
-        s = MySubject()
+        MySubject()
 
 
-def test_subject_nodataclass():
+def test_subject_good():
     @dataclass
     class MySubject(Subject):
         pass
 
-    s = MySubject()
+    MySubject()
