@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from enum import Enum
+from enum import IntEnum
 from typing import List, Optional, Tuple, Union, cast
 
 import torch
@@ -13,7 +13,7 @@ from .domain import Domain
 from .types import NDSlice, ShapeType, SliceType
 
 
-class VarUsage(Enum):
+class VarUsage(IntEnum):
     r"""
     Indicates whether a variable should be used for modeling a value (FREE),
     clamped to its current value, or whether it is merely padding so that any
@@ -104,42 +104,35 @@ class VarBase(ABC):
         return self._get_domain()
 
     @abstractmethod
-    def _get_tensor(self) -> Tensor:
-        pass
+    def _get_tensor(self) -> Tensor: ...
 
     @abstractmethod
-    def _set_tensor(self, value: Tensor):
-        pass
+    def _set_tensor(self, value: Tensor): ...
 
     @abstractmethod
-    def _get_usage(self) -> Tensor:
-        pass
+    def _get_usage(self) -> Tensor: ...
 
     @abstractmethod
-    def _set_usage(self, value: Union[Tensor, VarUsage]):
-        pass
+    def _set_usage(self, value: Union[Tensor, VarUsage]): ...
 
     @abstractmethod
-    def _get_domain(self) -> Domain:
-        pass
+    def _get_domain(self) -> Domain: ...
 
-    def _get_usage_(self) -> Tensor:
+    def get_usage(self) -> Tensor:
         return self._get_usage()
 
-    def _set_usage_(self, value: Union[Tensor, VarUsage]):
+    def set_usage(self, value: Union[Tensor, VarUsage]):
         self._set_usage(value)
 
     # I wasn't allowed to make property from abstract methods
-    usage = property(_get_usage_, _set_usage_)
+    usage = property(get_usage, set_usage)
 
     @abstractmethod
-    def _get_original_tensor(self) -> Tensor:
-        pass
+    def _get_original_tensor(self) -> Tensor: ...
 
-    def _get_original_tensor_(self) -> Tensor:
+    @property
+    def original_tensor(self) -> Tensor:
         return self._get_original_tensor()
-
-    original_tensor = property(_get_original_tensor_)
 
     def clamp_annotated(self) -> None:
         self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
@@ -148,13 +141,11 @@ class VarBase(ABC):
         self.usage[self.usage == VarUsage.CLAMPED] = VarUsage.ANNOTATED
 
     @abstractmethod
-    def _get_ndslice(self) -> NDSlice:
-        pass
+    def _get_ndslice(self) -> NDSlice: ...
 
-    def _get_ndslice_(self) -> NDSlice:
+    @property
+    def ndslice(self) -> NDSlice:
         return self._get_ndslice()
-
-    ndslice = property(_get_ndslice_)
 
 
 def compose_single(lhs: SliceType, rhs: SliceType, length: int):
@@ -198,7 +189,7 @@ class VarBranch(VarBase):
         if isinstance(value, VarUsage):
             self.usage = torch.full_like(self.tensor, value.value)
         else:
-            self.root.usage[self.ndslice] = cast(Tensor, value)
+            self.root.usage[self.ndslice] = cast(Tensor, value.expand_as(self.tensor))
 
     def _get_domain(self) -> Domain:
         return self.root.domain
@@ -286,7 +277,7 @@ class Var(VarBase):
         if isinstance(value, VarUsage):
             self._usage = torch.full_like(self.tensor, value.value)
         else:
-            self._usage = cast(Tensor, value)
+            self._usage = cast(Tensor, value.expand_as(self.tensor))
 
     def _get_domain(self) -> Domain:
         return self._domain

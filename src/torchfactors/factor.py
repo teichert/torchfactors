@@ -105,8 +105,7 @@ class Factor:
 class DensableFactor(Factor):
 
     @abstractmethod
-    def dense_(self) -> Tensor:
-        pass
+    def dense_(self) -> Tensor: ...
 
     @property
     def dense(self) -> Tensor:
