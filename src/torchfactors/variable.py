@@ -124,7 +124,6 @@ class VarBase(ABC):
     def set_usage(self, value: Union[Tensor, VarUsage]):
         self._set_usage(value)
 
-    # I wasn't allowed to make property from abstract methods
     usage = property(get_usage, set_usage)
 
     @abstractmethod
@@ -187,9 +186,8 @@ class VarBranch(VarBase):
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
         if isinstance(value, VarUsage):
-            self.usage = torch.full_like(self.tensor, value.value)
-        else:
-            self.root.usage[self.ndslice] = cast(Tensor, value.expand_as(self.tensor))
+            value = torch.tensor(value)
+        self.root.usage[self.ndslice] = cast(Tensor, value.expand_as(self.tensor))
 
     def _get_domain(self) -> Domain:
         return self.root.domain
@@ -226,10 +224,9 @@ class Var(VarBase):
                  usage: Union[VarUsage, Tensor, None] = VarUsage.DEFAULT,
                  tensor: Optional[Tensor] = None,
                  info: typing_extensions._AnnotatedAlias = None):
-        if tensor is not None:
-            self.tensor = tensor
         self._domain = domain
         if tensor is not None:
+            self._tensor = tensor
             if usage is not None and isinstance(usage, VarUsage):
                 usage = torch.full_like(self.tensor, usage.value)
             self._usage: Tensor = cast(Tensor, usage)
@@ -268,16 +265,15 @@ class Var(VarBase):
         return self._tensor
 
     def _set_tensor(self, value: Tensor):
-        self._tensor = value
+        self._tensor[self.ndslice] = value
 
     def _get_usage(self) -> Tensor:
         return self._usage
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
-        if isinstance(value, VarUsage):
-            self._usage = torch.full_like(self.tensor, value.value)
-        else:
-            self._usage = cast(Tensor, value.expand_as(self.tensor))
+        if isinstance(value, VarUsage) or not value.shape:
+            value = torch.full_like(self.tensor, int(value))
+        self._usage = value
 
     def _get_domain(self) -> Domain:
         return self._domain
