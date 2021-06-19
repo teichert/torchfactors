@@ -12,6 +12,8 @@ from torch import Size, Tensor
 from .domain import Domain
 from .types import NDSlice, ShapeType, SliceType
 
+Tensorable = Union[Tensor, int, float, bool]
+
 
 class VarUsage(IntEnum):
     r"""
@@ -91,13 +93,15 @@ class VarBase(ABC):
     def shape(self) -> Size:
         return self.tensor.shape
 
-    @property
-    def tensor(self) -> Tensor:
+    # @property
+    def get_tensor(self) -> Tensor:
         return self._get_tensor()
 
-    @tensor.setter
-    def tensor(self, value: Tensor):
+    # @tensor.setter
+    def set_tensor(self, value: Tensorable):
         self._set_tensor(value)
+
+    tensor = property(get_tensor, set_tensor)
 
     @property
     def domain(self) -> Domain:
@@ -107,7 +111,7 @@ class VarBase(ABC):
     def _get_tensor(self) -> Tensor: ...
 
     @abstractmethod
-    def _set_tensor(self, value: Tensor): ...
+    def _set_tensor(self, value: Tensorable): ...
 
     @abstractmethod
     def _get_usage(self) -> Tensor: ...
@@ -118,9 +122,11 @@ class VarBase(ABC):
     @abstractmethod
     def _get_domain(self) -> Domain: ...
 
+    # @property
     def get_usage(self) -> Tensor:
         return self._get_usage()
 
+    # @get_usage.setter
     def set_usage(self, value: Union[Tensor, VarUsage]):
         self._set_usage(value)
 
@@ -178,7 +184,7 @@ class VarBranch(VarBase):
     def _get_tensor(self) -> Tensor:
         return self.root.tensor[self.ndslice]
 
-    def _set_tensor(self, value: Tensor):
+    def _set_tensor(self, value: Tensorable):
         self.root.tensor[self.ndslice] = value
 
     def _get_usage(self) -> Tensor:
@@ -229,7 +235,7 @@ class Var(VarBase):
             self._tensor = tensor
             if usage is not None and isinstance(usage, VarUsage):
                 usage = torch.full_like(self.tensor, usage.value)
-            self._usage: Tensor = cast(Tensor, usage)
+        self.usage = usage
         self._info = info
 
     @__init__.register
@@ -264,7 +270,7 @@ class Var(VarBase):
     def _get_tensor(self) -> Tensor:
         return self._tensor
 
-    def _set_tensor(self, value: Tensor):
+    def _set_tensor(self, value: Tensorable):
         self._tensor[self.ndslice] = value
 
     def _get_usage(self) -> Tensor:

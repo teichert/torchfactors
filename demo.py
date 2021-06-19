@@ -38,3 +38,20 @@ for u in loader:
 # all_log_probs = log_einsum(grounded, u.items)
 # one_log_probs = log_einsum(grounded, u.items[0])
 # print(list(model.parameters()))
+
+
+# class MyClass:
+#     def __init__(self, a: str):
+#         self.a = a
+
+#     @property
+#     def a(self) -> int:
+#         return self._a
+
+#     @a.setter
+#     def a(self, s: str):
+#         self._a = int(s)
+
+
+# a = MyClass("78")
+# assert a.a == 78

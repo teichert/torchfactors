@@ -29,7 +29,9 @@ def test_shape():
     assert v2.ndslice == (slice(1, 3), slice(2, 4))
     assert t.sum() == 3*4
     assert v2.shape == (2, 2)
-    v2.tensor = 0.0
+    # could have done v2.tensor = 0.0, but waiting on:
+    # https://github.com/python/mypy/issues/3004
+    v2.set_tensor(0.0)
     assert v2.tensor.sum() == 0.0
     assert t.sum() == 3*4 - 4
 
@@ -37,9 +39,9 @@ def test_shape():
 def test_usage3():
     t = torch.ones(3, 4)
     v = Var(t, Range[4])
-    v.usage = ANNOTATED
+    v.set_usage(ANNOTATED)
     assert (v.usage == ANNOTATED).all()
-    v[1, 2:4].usage = OBSERVED
+    v[1, 2:4].set_usage(OBSERVED)
     assert (v.usage == OBSERVED).sum() == 2
 
 
@@ -48,12 +50,12 @@ def test_clamp():
     v = Var(t, Range[4])
     v2 = v[2, :]
     # nothing annotated, so nothing clamped
-    v2.usage = OBSERVED
+    v2.set_usage(OBSERVED)
     v.clamp_annotated()
     assert (v2.usage == OBSERVED).all()
 
     # mark as annotated
-    v2.usage = ANNOTATED
+    v2.set_usage(ANNOTATED)
     v.clamp_annotated()
     assert (v2.usage == CLAMPED).all()
     assert (v.usage == CLAMPED).sum() == 4
@@ -86,7 +88,7 @@ def test_nested():
     t = torch.zeros(4, 10, 12, 7)
     v = Var(t, Range[4])
     va = v[:, 3, 3:9][2, 1:3, :5]
-    va.tensor = 1
+    va.set_tensor(1)
     assert va.shape == (2, 5)
     assert va.tensor.sum() == 10
 
