@@ -97,3 +97,44 @@ def test_nested():
     assert vb.tensor.sum() == 10
 
     assert v.tensor.sum() == 10
+    assert va == vb
+
+
+def test_domain():
+    t = torch.ones(3, 4)
+    v = Var(t, Range[4])
+    v2 = v[2:, :]
+    assert v2.domain == v.domain
+
+
+def test_eq():
+    t = torch.ones(3, 4)
+    t2 = torch.ones(3, 4)
+    v1 = Var(t, Range[4])
+    v2 = Var(t, Range[4])
+    v3 = v1[2:, :]
+    v4 = v2[2:, :]
+    assert v1 == v2
+    assert v3 == v4
+    assert v1 != v3
+    v5 = Var(t2, Range[4])
+    assert v1 != v5
+
+
+def test_dict():
+    t = torch.ones(3, 4)
+    t2 = torch.ones(3, 4)
+    v1 = Var(t, Range[4])
+    v2 = Var(t, Range[4])
+    v3 = v1[2:, :]
+    v4 = v2[2:, :]
+    v5 = Var(t2, Range[4])
+    d = dict()
+    d[v1] = (1, 2)
+    d[v3] = (3, 4)
+    d[v5] = (5,)
+    assert d[v1] == (1, 2)
+    assert d[v2] == (1, 2)
+    assert d[v3] == (3, 4)
+    assert d[v4] == (3, 4)
+    assert d[v5] == (5,)

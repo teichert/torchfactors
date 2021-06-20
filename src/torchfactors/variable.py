@@ -152,6 +152,16 @@ class VarBase(ABC):
     def ndslice(self) -> NDSlice:
         return self._get_ndslice()
 
+    def __eq__(self, other) -> bool:
+        return self.hash_key() == other.hash_key()
+
+    # TODO: make an ndrange which can be hashed and use that instead
+    def hash_key(self):
+        return id(self.original_tensor), self.ndslice
+
+    def __hash__(self) -> int:
+        return hash(self.hash_key())
+
 
 def compose_single(lhs: SliceType, rhs: SliceType, length: int):
     out = range(length)[cast(slice, lhs)][rhs]
@@ -197,15 +207,6 @@ class VarBranch(VarBase):
 
     def _get_domain(self) -> Domain:
         return self.root.domain
-
-    def __eq__(self, other) -> bool:
-        return self.hash_key() == other.hash_key()
-
-    def hash_key(self):
-        return self.root, self.ndslice
-
-    def __hash__(self) -> int:
-        return hash(self.hash_key())
 
     def _get_original_tensor(self) -> Tensor:
         return self.root.tensor
