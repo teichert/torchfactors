@@ -1,7 +1,8 @@
 from typing import Dict, Tuple
 
 import torch
-from torchfactors import ANNOTATED, CLAMPED, OBSERVED, VarBase, VarUsage
+from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED,
+                          VarBase, VarUsage)
 from torchfactors.domain import Range
 from torchfactors.variable import Var, compose, compose_single
 
@@ -101,6 +102,10 @@ def test_nested():
     assert v.tensor.sum() == 10
     assert va == vb
 
+    v.set_tensor(3.)
+    assert va.tensor.sum() == 30
+    assert vb.tensor.sum() == 30
+
 
 def test_domain():
     t = torch.ones(3, 4)
@@ -128,8 +133,10 @@ def test_dict():
     t2 = torch.ones(3, 4)
     v1 = Var(t, Range[4])
     v2 = Var(t, Range[4])
+    assert hash(v1) == hash(v2)
     v3 = v1[2:, :]
     v4 = v2[2:, :]
+    assert hash(v3) == hash(v4)
     v5 = Var(t2, Range[4])
     d: Dict[VarBase, Tuple[int, ...]] = dict()
     d[v1] = (1, 2)
@@ -140,3 +147,51 @@ def test_dict():
     assert d[v3] == (3, 4)
     assert d[v4] == (3, 4)
     assert d[v5] == (5,)
+
+
+def test_var_from_tensor_usage():
+    t = torch.ones(3, 4)
+    v = Var(Range[4], t)
+    assert v.tensor is t
+    assert list(v.domain) == [0, 1, 2, 3]
+    assert v.usage.shape == t.shape
+    assert (v.usage == DEFAULT).all()
+
+
+def test_var_from_tensor_usage_dom():
+    t = torch.ones(3, 4)
+    v = Var(t, LATENT, Range[4])
+    assert v.tensor is t
+    assert list(v.domain) == [0, 1, 2, 3]
+    assert v.usage.shape == t.shape
+    assert (v.usage == LATENT).all()
+
+
+def test_var_from_usage_tensor_dom():
+    t = torch.ones(3, 4)
+    v = Var(LATENT, t, Range[4])
+    assert v.tensor is t
+    assert list(v.domain) == [0, 1, 2, 3]
+    assert v.usage.shape == t.shape
+    assert (v.usage == LATENT).all()
+
+
+def test_var_from_usage_dom_tensor():
+    t = torch.ones(3, 4)
+    v = Var(LATENT, Range[4], t)
+    assert v.tensor is t
+    assert list(v.domain) == [0, 1, 2, 3]
+    assert v.usage.shape == t.shape
+    assert (v.usage == LATENT).all()
+
+
+def test_pad_and_stack():
+    vs = [
+        Var(LATENT, Range[4], torch.ones(3, 4)),
+        Var(LATENT, Range[4], torch.ones(2, 10)),
+        Var(LATENT, Range[4], torch.ones(4, 7)),
+    ]
+    v = Var.pad_and_stack(vs)
+    assert v.domain == Range[4]
+    assert (v.usage == LATENT).sum() == (3 * 4 + 2 * 10 + 4 * 7)
+    assert v.shape == (3, 4, 10)
