@@ -157,14 +157,31 @@ class VarBase(ABC):
 
     # TODO: make an ndrange which can be hashed and use that instead
     def hash_key(self):
-        return id(self.original_tensor), self.ndslice
+        return (id(self.original_tensor),
+                as_ndrange(self.ndslice, self.original_tensor.shape))
 
     def __hash__(self) -> int:
         return hash(self.hash_key())
 
 
+def as_range(one_slice: slice, length: int) -> range:
+    """returns a range representing the same subset of integers as the given
+    slice assuming the given length"""
+    return range(length)[one_slice]
+
+
+def as_ndrange(ndslice: NDSlice, shape: ShapeType):
+    if isinstance(ndslice, tuple):
+        if len(ndslice) == 1 and ndslice[0] is ...:
+            return tuple(as_range(slice(None), length)
+                         for length in shape)
+        else:
+            return tuple(as_range(one_slice, length)
+                         for one_slice, length in zip(ndslice, shape))
+
+
 def compose_single(lhs: SliceType, rhs: SliceType, length: int):
-    out = range(length)[cast(slice, lhs)][rhs]
+    out = as_range(cast(slice, lhs), length)[rhs]
     return out if isinstance(out, int) else slice(out.start, out.stop, out.step)
 
 

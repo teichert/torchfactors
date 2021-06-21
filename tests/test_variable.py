@@ -1,5 +1,7 @@
+from typing import Dict, Tuple
+
 import torch
-from torchfactors import ANNOTATED, CLAMPED, OBSERVED, VarUsage
+from torchfactors import ANNOTATED, CLAMPED, OBSERVED, VarBase, VarUsage
 from torchfactors.domain import Range
 from torchfactors.variable import Var, compose, compose_single
 
@@ -129,7 +131,7 @@ def test_dict():
     v3 = v1[2:, :]
     v4 = v2[2:, :]
     v5 = Var(t2, Range[4])
-    d = dict()
+    d: Dict[VarBase, Tuple[int, ...]] = dict()
     d[v1] = (1, 2)
     d[v3] = (3, 4)
     d[v5] = (5,)
