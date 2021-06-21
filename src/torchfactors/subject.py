@@ -5,11 +5,10 @@ from dataclasses import dataclass, field, fields
 from typing import (Dict, FrozenSet, Generic, List, Sequence, TypeVar, Union,
                     cast)
 
-import torch
 from torch.utils.data import DataLoader, Dataset
 
 from .domain import Domain
-from .variable import Var
+from .variable import Var, VarField
 
 SubjectType = TypeVar('SubjectType', bound='Subject')
 
@@ -37,19 +36,35 @@ class Subject:
     def init_variables(self):
         cls = type(self)
         vars = []
-        # TODO: should this just be fields?
-        for attr_name in dir(cls):
-            attr = getattr(cls, attr_name)
-            if isinstance(attr, Var):
-                property = cast(Var, getattr(self, attr_name))
-                if property.tensor is None:
-                    raise ValueError(
-                        "need to specify an actual tensor for every variable in the subject")
-                if property.domain is Domain.OPEN:
-                    property._domain = attr.domain
-                if property.usage is None:
-                    property.usage = torch.full_like(property.tensor, attr.usage.value)
-                vars.append(attr)
+        cls_attr_id_to_var: Dict[int, Var] = {}
+        # basic idea: for each field, check if the class_variable has more information
+        # than in this particular object; if it does, then copy over.
+        # class version should never have tensor-like usage nor an actual tensor.
+        # instance version should always have a tensor-based usage and an actual tensor.
+        for f in fields(cls):
+            attr_name = f.name
+            if not hasattr(cls, attr_name):
+                continue
+            var_field = getattr(cls, attr_name)
+            if isinstance(var_field, VarField):
+                var_instance = cast(Var, getattr(self, attr_name))
+                cls_attr_id_to_var[id(var_field)] = var_instance
+                if var_instance._tensor is None:
+                    if isinstance(var_field._shape, VarField):
+                        source_var = cls_attr_id_to_var[id(var_field._shape)]
+                        # source should already have tensor with shape by now
+                        var_instance._tensor = var_field._init(source_var.shape)
+                    elif var_field._shape is not None:
+                        var_instance._tensor = var_field._init(var_field._shape)
+                    else:
+                        raise ValueError(
+                            "need to specify an actual tensor (or a shape)"
+                            "for every variable in the subject")
+                if var_instance.domain is Domain.OPEN:
+                    var_instance._domain = var_field.domain
+                if var_instance.usage is None:
+                    var_instance.usage = var_field.usage
+                vars.append(var_field)
         self.__vars = frozenset(vars)
 
     # if this object has been stacked, then:
@@ -58,7 +73,7 @@ class Subject:
     # 3) other values will take the value of the first object, but
     #    --- the full list will be accessible via stacked.list(stacked.item)
     #
-    @staticmethod
+    @ staticmethod
     def stack(subjects: Sequence[SubjectType]) -> SubjectType:
         if not subjects:
             raise ValueError(
@@ -84,7 +99,7 @@ class Subject:
                 for subject in subjects]
         return out
 
-    @staticmethod
+    @ staticmethod
     def data_loader(data: Union[List[ExampleType], Dataset], **kwargs) -> DataLoader:
         if not isinstance(data, Dataset):
             data = ListDataset(data)

@@ -8,7 +8,7 @@ from .factor_graph import FactorGraph
 from .infer import query
 from .model import Model
 from .subject import Subject
-from .variable import Var, VarBase, VarBranch, VarUsage
+from .variable import Var, VarBase, VarBranch, VarField, VarUsage
 
 PADDING = VarUsage.PADDING
 LATENT = VarUsage.LATENT
@@ -22,7 +22,7 @@ OPEN = Domain.OPEN
 __all__ = [
     'Domain', 'SeqDomain', 'Range',
     'OPEN',
-    'VarUsage', 'VarBase', 'Var', 'VarBranch',
+    'VarUsage', 'VarBase', 'Var', 'VarBranch', 'VarField',
     'PADDING', 'LATENT', 'ANNOTATED', 'CLAMPED', 'OBSERVED', 'DEFAULT',
     'Subject',
     'Factor', 'DensableFactor',

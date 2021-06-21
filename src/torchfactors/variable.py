@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import List, Optional, Tuple, Union, cast
+from typing import Callable, List, Optional, Tuple, Union, cast
 
 import torch
 import typing_extensions
@@ -221,7 +221,10 @@ class VarBranch(VarBase):
         return self.root.usage[self.ndslice]
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
-        if isinstance(value, VarUsage):
+        if isinstance(value, VarUsage):  # or not value.shape:
+            if self.root.usage is None:
+                raise ValueError(
+                    "you need to set the usage on the root before setting on a branch")
             value = torch.tensor(value)
         self.root.usage[self.ndslice] = cast(Tensor, value.expand_as(self.tensor))
 
@@ -233,6 +236,43 @@ class VarBranch(VarBase):
 
     def _get_ndslice(self) -> NDSlice:
         return self.__ndslice
+
+
+class VarField(VarBase):
+
+    @overload  # type: ignore[misc]
+    def __init__(self,
+                 domain: Domain = Domain.OPEN,
+                 usage: Optional[VarUsage] = VarUsage.DEFAULT,
+                 shape: Union[VarBase, ShapeType, None] = None,
+                 init: Optional[Callable[[ShapeType], Tensor]] = torch.zeros,
+                 info: typing_extensions._AnnotatedAlias = None):
+        self._domain = domain
+        self._usage = usage
+        self._shape = shape
+        self._init = init
+        self._info = info
+
+    def _get_tensor(self) -> Tensor:
+        raise NotImplementedError("var fields don't actually have a tensor")
+
+    def _set_tensor(self, value: Tensorable):
+        raise NotImplementedError("var fields don't actually have a tensor")
+
+    def _get_usage(self) -> Tensor:
+        raise NotImplementedError("need to access _usage directly")
+
+    def _set_usage(self, value: Union[Tensor, VarUsage]):
+        raise NotImplementedError("need to access _usage directly")
+
+    def _get_domain(self) -> Domain:
+        raise NotImplementedError("need to access _domain directly")
+
+    def _get_original_tensor(self) -> Tensor:
+        raise NotImplementedError("var fields don't actually have a tensor")
+
+    def _get_ndslice(self) -> NDSlice:
+        raise NotImplementedError("var fields don't actually have a tensor")
 
 
 class Var(VarBase):
@@ -248,26 +288,31 @@ class Var(VarBase):
 
     @overload  # type: ignore[misc]
     def __init__(self, domain: Domain = Domain.OPEN,
-                 usage: Union[VarUsage, Tensor, None] = VarUsage.DEFAULT,
+                 usage: Union[VarUsage, Tensor, None] = None,
                  tensor: Optional[Tensor] = None,
                  info: typing_extensions._AnnotatedAlias = None):
+        """
+        when the shape is another variable object, that indicates that this variable object
+        is being
+        """
         self._domain = domain
-        if tensor is not None:
-            self._tensor = tensor
-            if usage is not None and isinstance(usage, VarUsage):
-                usage = torch.full_like(self.tensor, usage.value)
-        self.usage = usage
+        self._tensor = tensor
+        # can only build usage if there is a tensor
+        if self._tensor is not None and usage is not None:
+            self.usage = usage
+        else:
+            self._usage = usage
         self._info = info
 
     @__init__.register
     def _dom_tensor_usage(self, domain: Domain,
                           tensor: Tensor,
-                          usage: Union[VarUsage, Tensor, None] = VarUsage.DEFAULT):
+                          usage: Union[VarUsage, Tensor, None] = None):
         self.__init__(domain, usage, tensor)  # type: ignore[misc]
 
     @__init__.register
     def _tensor_dom_usage(self, tensor: Tensor, domain: Domain = Domain.OPEN,
-                          usage: Union[VarUsage, Tensor, None] = VarUsage.DEFAULT):
+                          usage: Union[VarUsage, Tensor, None] = None):
         self.__init__(domain, usage, tensor)  # type: ignore[misc]
 
     @__init__.register
@@ -289,13 +334,13 @@ class Var(VarBase):
         return VarBranch(root=self, ndslice=ndslice)
 
     def _get_tensor(self) -> Tensor:
-        return self._tensor
+        return cast(Tensor, self._tensor)
 
     def _set_tensor(self, value: Tensorable):
-        self._tensor[self.ndslice] = value
+        cast(Tensor, self._tensor)[self.ndslice] = value
 
     def _get_usage(self) -> Tensor:
-        return self._usage
+        return cast(Tensor, self._usage)
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
         if isinstance(value, VarUsage) or not value.shape:

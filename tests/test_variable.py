@@ -1,10 +1,11 @@
 from typing import Dict, Tuple
 
+import pytest
 import torch
 from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED,
                           VarBase, VarUsage)
 from torchfactors.domain import Range
-from torchfactors.variable import Var, compose, compose_single
+from torchfactors.variable import Var, VarField, compose, compose_single
 
 
 def test_usage1():
@@ -17,6 +18,7 @@ def test_variable():
     assert len(v.domain) == 4
     assert v.tensor is t
     assert v.shape == (3, 4)
+    v.set_usage(OBSERVED)
     assert isinstance(v.usage, torch.Tensor)
     print(v.usage == VarUsage.OBSERVED)
     assert (v.usage == VarUsage.OBSERVED).all()
@@ -52,8 +54,10 @@ def test_clamp():
     t = torch.ones(3, 4)
     v = Var(t, Range[4])
     v2 = v[2, :]
+    with pytest.raises(ValueError):
+        v2.set_usage(OBSERVED)
+    v.set_usage(OBSERVED)
     # nothing annotated, so nothing clamped
-    v2.set_usage(OBSERVED)
     v.clamp_annotated()
     assert (v2.usage == OBSERVED).all()
 
@@ -154,6 +158,7 @@ def test_var_from_tensor_usage():
     v = Var(Range[4], t)
     assert v.tensor is t
     assert list(v.domain) == [0, 1, 2, 3]
+    v.set_usage(DEFAULT)
     assert v.usage.shape == t.shape
     assert (v.usage == DEFAULT).all()
 
@@ -195,3 +200,21 @@ def test_pad_and_stack():
     assert v.domain == Range[4]
     assert (v.usage == LATENT).sum() == (3 * 4 + 2 * 10 + 4 * 7)
     assert v.shape == (3, 4, 10)
+
+
+def test_var_field():
+    v = VarField()
+    with pytest.raises(NotImplementedError):
+        v.tensor
+    with pytest.raises(NotImplementedError):
+        v.set_tensor(1.0)
+    with pytest.raises(NotImplementedError):
+        v.usage
+    with pytest.raises(NotImplementedError):
+        v.set_usage(DEFAULT)
+    with pytest.raises(NotImplementedError):
+        v.domain
+    with pytest.raises(NotImplementedError):
+        v.original_tensor
+    with pytest.raises(NotImplementedError):
+        v.ndslice
