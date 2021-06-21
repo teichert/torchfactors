@@ -200,6 +200,9 @@ def compose(shape: ShapeType, first: NDSlice, second: NDSlice):
 
 
 class VarBranch(VarBase):
+    r"""
+    Represents a subset of a variable tensor
+    """
 
     def __init__(self, root: Var, ndslice: NDSlice):
         self.root = root
