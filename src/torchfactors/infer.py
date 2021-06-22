@@ -58,7 +58,7 @@ class BPInference:
         bel = torch.zeros_like(t)
         for region_id, region, v in self.strategy.get_regions_with_var(variable):
             t[v.ndslice] += 1
-            bel[v.ndslice] += region.query(self.in_messages(region_id), [v])[0]
+            bel[v.ndslice] += region.product_marginals(self.in_messages(region_id), [v])[0]
         return (bel / t)[variable.ndslice]
 
     def message(self, key: Tuple[int, int]) -> TensorFactor:
@@ -113,14 +113,14 @@ class BPInference:
 
 # TODO: handle queries that are not in the graph
 # should I be normalizing? probably
-def query(self, *queries: Optional[Var],
-          strategy=None, force_multi=False) -> Union[Sequence[Tensor], Tensor]:
+def marginals(factor_graph: FactorGraph, *queries: Optional[Var],
+              strategy=None, force_multi=False) -> Union[Sequence[Tensor], Tensor]:
     if strategy is None:
-        strategy = BetheGraph(self)
+        strategy = BetheGraph(factor_graph)
     if not queries:
         queries = (None,)
     # query_list = [(q,) if isinstance(q, VarBase) else q for q in queries]
-    bp = BPInference(self, strategy)
+    bp = BPInference(factor_graph, strategy)
     bp.run()
     responses: Sequence[Tensor] = tuple(
         bp.belief(query) if query is not None else bp.logz() for query in queries)

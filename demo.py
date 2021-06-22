@@ -32,7 +32,7 @@ for u in loader:
     # u.items[[3, 4, 5]].usage = tx.VarUsage.ANNOTATED
     u.clamp_annotated()
     u.unclamp_annotated()
-    logz = tx.query(grounded)
+    logz = tx.marginals(grounded)
     print(logz)
 # logz = log_einsum(grounded, [()])
 # all_log_probs = log_einsum(grounded, u.items)

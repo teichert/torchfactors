@@ -32,10 +32,18 @@ class Factor:
     def __len__(self) -> int:
         return len(self.variables)
 
-    def query(self, others: Sequence[Factor], *queries: Sequence[Var]
-              ) -> Sequence[Tensor]:
-        return self.queryf([f.variables for f in others], *queries)(
-            others)
+    def product_marginals(self, other_factors: Sequence[Factor], *queries: Sequence[Var]
+                          ) -> Sequence[Tensor]:
+        r"""
+        For each set of query variables, returns the marginal score for each
+        configuration of those variables, with scores being computed as the product
+        of this factor with the other `other_factors`.
+
+        The partition function can be queried via an empty tuple of variables.
+        If no queries are specified, then the partition function is queried.
+        """
+        return self.queryf([f.variables for f in other_factors], *queries)(
+            other_factors)
 
     # @abstractmethod
     def queryf(self, others: Sequence[Sequence[Var]], *queries: Sequence[Var]
@@ -44,7 +52,7 @@ class Factor:
 
     def free_energy(self, other_energy: Sequence[Factor], messages: Sequence[Factor]
                     ) -> Tensor:
-        """
+        r"""
         Returns an estimate of the additive contribution of this factor to the
         total free energy of a collection of factors.
 
@@ -69,9 +77,15 @@ class Factor:
         Given these computed configuration scores and marginal probabilities
         (known as beliefs).  The group free energy is simply the entropy of the
         belief minus the average log score.  (Be aware that our ipmlementation
-        deals with scores and in log-space to begin with.) A
-        separate free_energy is computed for each batch_dimension so the shape
-        of the output tensor should be the batch_shape.
+        deals with scores and in log-space to begin with.) A separate
+        free_energy is computed for each batch_dimension so the shape of the
+        output tensor should be the batch_shape.
+
+        This computation is straight forward for dense factors, but can require
+        care for sparse (a.k.a. structured) factors (e.g.
+        projective-dependency-tree factor, or CFG-Tree factor). Thus,
+        implementing such a factor requires implementing a mechanism for
+        computing this quantity.
         """
         raise NotImplementedError("don't know how to do queries on this")
 
@@ -303,7 +317,7 @@ class DensableFactor(Factor):
         variables = list(set(v
                              for f in [self, *other_energy]
                              for v in f.variables))
-        log_belief = self.query([*other_energy, *messages], variables)[0]
+        log_belief = self.product_marginals([*other_energy, *messages], variables)[0]
         log_belief = DensableFactor.normalize(variables, log_belief)
         # positives = torch.logsumexp(log_belief.clamp_min(0) +
         #                             torch.where(log_belief >= 0,
@@ -314,7 +328,7 @@ class DensableFactor(Factor):
         #                             (-log_belief.clamp_max(0)).log(), 0.),
         #                             dim=variable_dims)
         # entropy = torch.logsumexp(log_belief * log_belief.log(), dim=variable_dims)
-        log_potentials, = self.query(other_energy, variables)
+        log_potentials, = self.product_marginals(other_energy, variables)
         belief = log_belief.exp()
         tensor = self.dense
         num_dims = len(tensor.shape)

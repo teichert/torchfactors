@@ -5,7 +5,7 @@ from .components.tensor_factor import TensorFactor
 from .domain import Domain, Range, SeqDomain
 from .factor import DensableFactor, Factor
 from .factor_graph import FactorGraph
-from .infer import query
+from .infer import marginals
 from .model import Model
 from .subject import Subject
 from .variable import TensorVar, Var, VarBranch, VarField, VarUsage
@@ -30,5 +30,5 @@ __all__ = [
     'LinearFactor',
     'Model',
     'FactorGraph',
-    'query',
+    'marginals',
 ]

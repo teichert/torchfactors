@@ -33,8 +33,8 @@ class Region(object):
     def factor_set(self) -> FrozenSet[Factor]:
         return frozenset(self.factors)
 
-    def query(self, others: Sequence[Factor],
-              *queries: Sequence[Var], exclude: Optional['Region'] = None):
+    def product_marginals(self, others: Sequence[Factor],
+                          *queries: Sequence[Var], exclude: Optional['Region'] = None):
         return self.queryf(others, *queries, exclude=exclude)
 
     @ cache
