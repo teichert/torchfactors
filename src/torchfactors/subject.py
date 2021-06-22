@@ -60,6 +60,7 @@ class Subject:
                     setattr(self, attr_name, var_instance)
                 cls_attr_id_to_var[id(var_field)] = var_instance
                 if var_instance._tensor is None:
+                    # shape can be delegated to earlier field
                     if isinstance(var_field._shape, VarField):
                         source_var = cls_attr_id_to_var[id(var_field._shape)]
                         # source should already have tensor with shape by now
@@ -83,7 +84,7 @@ class Subject:
     # 3) other values will take the value of the first object, but
     #    --- the full list will be accessible via stacked.list(stacked.item)
     #
-    @ staticmethod
+    @staticmethod
     def stack(subjects: Sequence[SubjectType]) -> SubjectType:
         if not subjects:
             raise ValueError(
@@ -140,9 +141,10 @@ class Subject:
                 setattr(obj, other_fieldname, val)
         return out
 
-    @ staticmethod
-    def data_loader(data: Union[List[ExampleType], Dataset], batch_size: int | None = 1,
-                    **kwargs) -> DataLoader:
+    @staticmethod
+    def data_loader(data: Union[List[ExampleType], Dataset[ExampleType]],
+                    batch_size: int | None = 1,
+                    **kwargs) -> DataLoader[ExampleType]:
         if not isinstance(data, Dataset):
             data = ListDataset(data)
         return DataLoader(cast(Dataset, data), collate_fn=Subject.stack, batch_size=batch_size,

@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import List
+from typing import ClassVar, List
 
 import pytest
 import torch
-from torchfactors import LATENT, OBSERVED, Range, Subject, TensorVar, VarField
+from torchfactors import (ANNOTATED, CLAMPED, LATENT, OBSERVED, Range, Subject,
+                          TensorVar, VarField)
 from torchfactors.variable import Var
 
 
@@ -37,6 +38,101 @@ def test_basic():
     assert u.hidden.shape == (6,)
     assert (u.observations.usage == OBSERVED).all()
     assert (u.hidden.usage == LATENT).all()
+
+
+def test_implicit():
+    with pytest.raises(ValueError):
+        @dataclass
+        class Utterance(Subject):
+            observations: Var = VarField(Range[10], OBSERVED)
+            other: Var = VarField(Range[4], OBSERVED, shape=observations)
+
+        Utterance(TensorVar(torch.tensor([1, 3, 2, 4, 3, 5, 4]))),
+
+
+def test_only_implicit():
+    @dataclass
+    class Utterance(Subject):
+        v: Var = VarField(Range[4], LATENT, shape=(3, 4), init=torch.ones)
+
+    u = Utterance()
+    assert (u.v.tensor == 1).sum() == 3 * 4
+    assert u.v.shape == (3, 4)
+
+
+def test_no_shape():
+    with pytest.raises(ValueError):
+        @dataclass
+        class Utterance(Subject):
+            v: Var = VarField(Range[4], LATENT)
+
+        Utterance()
+
+
+def test_stack_zero():
+    with pytest.raises(ValueError):
+        @dataclass
+        class Utterance(Subject):
+            v: Var = VarField(Range[4], LATENT)
+
+        Utterance.stack([])
+
+
+def test_stack_twice():
+    @dataclass
+    class Utterance(Subject):
+        v: Var = VarField(Range[4], LATENT, shape=(3, 4))
+
+    u = Utterance.stack([Utterance()])
+    with pytest.raises(ValueError):
+        Utterance.stack([u])
+
+
+def test_no_vars():
+    @dataclass
+    class Utterance(Subject):
+        i: int
+
+    data = [Utterance(3), Utterance(4), Utterance(5)]
+    combined = Utterance.stack(data)
+    a, b, c = combined.unstack()
+    assert a.i == 3
+    assert b.i == 4
+    assert c.i == 5
+
+
+def test_no_fields():
+    @dataclass
+    class Utterance(Subject):
+        i: ClassVar[int] = 10
+
+    data = [Utterance(), Utterance(), Utterance()]
+    combined = Utterance.stack(data)
+    with pytest.raises(ValueError):
+        combined.unstack()
+
+
+def test_clamp_annotated():
+    @dataclass
+    class Utterance(Subject):
+        items1: Var = VarField(Range[4], ANNOTATED)
+        items2: Var = VarField(Range[4], ANNOTATED)
+
+    u = Utterance(TensorVar(torch.ones(10)), TensorVar(torch.ones(5)))
+    assert (u.items1.usage == ANNOTATED).sum() == 10
+    assert (u.items2.usage == ANNOTATED).sum() == 5
+    assert (u.items1.usage == CLAMPED).sum() == 0
+    assert (u.items2.usage == CLAMPED).sum() == 0
+    u.clamp_annotated()
+    assert (u.items1.usage == ANNOTATED).sum() == 0
+    assert (u.items2.usage == ANNOTATED).sum() == 0
+    assert (u.items1.usage == CLAMPED).sum() == 10
+    assert (u.items2.usage == CLAMPED).sum() == 5
+    u.unclamp_annotated()
+    assert (u.items1.usage == ANNOTATED).sum() == 10
+    assert (u.items2.usage == ANNOTATED).sum() == 5
+    assert (u.items1.usage == CLAMPED).sum() == 0
+    assert (u.items2.usage == CLAMPED).sum() == 0
 
 
 def test_stacked():
