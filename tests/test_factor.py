@@ -39,3 +39,13 @@ def test_init_tensor_factor():
     f = TensorFactor(v)
     assert f.dense.shape == (3, 4, 10)
     assert (f.dense == 0).all()
+
+
+def test_multi_factor():
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
+    v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+    f = TensorFactor([v1, v2])
+    assert f.shape == (3, 4, 10, 5)
+
+
+test_multi_factor()
