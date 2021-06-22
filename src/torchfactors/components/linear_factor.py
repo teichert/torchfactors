@@ -7,10 +7,10 @@ from typing import Sequence, Union
 
 import torch
 from torch import Tensor
-from torchfactors.variable import Var
 
-from ..factor import Factor
-from ..model import ParamNamespace
+from torchfactors.factor import Factor
+from torchfactors.model import ParamNamespace
+from torchfactors.variable import Var
 
 
 @ dataclass
