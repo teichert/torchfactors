@@ -64,8 +64,8 @@ class Factor:
         if not queries or isinstance(queries[0], Var):
             raise ValueError("each query needs to be a sequence of Vars "
                              "(did you forget the brackets around your single variable groups?) "
-                             "consider using product_marginal() if you only have one variable or if you want to "
-                             "just get the partition function.")
+                             "consider using product_marginal() if you only have one variable "
+                             "or if you want to just get the partition function.")
         return self.marginals_closure(*queries, other_factors=other_factors)()
 
     @cached_property
