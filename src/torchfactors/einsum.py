@@ -12,13 +12,15 @@ class MultiEquation(object):
 
 
 @singledispatch
-def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor):
-    return tse.log_einsum(compiled_equation, tensors)
+def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 1):
+    return tse.log_einsum(compiled_equation, *tensors, block_size=block_size)
 
 
 @log_einsum.register
-def _from_multi(compiled_equation: MultiEquation, *tensors: Tensor):
-    return tuple(tse.log_einsum(eq, tensors) for eq in compiled_equation.equations)
+def _from_multi(compiled_equation: MultiEquation,
+                *tensors: Tensor, block_size: int = 1):
+    return tuple(tse.log_einsum(eq, *tensors, block_size=block_size)
+                 for eq in compiled_equation.equations)
 
 
 def compile_equation(equation: str, force_multi: bool = False

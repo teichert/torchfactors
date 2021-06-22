@@ -1,13 +1,13 @@
-from dataclasses import dataclass
-from typing import ClassVar
+from typing import Callable, Optional, Sequence, Union
 
 import torch
 from torch import Tensor
+from torchfactors.types import ShapeType
+from torchfactors.variable import Var
 
 from ..factor import DensableFactor
 
 
-@ dataclass
 class TensorFactor(DensableFactor):
     r"""
     A factor that is fully specified by a single, fixed tensor. The tensor
@@ -18,13 +18,15 @@ class TensorFactor(DensableFactor):
 
     """
 
-    AUTO: ClassVar[Tensor] = torch.tensor(0.0)
-    tensor: Tensor = AUTO
+    def __init__(self, variables: Union[Var, Sequence[Var]],
+                 tensor: Optional[Tensor] = None,
+                 init: Callable[[ShapeType], Tensor] = torch.zeros):
+        super().__init__(variables)
+        if tensor is None:
+            tensor = init(self.shape)
+        if tensor.shape != self.shape:
+            raise ValueError("you didn't provide a tensor with the correct shape")
+        self.tensor = tensor
 
     def dense_(self):
         return self.tensor
-
-    def __post_init__(self):
-        if self.tensor is TensorFactor.AUTO:
-            self.tensor = torch.zeros(
-                *[len(v.domain) for v in self.variables])

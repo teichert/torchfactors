@@ -49,7 +49,7 @@ class Region(object):
                                  if exclude is not None else self.factor_set)
         _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(surviving_factors))
         input_factors = list(surviving_factors[:ix]) + list(surviving_factors[ix:]) + list(others)
-        return controller.marginals_closure(input_factors, *queries)
+        return controller.marginals_closure(*queries, other_factors=input_factors)
 
     # TODO: here
     def free_energy(self, messages: Sequence['Factor']) -> Tensor:

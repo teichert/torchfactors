@@ -245,7 +245,7 @@ class VarField(Var):
                  domain: Domain = Domain.OPEN,
                  usage: Optional[VarUsage] = VarUsage.DEFAULT,
                  shape: Union[Var, ShapeType, None] = None,
-                 init: Optional[Callable[[ShapeType], Tensor]] = torch.zeros,
+                 init: Callable[[ShapeType], Tensor] = torch.zeros,
                  info: typing_extensions._AnnotatedAlias = None):
         self._domain = domain
         self._usage = usage

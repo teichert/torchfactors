@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import math
 from abc import abstractmethod
-from dataclasses import dataclass
 from functools import cached_property
-from typing import Callable, Iterator, Sequence
+from typing import Callable, Iterator, Sequence, Union
 
 import torch
 from torch import Tensor
@@ -14,7 +13,7 @@ from torchfactors import einsum
 from .variable import Var
 
 
-@dataclass
+# @dataclass
 class Factor:
     r"""
     A Factor has a domain which is defined by the set of variables it is
@@ -24,7 +23,14 @@ class Factor:
     factor need to know how to answer queries given other "denseable" factors
     as input and a set of (einsum style) queries to respond to.
     """
-    variables: Sequence[Var]
+
+    def __init__(self, variables: Union[Var, Sequence[Var]]):
+        if isinstance(variables, Var):
+            variables = (variables,)
+        self.variables = variables
+        for v in self.variables[1:]:
+            if v.shape != self.shape:
+                raise ValueError("all variables must have the same shape (domains can vary)")
 
     def __iter__(self) -> Iterator[Var]:
         return iter(self.variables)
@@ -32,7 +38,20 @@ class Factor:
     def __len__(self) -> int:
         return len(self.variables)
 
-    def product_marginals(self, other_factors: Sequence[Factor], *queries: Sequence[Var]
+    def product_marginal(self, query: Union[Sequence[Var], Var, None] = None,
+                         other_factors: Sequence[Factor] = ()
+                         ) -> Tensor:
+        r"""
+        convenience method for a single product_marginal query
+        """
+        if query is None:
+            query = ()
+        elif isinstance(query, Var):
+            query = (query,)
+        out, = self.product_marginals(query, other_factors=other_factors)
+        return out
+
+    def product_marginals(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
                           ) -> Sequence[Tensor]:
         r"""
         For each set of query variables, returns the marginal score for each
@@ -42,9 +61,9 @@ class Factor:
         The partition function can be queried via an empty tuple of variables.
         If no queries are specified, then the partition function is queried.
         """
-        return self.marginals_closure(other_factors, *queries)()
+        return self.marginals_closure(*queries, other_factors=other_factors)()
 
-    def marginals_closure(self, others: Sequence[Factor], *queries: Sequence[Var]
+    def marginals_closure(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
                           ) -> Callable[[], Sequence[Tensor]]:
         r"""
         Given a set of other factors and a set of product_marginal queries,
@@ -114,7 +133,7 @@ class Factor:
         r"""
         Returns the shape of the (possibly implicit) tensor that would represent this tensor
         """
-        return tuple(*self.batch_shape, *self.out_shape)
+        return tuple([*self.batch_shape, *self.out_shape])
 
     @cached_property
     def cells(self):
@@ -137,13 +156,15 @@ class Factor:
         r"""
         The shape of the dimensions of the implicit tensor corresponding to
         various elements in a single batch as opposed to alternative
-        configurations of a single element of the batch. (All dimensions but the
-        last of each input variable are treated as independent elements of the
-        same batch.)
+        configurations of a single element of the batch. (All dimensions of the
+        variables are batch dimensions with the actual configuration being
+        identified by the value [an additional dimension].  The batch dimensions
+        should be consistent across variables, but the domain of the variables
+        [and thus the output dimensions] need not be consitent.)
         """
         # should be the same for all variables (maybe worth checking?)
         first = self.variables[0]
-        return tuple(first.tensor.shape[:-1])
+        return tuple(first.tensor.shape)
 
     @property
     def num_batch_dims(self):
@@ -152,12 +173,6 @@ class Factor:
         single batch (vs distinguishing configurations of a single element).
         """
         return len(self.batch_shape)
-
-    # @property
-    # def excluded_mask(self):
-
-
-# def inverse
 
 
 # class Factors(ABC, Iterable[Factor]):
@@ -288,19 +303,19 @@ class DensableFactor(Factor):
         # d[self.padded_mask]=float('nan')
         # return d
 
-    def marginals_closure(self, others: Sequence[Factor], *queries: Sequence[Var]
+    def marginals_closure(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
                           ) -> Callable[[], Sequence[Tensor]]:
         equation = einsum.compile_obj_equation([self.variables] +
-                                               [other.variables for other in others],
+                                               [other.variables for other in other_factors],
                                                queries, force_multi=True)
 
         def f() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make
             # sure that changes in e.g. usage are reflected
-            dense = [self.dense]
             # any nans in any factor should be treated as a log(1)
             # meaning that it doesn't impact the product
-            return einsum.log_einsum(equation, dense + [f.dense() for f in others])
+            input_tensors = [self.dense] + [f.dense() for f in other_factors]
+            return einsum.log_einsum(equation, *input_tensors)
         return f
 
     @ staticmethod
@@ -321,7 +336,7 @@ class DensableFactor(Factor):
         variables = list(set(v
                              for f in [self, *other_energy]
                              for v in f.variables))
-        log_belief = self.product_marginals([*other_energy, *messages], variables)[0]
+        log_belief = self.product_marginal(variables, other_factors=[*other_energy, *messages])
         log_belief = DensableFactor.normalize(variables, log_belief)
         # positives = torch.logsumexp(log_belief.clamp_min(0) +
         #                             torch.where(log_belief >= 0,
@@ -332,7 +347,7 @@ class DensableFactor(Factor):
         #                             (-log_belief.clamp_max(0)).log(), 0.),
         #                             dim=variable_dims)
         # entropy = torch.logsumexp(log_belief * log_belief.log(), dim=variable_dims)
-        log_potentials, = self.product_marginals(other_energy, variables)
+        log_potentials = self.product_marginal(variables, other_factors=other_energy)
         belief = log_belief.exp()
         tensor = self.dense
         num_dims = len(tensor.shape)

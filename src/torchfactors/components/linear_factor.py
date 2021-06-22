@@ -3,10 +3,11 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from functools import cached_property
-from typing import ClassVar
+from typing import Sequence, Union
 
 import torch
 from torch import Tensor
+from torchfactors.variable import Var
 
 from ..factor import DensableFactor
 from ..model import ParamNamespace
@@ -14,11 +15,16 @@ from ..model import ParamNamespace
 
 @ dataclass
 class LinearFactor(DensableFactor):
-    __default: ClassVar[Tensor] = torch.tensor(0.0)
-    params: ParamNamespace
-    input: Tensor = __default
-    bias: bool = True
-    # input_dimensions: int = 1
+
+    def __init__(self,
+                 variables: Union[Var, Sequence[Var]],
+                 params: ParamNamespace,
+                 input: Tensor = torch.tensor(0.0),
+                 bias: bool = True):
+        super().__init__(variables)
+        self.input = input
+        self.bias = bias
+        self.params = params
 
     @ cached_property
     def in_shape(self):
