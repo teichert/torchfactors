@@ -305,9 +305,16 @@ class DensableFactor(Factor):
 
     def marginals_closure(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
                           ) -> Callable[[], Sequence[Tensor]]:
-        equation = einsum.compile_obj_equation([self.variables] +
-                                               [other.variables for other in other_factors],
-                                               queries, force_multi=True)
+        batch_dims = [object() for _ in range(self.num_batch_dims)]
+
+        def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
+            return tuple([*batch_dims, *objs])
+
+        equation = einsum.compile_obj_equation(
+            [with_batch_dims(self.variables)] +
+            [with_batch_dims(other.variables)
+             for other in other_factors],
+            [with_batch_dims(q) for q in queries], force_multi=True)
 
         def f() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make

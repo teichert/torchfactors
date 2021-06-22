@@ -1,13 +1,13 @@
 import pytest
 import torch
-from torchfactors import Range, TensorFactor, TensorVar
+from torchfactors import Range, TensorFactor, TensorVar, ndrange
 from torchfactors.factor import Factor
 
 
 def test_factor():
     t = torch.ones(3, 4)
     v = TensorVar(t, domain=Range(10))
-    f: Factor = TensorFactor(v, torch.rand(3, 4, 10))
+    f: Factor = TensorFactor(v, ndrange(3, 4, 10))
     assert f.shape == (3, 4, 10)
     assert f.batch_cells == 3 * 4
     assert f.batch_shape == (3, 4)
@@ -32,4 +32,4 @@ def test_bad_tensor_factor():
         TensorFactor(v, torch.rand(3, 4, 9))
 
 
-test_factor()
+# test_factor()
