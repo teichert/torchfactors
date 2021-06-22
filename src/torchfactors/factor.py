@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from abc import abstractmethod
 from functools import cached_property
-from typing import Callable, Iterator, Sequence, Union
+from typing import Callable, Iterator, Sequence, Union, cast
 
 import torch
 from torch import Tensor
@@ -111,14 +111,6 @@ class Factor:
         computing this quantity.
         """
         raise NotImplementedError("don't know how to do queries on this")
-
-    def dense(self) -> Tensor:
-        r"""
-        Returns a tensor representing the factor (should have the same shape as
-        the factor and dimensions should correspond to the variables in the same
-        order as given by the factor).
-        """
-        raise NotImplementedError("don't know how to give a dense version of this")
 
     @cached_property
     def out_shape(self):
@@ -315,13 +307,18 @@ class DensableFactor(Factor):
             [with_batch_dims(other.variables)
              for other in other_factors],
             [with_batch_dims(q) for q in queries], force_multi=True)
+        for factor in other_factors:
+            if not isinstance(factor, DensableFactor):
+                raise TypeError("DensableFactor doesn't know how to be commander "
+                                "for non-densable factors")
 
         def f() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make
             # sure that changes in e.g. usage are reflected
             # any nans in any factor should be treated as a log(1)
             # meaning that it doesn't impact the product
-            input_tensors = [self.dense] + [f.dense() for f in other_factors]
+            input_tensors = [self.dense] + [cast(DensableFactor, f).dense
+                                            for f in other_factors]
             return einsum.log_einsum(equation, *input_tensors)
         return f
 
