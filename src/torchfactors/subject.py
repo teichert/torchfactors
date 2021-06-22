@@ -8,7 +8,7 @@ from typing import (Dict, FrozenSet, Generic, List, Sequence, TypeVar, Union,
 from torch.utils.data import DataLoader, Dataset
 
 from .domain import Domain
-from .variable import Var, VarField
+from .variable import Var, VarField, VarUsage
 
 SubjectType = TypeVar('SubjectType', bound='Subject')
 
@@ -47,7 +47,14 @@ class Subject:
                 continue
             var_field = getattr(cls, attr_name)
             if isinstance(var_field, VarField):
-                var_instance = cast(Var, getattr(self, attr_name))
+                var_instance = getattr(self, attr_name)
+                if not isinstance(var_instance, Var):
+                    if var_field._usage != VarUsage.LATENT:
+                        raise ValueError("only latent variables can be left implicit; "
+                                         "make sure that you pass in all required variables "
+                                         "to the subject constructor")
+                    var_instance = Var()
+                    setattr(self, attr_name, var_instance)
                 cls_attr_id_to_var[id(var_field)] = var_instance
                 if var_instance._tensor is None:
                     if isinstance(var_field._shape, VarField):
@@ -61,15 +68,15 @@ class Subject:
                             "need to specify an actual tensor (or a shape)"
                             "for every variable in the subject")
                 if var_instance.domain is Domain.OPEN:
-                    var_instance._domain = var_field.domain
+                    var_instance._domain = var_field._domain
                 if var_instance.usage is None:
-                    var_instance.usage = var_field.usage
-                vars.append(var_field)
+                    var_instance.usage = var_field._usage
+                vars.append(attr_name)
         self.__vars = frozenset(vars)
 
     # if this object has been stacked, then:
     # 1) (it will know it and not allow stacking again for now)
-    # 2) all variables will be replaced with stacked and padded variables
+    # 2) all variable fields will be replaced with stacked and padded variables
     # 3) other values will take the value of the first object, but
     #    --- the full list will be accessible via stacked.list(stacked.item)
     #
