@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from abc import abstractmethod
 from functools import cached_property
-from typing import Callable, Iterator, Sequence, Union, cast
+from typing import Callable, Iterator, Sequence, Union
 
 import torch
 from torch import Tensor
@@ -63,55 +63,6 @@ class Factor:
         """
         return self.marginals_closure(*queries, other_factors=other_factors)()
 
-    def marginals_closure(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
-                          ) -> Callable[[], Sequence[Tensor]]:
-        r"""
-        Given a set of other factors and a set of product_marginal queries,
-        returns a function that recomputes the corresponding marginals for each
-        query given the current values of the factors.
-
-        """
-        raise NotImplementedError("don't know how to do queries on this")
-
-    def free_energy(self, other_energy: Sequence[Factor], messages: Sequence[Factor]
-                    ) -> Tensor:
-        r"""
-        Returns an estimate of the additive contribution of this factor to the
-        total free energy of a collection of factors.
-
-        The exact free energy of the system is the negative log partition
-        function.  The partition function is the constant factor Z that would
-        normalize the scores to sum to one.  With appropriate grouping of
-        factors, it is possible to compute the exact free energy of the system
-        in terms of free energies of groups by subtracting out double-counted
-        groups.  The free energy of a particular group with respect to the
-        entire system is a function of the scores of each joint configuration of
-        the group as well as an estimate of the marginal probability of each
-        group configuration under the full system.
-
-        In this function, the group configuration scores are specified via
-        "commanding factor" (self) and the `other_energy` factors whier are all
-        multiplied together to produce a score for each joint configuration. The
-        marginal probabilities are additionally specified by the `messages`
-        which are multiplied to the commander and other_energy factors, with the
-        output being normalized to produce a distribution over the
-        configurations.
-
-        Given these computed configuration scores and marginal probabilities
-        (known as beliefs).  The group free energy is simply the entropy of the
-        belief minus the average log score.  (Be aware that our ipmlementation
-        deals with scores and in log-space to begin with.) A separate
-        free_energy is computed for each batch_dimension so the shape of the
-        output tensor should be the batch_shape.
-
-        This computation is straight forward for dense factors, but can require
-        care for sparse (a.k.a. structured) factors (e.g.
-        projective-dependency-tree factor, or CFG-Tree factor). Thus,
-        implementing such a factor requires implementing a mechanism for
-        computing this quantity.
-        """
-        raise NotImplementedError("don't know how to do queries on this")
-
     @cached_property
     def out_shape(self):
         r"""
@@ -166,28 +117,16 @@ class Factor:
         """
         return len(self.batch_shape)
 
-
-# class Factors(ABC, Iterable[Factor]):
-#     r"""
-#     A collection of factors (sometimes a coherent model component is most easily
-#     described as a subclass of this)
-#     """
-
-#     def __iter__(self) -> Iterator[Factor]:
-#         return self.factors()
-
-#     @abstractmethod
-#     def factors(self) -> Iterator[Factor]:
-#         pass
-
-
-class DensableFactor(Factor):
-
     @abstractmethod
     def dense_(self) -> Tensor: ...
 
     @property
     def dense(self) -> Tensor:
+        r"""
+        A tensor representing the factor (should have the same shape as
+        the factor and dimensions should correspond to the variables in the same
+        order as given by the factor).
+        """
         return self.dense_()
         # I only care about fixing the output here (don't care about observed
         # inputs since those have already been clamped and set to nan)
@@ -297,6 +236,13 @@ class DensableFactor(Factor):
 
     def marginals_closure(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
                           ) -> Callable[[], Sequence[Tensor]]:
+        r"""
+        Given a set of other factors and a set of product_marginal queries,
+        returns a function that recomputes the corresponding marginals for each
+        query given the current values of the factors.
+
+        """
+
         batch_dims = [object() for _ in range(self.num_batch_dims)]
 
         def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
@@ -307,25 +253,20 @@ class DensableFactor(Factor):
             [with_batch_dims(other.variables)
              for other in other_factors],
             [with_batch_dims(q) for q in queries], force_multi=True)
-        for factor in other_factors:
-            if not isinstance(factor, DensableFactor):
-                raise TypeError("DensableFactor doesn't know how to be commander "
-                                "for non-densable factors")
 
         def f() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make
             # sure that changes in e.g. usage are reflected
             # any nans in any factor should be treated as a log(1)
             # meaning that it doesn't impact the product
-            input_tensors = [self.dense] + [cast(DensableFactor, f).dense
+            input_tensors = [self.dense] + [f.dense
                                             for f in other_factors]
             return einsum.log_einsum(equation, *input_tensors)
         return f
 
     @ staticmethod
-    def normalize(variables: Sequence[Var], tensor: Tensor) -> Tensor:
+    def normalize(tensor: Tensor, num_batch_dims=0) -> Tensor:
         num_dims = len(tensor.shape)
-        num_batch_dims = len(tensor.shape) - len(variables)
 
         # normalize by subtracting out the sum of the last |V| dimensions
         variable_dims = list(range(num_batch_dims, num_dims))
@@ -335,13 +276,48 @@ class DensableFactor(Factor):
 
     def free_energy(self, other_energy: Sequence[Factor], messages: Sequence[Factor]
                     ) -> Tensor:
+        r"""
+        Returns an estimate of the additive contribution of this factor to the
+        total free energy of a collection of factors.
+
+        The exact free energy of the system is the negative log partition
+        function.  The partition function is the constant factor Z that would
+        normalize the scores to sum to one.  With appropriate grouping of
+        factors, it is possible to compute the exact free energy of the system
+        in terms of free energies of groups by subtracting out double-counted
+        groups.  The free energy of a particular group with respect to the
+        entire system is a function of the scores of each joint configuration of
+        the group as well as an estimate of the marginal probability of each
+        group configuration under the full system.
+
+        In this function, the group configuration scores are specified via
+        "commanding factor" (self) and the `other_energy` factors whier are all
+        multiplied together to produce a score for each joint configuration. The
+        marginal probabilities are additionally specified by the `messages`
+        which are multiplied to the commander and other_energy factors, with the
+        output being normalized to produce a distribution over the
+        configurations.
+
+        Given these computed configuration scores and marginal probabilities
+        (known as beliefs).  The group free energy is simply the entropy of the
+        belief minus the average log score.  (Be aware that our ipmlementation
+        deals with scores and in log-space to begin with.) A separate
+        free_energy is computed for each batch_dimension so the shape of the
+        output tensor should be the batch_shape.
+
+        This computation is straight forward for dense factors, but can require
+        care for sparse (a.k.a. structured) factors (e.g.
+        projective-dependency-tree factor, or CFG-Tree factor). Thus,
+        implementing such a factor requires implementing a mechanism for
+        computing this quantity.
+        """
         # TODO?: there is a way to do this with expectation semiring that would be general to
         # non-denseables
         variables = list(set(v
                              for f in [self, *other_energy]
                              for v in f.variables))
         log_belief = self.product_marginal(variables, other_factors=[*other_energy, *messages])
-        log_belief = DensableFactor.normalize(variables, log_belief)
+        log_belief = Factor.normalize(log_belief, num_batch_dims=self.num_batch_dims)
         # positives = torch.logsumexp(log_belief.clamp_min(0) +
         #                             torch.where(log_belief >= 0,
         #                             log_belief.clamp_min(0).log(), 0.),
@@ -361,3 +337,17 @@ class DensableFactor(Factor):
         entropy = torch.sum(belief * log_belief, dim=variable_dims)
         avg_energy = torch.sum(belief * log_potentials)
         return entropy - avg_energy
+
+
+# class Factors(ABC, Iterable[Factor]):
+#     r"""
+#     A collection of factors (sometimes a coherent model component is most easily
+#     described as a subclass of this)
+#     """
+
+#     def __iter__(self) -> Iterator[Factor]:
+#         return self.factors()
+
+#     @abstractmethod
+#     def factors(self) -> Iterator[Factor]:
+#         pass

@@ -6,8 +6,9 @@ from typing import Callable, Dict, Optional, Sequence, Tuple, Union
 import torch
 from torch import Tensor
 
+from torchfactors.factor import Factor
+
 from .components.tensor_factor import TensorFactor
-from .factor import DensableFactor
 from .factor_graph import FactorGraph
 from .strategies.bethe_graph import BetheGraph
 from .strategy import Strategy
@@ -104,7 +105,7 @@ class BPInference:
                 denominator = compute_denominator()
                 # - and + rather than / and * since this is in log space
                 out.tensor.data = numerator - (out.tensor + denominator)
-                out.tensor.data = DensableFactor.normalize(out.variables, out.tensor)
+                out.tensor.data = Factor.normalize(out.tensor, num_batch_dims=out.num_batch_dims)
         return f
 
     def run(self):

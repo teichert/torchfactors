@@ -5,10 +5,10 @@ from torch import Tensor
 from torchfactors.types import ShapeType
 from torchfactors.variable import Var
 
-from ..factor import DensableFactor
+from ..factor import Factor
 
 
-class TensorFactor(DensableFactor):
+class TensorFactor(Factor):
     r"""
     A factor that is fully specified by a single, fixed tensor. The tensor
     should assign a (log) score for each possible joint configuration of (the

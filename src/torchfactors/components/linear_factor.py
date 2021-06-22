@@ -9,12 +9,12 @@ import torch
 from torch import Tensor
 from torchfactors.variable import Var
 
-from ..factor import DensableFactor
+from ..factor import Factor
 from ..model import ParamNamespace
 
 
 @ dataclass
-class LinearFactor(DensableFactor):
+class LinearFactor(Factor):
 
     def __init__(self,
                  variables: Union[Var, Sequence[Var]],

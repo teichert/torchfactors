@@ -3,7 +3,7 @@ from __future__ import annotations
 from .components.linear_factor import LinearFactor
 from .components.tensor_factor import TensorFactor
 from .domain import Domain, Range, SeqDomain
-from .factor import DensableFactor, Factor
+from .factor import Factor
 from .factor_graph import FactorGraph
 from .infer import marginals
 from .model import Model
@@ -26,7 +26,7 @@ __all__ = [
     'VarUsage', 'Var', 'VarBranch', 'VarField', 'TensorVar',
     'PADDING', 'LATENT', 'ANNOTATED', 'CLAMPED', 'OBSERVED', 'DEFAULT',
     'Subject',
-    'Factor', 'DensableFactor',
+    'Factor',
     'TensorFactor',
     'LinearFactor',
     'Model',
