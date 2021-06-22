@@ -10,6 +10,7 @@ from torch import Tensor
 
 from torchfactors import einsum
 
+from .utils import replace_negative_infinities
 from .variable import Var
 
 
@@ -283,7 +284,9 @@ class Factor:
         tensor -= normalizer[(...,) + (None,) * (num_dims - num_batch_dims)]
         return tensor
 
-    def free_energy(self, other_energy: Sequence[Factor], messages: Sequence[Factor]
+    def free_energy(self,
+                    other_energy: Sequence[Factor] = (),
+                    messages: Sequence[Factor] = ()
                     ) -> Tensor:
         r"""
         Returns an estimate of the additive contribution of this factor to the
@@ -338,13 +341,15 @@ class Factor:
         # entropy = torch.logsumexp(log_belief * log_belief.log(), dim=variable_dims)
         log_potentials = self.product_marginal(variables, other_factors=other_energy)
         belief = log_belief.exp()
-        tensor = self.dense
-        num_dims = len(tensor.shape)
-        num_batch_dims = len(tensor.shape) - len(variables)
-        # normalize by subtracting out the sum of the last |V| dimensions
-        variable_dims = list(range(num_batch_dims, num_dims))
-        entropy = torch.sum(belief * log_belief, dim=variable_dims)
-        avg_energy = torch.sum(belief * log_potentials)
+        # tensor = self.dense
+        # num_dims = len(tensor.shape)
+        # num_batch_dims = len(tensor.shape) - len(variables)
+        # # normalize by subtracting out the sum of the last |V| dimensions
+        # variable_dims = list(range(num_batch_dims, num_dims))
+        variable_dims = list(range(self.num_batch_dims, len(self.shape)))
+        entropy = torch.sum(belief * replace_negative_infinities(log_belief), dim=variable_dims)
+        avg_energy = torch.sum(
+            belief * replace_negative_infinities(log_potentials), dim=variable_dims)
         return entropy - avg_energy
 
 

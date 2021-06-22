@@ -1,3 +1,5 @@
+import math
+
 import pytest
 import torch
 from torchfactors import Range, TensorFactor, TensorVar, ndrange
@@ -21,9 +23,14 @@ def test_factor():
     zs = f.product_marginal()
     expected_zs = factor_tensor.logsumexp(dim=-1)
     assert zs.isclose(expected_zs).all()
+    zs2 = -f.free_energy()
+    assert zs2.isclose(expected_zs).all()
     # f.tensor = torch.arange(3, 4, 10)
     # f.normalize()
     # assert f.tensor.exp().sum() == 1.0
+
+
+test_factor()
 
 
 def test_bad_tensor_factor():
@@ -86,11 +93,9 @@ def test_multi_factor_bad_2vars():
         f.product_marginals(v1, v2)
 
 
-# def test_normalize():
-#     Factor.normalize()
-#     v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
-#     v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
-#     f = TensorFactor([v1, v2])
-#     with pytest.raises(ValueError):
-#         # missing the brackets around the variables makes things ambiguous
-#         f.product_marginals(v1, v2)
+def test_normalize():
+    out = Factor.normalize(torch.ones(2, 3, 4, 5), 2)
+    expected = torch.full((2, 3, 4, 5), fill_value=-math.log(20))
+    assert out.isclose(expected).all()
+
+# TODO: test where they vary accross batch dims
