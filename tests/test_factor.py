@@ -25,12 +25,6 @@ def test_factor():
     assert zs.isclose(expected_zs).all()
     zs2 = -f.free_energy()
     assert zs2.isclose(expected_zs).all()
-    # f.tensor = torch.arange(3, 4, 10)
-    # f.normalize()
-    # assert f.tensor.exp().sum() == 1.0
-
-
-test_factor()
 
 
 def test_bad_tensor_factor():

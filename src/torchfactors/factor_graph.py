@@ -7,10 +7,12 @@ from .variable import Var
 
 
 class FactorGraph:
-    """
+    r"""
+    Rpresentation of a set of factors as a bi-partite graph of factor nodes
+    and variable nodes.
     """
 
-    def __init__(self, factors: List[Factor]):
+    def __init__(self, factors: Sequence[Factor]):
         # factors come first, then variables
         self.factors = factors
         self.num_factors = len(factors)
