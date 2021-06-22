@@ -19,3 +19,7 @@ def test_strategy():
     bg = BetheGraph(fg)
     assert len(bg.regions) == len(factors) + len(vs)
     assert len(bg.edges) == sum(1 for f in factors for v in f)
+    # corresponds to factor 0 which touches vars 0 and 1
+    assert set(bg.regions[0].variables) == {vs[0], vs[1]}
+    assert set(bg.regions[0].factors) == {factors[0]}
+    assert set(bg.regions[0].factor_set) == {factors[0]}

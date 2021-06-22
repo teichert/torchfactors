@@ -33,13 +33,17 @@ class Region(object):
     def factor_set(self) -> FrozenSet[Factor]:
         return frozenset(self.factors)
 
-    def product_marginals(self, others: Sequence[Factor],
-                          *queries: Sequence[Var], exclude: Optional['Region'] = None):
-        return self.marginals_closure(others, *queries, exclude=exclude)
+    def product_marginals(self,
+                          queries: Sequence[Sequence[Var]] = (()),
+                          other_factors: Sequence[Factor] = (()),
+                          exclude: Optional[Region] = None):
+        return self.marginals_closure(queries, exclude=exclude)
 
     @ cache
-    def marginals_closure(self, others: Sequence[Factor], exclude: Optional['Region'],
-                          *queries: Sequence[Var]
+    def marginals_closure(self,
+                          queries: Sequence[Sequence[Var]] = (()),
+                          other_factors: Sequence[Factor] = (()),
+                          exclude: Optional[Region] = None
                           ) -> Callable[[], Sequence[Tensor]]:
         # factors appearing in the excluded region are excluded note that the
         # first factor (in the region) touching the most variables determines
@@ -48,7 +52,8 @@ class Region(object):
         surviving_factors = list((self.factor_set - exclude.factor_set)
                                  if exclude is not None else self.factor_set)
         _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(surviving_factors))
-        input_factors = list(surviving_factors[:ix]) + list(surviving_factors[ix:]) + list(others)
+        input_factors = list(surviving_factors[:ix]) + \
+            list(surviving_factors[ix:]) + list(other_factors)
         return controller.marginals_closure(*queries, other_factors=input_factors)
 
     # TODO: here

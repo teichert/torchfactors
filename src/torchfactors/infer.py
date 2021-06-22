@@ -59,7 +59,8 @@ class BPInference:
         bel = torch.zeros_like(t)
         for region_id, region, v in self.strategy.get_regions_with_var(variable):
             t[v.ndslice] += 1
-            bel[v.ndslice] += region.product_marginals(self.in_messages(region_id), [v])[0]
+            bel[v.ndslice] += region.product_marginals([(v,)],
+                                                       other_factors=self.in_messages(region_id))[0]
         return (bel / t)[variable.ndslice]
 
     def message(self, key: Tuple[int, int]) -> TensorFactor:
