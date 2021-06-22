@@ -7,6 +7,7 @@ from .factor import Factor
 from .factor_graph import FactorGraph
 from .infer import marginals
 from .model import Model
+from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
 from .utils import ndrange
 from .variable import TensorVar, Var, VarBranch, VarField, VarUsage
@@ -32,5 +33,6 @@ __all__ = [
     'Model',
     'FactorGraph',
     'marginals',
-    'ndrange'
+    'ndrange',
+    'BetheGraph',
 ]

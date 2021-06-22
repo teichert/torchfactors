@@ -12,4 +12,4 @@ def BetheGraph(graph: FactorGraph) -> Strategy:
             for factor_node in graph.factor_nodes] + [
             Region(graph, (variable_node,), 1 - len(graph.neighbors[variable_node]))
             for variable_node in graph.variable_nodes],
-        edges=[(i, j) for i in range(graph.num_nodes) for j in graph.neighbors[i]])
+        edges=[(i, j) for i in range(len(graph.factor_nodes)) for j in graph.neighbors[i]])
