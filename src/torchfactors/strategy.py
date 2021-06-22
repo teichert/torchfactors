@@ -35,12 +35,12 @@ class Region(object):
 
     def product_marginals(self, others: Sequence[Factor],
                           *queries: Sequence[Var], exclude: Optional['Region'] = None):
-        return self.queryf(others, *queries, exclude=exclude)
+        return self.marginals_closure(others, *queries, exclude=exclude)
 
     @ cache
-    def queryf(self, others: Sequence[Factor], exclude: Optional['Region'],
-               *queries: Sequence[Var]
-               ) -> Callable[[], Sequence[Tensor]]:
+    def marginals_closure(self, others: Sequence[Factor], exclude: Optional['Region'],
+                          *queries: Sequence[Var]
+                          ) -> Callable[[], Sequence[Tensor]]:
         # factors appearing in the excluded region are excluded note that the
         # first factor (in the region) touching the most variables determines
         # how the inference is done (if this needs to be modified, then have
@@ -49,11 +49,7 @@ class Region(object):
                                  if exclude is not None else self.factor_set)
         _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(surviving_factors))
         input_factors = list(surviving_factors[:ix]) + list(surviving_factors[ix:]) + list(others)
-        wrapped = controller.queryf([f.variables for f in input_factors], *queries)
-
-        def f():
-            return wrapped(input_factors)
-        return f
+        return controller.marginals_closure(input_factors, *queries)
 
     # TODO: here
     def free_energy(self, messages: Sequence['Factor']) -> Tensor:

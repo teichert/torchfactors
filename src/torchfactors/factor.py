@@ -4,7 +4,7 @@ import math
 from abc import abstractmethod
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Callable, Iterator, List, Sequence, cast
+from typing import Callable, Iterator, Sequence
 
 import torch
 from torch import Tensor
@@ -42,12 +42,16 @@ class Factor:
         The partition function can be queried via an empty tuple of variables.
         If no queries are specified, then the partition function is queried.
         """
-        return self.queryf([f.variables for f in other_factors], *queries)(
-            other_factors)
+        return self.marginals_closure(other_factors, *queries)()
 
-    # @abstractmethod
-    def queryf(self, others: Sequence[Sequence[Var]], *queries: Sequence[Var]
-               ) -> Callable[[Sequence[Factor]], Sequence[Tensor]]:
+    def marginals_closure(self, others: Sequence[Factor], *queries: Sequence[Var]
+                          ) -> Callable[[], Sequence[Tensor]]:
+        r"""
+        Given a set of other factors and a set of product_marginal queries,
+        returns a function that recomputes the corresponding marginals for each
+        query given the current values of the factors.
+
+        """
         raise NotImplementedError("don't know how to do queries on this")
 
     def free_energy(self, other_energy: Sequence[Factor], messages: Sequence[Factor]
@@ -284,13 +288,13 @@ class DensableFactor(Factor):
         # d[self.padded_mask]=float('nan')
         # return d
 
-    def queryf(self, others: Sequence[Sequence[Var]], *queries: Sequence[Var]
-               ) -> Callable[[Sequence[Factor]], Sequence[Tensor]]:
-        equation = einsum.compile_obj_equation(cast(List[Sequence[Var]], [self.variables]) +
-                                               list(others),
+    def marginals_closure(self, others: Sequence[Factor], *queries: Sequence[Var]
+                          ) -> Callable[[], Sequence[Tensor]]:
+        equation = einsum.compile_obj_equation([self.variables] +
+                                               [other.variables for other in others],
                                                queries, force_multi=True)
 
-        def f(others: Sequence[Factor]) -> Sequence[Tensor]:
+        def f() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make
             # sure that changes in e.g. usage are reflected
             dense = [self.dense]
