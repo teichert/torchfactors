@@ -54,3 +54,13 @@ def test_bad_multi_factor():
     with pytest.raises(ValueError):
         # batch dims don't match
         TensorFactor([v1, v2])
+
+
+def test_multi_factor():
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
+    v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+    f = TensorFactor([v1, v2])
+    assert f.product_marginal(v1).shape == (3, 4, 10)
+    assert (f.product_marginal(v1).exp() == 5).all()
+    assert f.product_marginal(v2).shape == (3, 4, 5)
+    assert (f.product_marginal(v2).exp() == 10).all()
