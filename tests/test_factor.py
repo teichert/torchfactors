@@ -56,7 +56,7 @@ def test_bad_multi_factor():
         TensorFactor([v1, v2])
 
 
-def test_multi_factor():
+def test_multi_factor_var():
     v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
     v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
     f = TensorFactor([v1, v2])
@@ -64,3 +64,23 @@ def test_multi_factor():
     assert (f.product_marginal(v1).exp() == 5).all()
     assert f.product_marginal(v2).shape == (3, 4, 5)
     assert (f.product_marginal(v2).exp() == 10).all()
+
+
+def test_multi_factor_2vars():
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
+    v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+    f = TensorFactor([v1, v2])
+    v1marg, v2marg = f.product_marginals([v1], [v2])
+    assert v1marg.shape == (3, 4, 10)
+    assert (v1marg.exp() == 5).all()
+    assert v2marg.shape == (3, 4, 5)
+    assert (v2marg.exp() == 10).all()
+
+
+def test_multi_factor_bad_2vars():
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
+    v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+    f = TensorFactor([v1, v2])
+    with pytest.raises(ValueError):
+        # missing the brackets around the variables makes things ambiguous
+        f.product_marginals(v1, v2)
