@@ -8,7 +8,7 @@ from typing import (Dict, FrozenSet, Generic, List, Sequence, TypeVar, Union,
 from torch.utils.data import DataLoader, Dataset
 
 from .domain import Domain
-from .variable import Var, VarField, VarUsage
+from .variable import TensorVar, VarField, VarUsage
 
 SubjectType = TypeVar('SubjectType', bound='Subject')
 
@@ -30,13 +30,16 @@ class ListDataset(Dataset, Generic[ExampleType]):
 @ dataclass
 class Subject:
     is_stacked: bool = field(init=False, default=False)
-    __lists: Dict[object, List[object]] = field(init=False, default_factory=dict)
+    __lists: Dict[str, List[object]] = field(init=False, default_factory=dict)
     __vars: FrozenSet = field(init=False, default=frozenset())
+
+    def list(self, key: str) -> List[object]:
+        return self.__lists[key]
 
     def init_variables(self):
         cls = type(self)
         vars = []
-        cls_attr_id_to_var: Dict[int, Var] = {}
+        cls_attr_id_to_var: Dict[int, TensorVar] = {}
         # basic idea: for each field, check if the class_variable has more information
         # than in this particular object; if it does, then copy over.
         # class version should never have tensor-like usage nor an actual tensor.
@@ -48,12 +51,12 @@ class Subject:
             var_field = getattr(cls, attr_name)
             if isinstance(var_field, VarField):
                 var_instance = getattr(self, attr_name)
-                if not isinstance(var_instance, Var):
+                if not isinstance(var_instance, TensorVar):
                     if var_field._usage != VarUsage.LATENT:
                         raise ValueError("only latent variables can be left implicit; "
                                          "make sure that you pass in all required variables "
                                          "to the subject constructor")
-                    var_instance = Var()
+                    var_instance = TensorVar()
                     setattr(self, attr_name, var_instance)
                 cls_attr_id_to_var[id(var_field)] = var_instance
                 if var_instance._tensor is None:
@@ -92,25 +95,28 @@ class Subject:
         out = copy.deepcopy(first)
         out.is_stacked = True
         # cls = type(out)
-        my_fields = set(field.name for field in fields(first)) - first.__vars
+        generic_fields = set(field.name for field in fields(Subject))
+        my_fields = set(field.name for field in fields(first)) - first.__vars - generic_fields
         for attr_name in first.__vars:
-            attr = cast(Var, getattr(out, attr_name))
-            stacked = Var.pad_and_stack([
-                cast(Var, getattr(subject, attr_name))
+            # attr = cast(TensorVar, getattr(out, attr_name))
+            stacked = TensorVar.pad_and_stack([
+                cast(TensorVar, getattr(subject, attr_name))
                 for subject in subjects])
             setattr(out, attr_name, stacked)
         for attr_name in my_fields:
-            attr = getattr(out, attr_name)
-            out.__lists[attr] = [
+            # attr = getattr(out, attr_name)
+            out.__lists[attr_name] = [
                 getattr(subject, attr_name)
                 for subject in subjects]
         return out
 
     @ staticmethod
-    def data_loader(data: Union[List[ExampleType], Dataset], **kwargs) -> DataLoader:
+    def data_loader(data: Union[List[ExampleType], Dataset], batch_size: int | None = 1,
+                    **kwargs) -> DataLoader:
         if not isinstance(data, Dataset):
             data = ListDataset(data)
-        return DataLoader(cast(Dataset, data), collate_fn=Subject.stack, **kwargs)
+        return DataLoader(cast(Dataset, data), collate_fn=Subject.stack, batch_size=batch_size,
+                          **kwargs)
         # def shapes(self):
         #     cls = type(obj)
         #     for attr_name in dir(cls):
@@ -132,11 +138,11 @@ class Subject:
 
     def clamp_annotated(self) -> None:
         for attr_name in self.__vars:
-            cast(Var, getattr(self, attr_name)).clamp_annotated()
+            cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
 
     def unclamp_annotated(self) -> None:
         for attr_name in self.__vars:
-            cast(Var, getattr(self, attr_name)).unclamp_annotated()
+            cast(TensorVar, getattr(self, attr_name)).unclamp_annotated()
 
     def __post_init__(self):
         self.init_variables()

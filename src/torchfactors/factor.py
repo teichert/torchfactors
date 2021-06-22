@@ -11,7 +11,7 @@ from torch import Tensor
 
 from torchfactors import einsum
 
-from .variable import VarBase
+from .variable import Var
 
 
 @dataclass
@@ -24,21 +24,21 @@ class Factor:
     factor need to know how to answer queries given other "denseable" factors
     as input and a set of (einsum style) queries to respond to.
     """
-    variables: Sequence[VarBase]
+    variables: Sequence[Var]
 
-    def __iter__(self) -> Iterator[VarBase]:
+    def __iter__(self) -> Iterator[Var]:
         return iter(self.variables)
 
     def __len__(self) -> int:
         return len(self.variables)
 
-    def query(self, others: Sequence[Factor], *queries: Sequence[VarBase]
+    def query(self, others: Sequence[Factor], *queries: Sequence[Var]
               ) -> Sequence[Tensor]:
         return self.queryf([f.variables for f in others], *queries)(
             others)
 
     # @abstractmethod
-    def queryf(self, others: Sequence[Sequence[VarBase]], *queries: Sequence[VarBase]
+    def queryf(self, others: Sequence[Sequence[Var]], *queries: Sequence[Var]
                ) -> Callable[[Sequence[Factor]], Sequence[Tensor]]:
         raise NotImplementedError("don't know how to do queries on this")
 
@@ -216,9 +216,9 @@ class DensableFactor(Factor):
         # d[self.padded_mask]=float('nan')
         # return d
 
-    def queryf(self, others: Sequence[Sequence[VarBase]], *queries: Sequence[VarBase]
+    def queryf(self, others: Sequence[Sequence[Var]], *queries: Sequence[Var]
                ) -> Callable[[Sequence[Factor]], Sequence[Tensor]]:
-        equation = einsum.compile_obj_equation(cast(List[Sequence[VarBase]], [self.variables]) +
+        equation = einsum.compile_obj_equation(cast(List[Sequence[Var]], [self.variables]) +
                                                list(others),
                                                queries, force_multi=True)
 
@@ -232,7 +232,7 @@ class DensableFactor(Factor):
         return f
 
     @ staticmethod
-    def normalize(variables: Sequence[VarBase], tensor: Tensor) -> Tensor:
+    def normalize(variables: Sequence[Var], tensor: Tensor) -> Tensor:
         num_dims = len(tensor.shape)
         num_batch_dims = len(tensor.shape) - len(variables)
 

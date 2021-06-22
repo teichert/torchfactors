@@ -43,7 +43,7 @@ class VarUsage(IntEnum):
     DEFAULT = OBSERVED
 
 
-class VarBase(ABC):
+class Var(ABC):
     """
     Represents a set of variables arranged in an n-dimensional grid. Each
     variable includes a placeholder for a value, an indicator for how the
@@ -199,16 +199,16 @@ def compose(shape: ShapeType, first: NDSlice, second: NDSlice):
     return tuple(out)
 
 
-class VarBranch(VarBase):
+class VarBranch(Var):
     r"""
     Represents a subset of a variable tensor
     """
 
-    def __init__(self, root: Var, ndslice: NDSlice):
+    def __init__(self, root: TensorVar, ndslice: NDSlice):
         self.root = root
         self.__ndslice = ndslice
 
-    def __getitem__(self, ndslice: NDSlice) -> VarBase:
+    def __getitem__(self, ndslice: NDSlice) -> Var:
         return VarBranch(self.root, compose(self.root.tensor.shape, self.ndslice, ndslice))
 
     def _get_tensor(self) -> Tensor:
@@ -238,13 +238,13 @@ class VarBranch(VarBase):
         return self.__ndslice
 
 
-class VarField(VarBase):
+class VarField(Var):
 
     @overload  # type: ignore[misc]
     def __init__(self,
                  domain: Domain = Domain.OPEN,
                  usage: Optional[VarUsage] = VarUsage.DEFAULT,
-                 shape: Union[VarBase, ShapeType, None] = None,
+                 shape: Union[Var, ShapeType, None] = None,
                  init: Optional[Callable[[ShapeType], Tensor]] = torch.zeros,
                  info: typing_extensions._AnnotatedAlias = None):
         self._domain = domain
@@ -275,7 +275,7 @@ class VarField(VarBase):
         raise NotImplementedError("var fields don't actually have a tensor")
 
 
-class Var(VarBase):
+class TensorVar(Var):
     """
     Represents a tensor wrapped with domain and usage information.
 
@@ -330,7 +330,7 @@ class Var(VarBase):
                           domain: Domain = Domain.OPEN):
         self.__init__(domain, usage, tensor)  # type: ignore[misc]
 
-    def __getitem__(self, ndslice: NDSlice) -> VarBase:
+    def __getitem__(self, ndslice: NDSlice) -> Var:
         return VarBranch(root=self, ndslice=ndslice)
 
     def _get_tensor(self) -> Tensor:
@@ -351,8 +351,8 @@ class Var(VarBase):
         return self._domain
 
     @staticmethod
-    def pad_and_stack(batch: List['Var'], pad_value=float('nan')
-                      ) -> 'Var':
+    def pad_and_stack(batch: List['TensorVar'], pad_value=-1,
+                      ) -> 'TensorVar':
         """
         given a list of tensors with same number of dimensions but possibly
         different shapes returns: (stacked, shapes) defined as follows: stacked:
@@ -373,7 +373,7 @@ class Var(VarBase):
         stacked_tensors = first_tensor.new_full(
             (batch_size, *max_shape), fill_value=pad_value, dtype=dtype)
         stacked_usages = first_tensor.new_full(
-            (batch_size, *max_shape), fill_value=VarUsage.PADDING.value, dtype=dtype)
+            (batch_size, *max_shape), fill_value=VarUsage.PADDING.value, dtype=int)
         # mask = first_tensor.new_full((batch_size, *max_shape),
         # fill_value=False, dtype=torch.bool)
         for i, x in enumerate(batch):
@@ -382,7 +382,7 @@ class Var(VarBase):
             stacked_usages[[i, *x_indexs]] = x.usage
             # mask[[i, *x_indexs]] = tensor.new_ones(tensor.shape)
         # Var(stacked, )
-        return Var(first.domain, tensor=stacked_tensors, usage=stacked_usages)
+        return TensorVar(first.domain, tensor=stacked_tensors, usage=stacked_usages)
 
     def _get_original_tensor(self) -> Tensor:
         return self.tensor

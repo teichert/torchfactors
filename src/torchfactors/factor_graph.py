@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Iterator, List, Sequence
 
-
 from .factor import Factor
-from .variable import VarBase
+from .variable import Var
 
 
 class FactorGraph:
@@ -54,7 +53,7 @@ class FactorGraph:
         ]
 
     def region_variables(self, node_ids: Sequence[int]
-                         ) -> List[VarBase]:
+                         ) -> List[Var]:
         return [
             self.variables[node_id - self.num_factors]
             for node_id in self.full_region(node_ids)

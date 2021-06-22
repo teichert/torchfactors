@@ -11,7 +11,7 @@ from .factor import DensableFactor
 from .factor_graph import FactorGraph
 from .strategies.bethe_graph import BetheGraph
 from .strategy import Strategy
-from .variable import VarBase
+from .variable import Var
 
 cache = lru_cache(maxsize=None)
 
@@ -39,7 +39,7 @@ class BPInference:
             )
         return -torch.stack(region_free_energies, -1).sum(dim=-1)
 
-    def belief(self, variable: VarBase) -> Tensor:
+    def belief(self, variable: Var) -> Tensor:
         r"""
         Each input variable has a tensor and an ndslice (or None to represent a
         request for the estimate of log Z); for each, we will return a tensor
@@ -113,7 +113,7 @@ class BPInference:
 
 # TODO: handle queries that are not in the graph
 # should I be normalizing? probably
-def query(self, *queries: Optional[VarBase],
+def query(self, *queries: Optional[Var],
           strategy=None, force_multi=False) -> Union[Sequence[Tensor], Tensor]:
     if strategy is None:
         strategy = BetheGraph(self)

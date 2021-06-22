@@ -10,7 +10,7 @@ from torch import Tensor
 
 from .factor import Factor
 from .factor_graph import FactorGraph
-from .variable import VarBase
+from .variable import Var
 
 cache = lru_cache(maxsize=None)
 
@@ -22,7 +22,7 @@ class Region(object):
     counting_number: float
 
     @ cached_property
-    def variables(self) -> Sequence[VarBase]:
+    def variables(self) -> Sequence[Var]:
         return self.factor_graph.region_variables(self.factor_graph_nodes)
 
     @ cached_property
@@ -34,12 +34,12 @@ class Region(object):
         return frozenset(self.factors)
 
     def query(self, others: Sequence[Factor],
-              *queries: Sequence[VarBase], exclude: Optional['Region'] = None):
+              *queries: Sequence[Var], exclude: Optional['Region'] = None):
         return self.queryf(others, *queries, exclude=exclude)
 
     @ cache
     def queryf(self, others: Sequence[Factor], exclude: Optional['Region'],
-               *queries: Sequence[VarBase]
+               *queries: Sequence[Var]
                ) -> Callable[[], Sequence[Tensor]]:
         # factors appearing in the excluded region are excluded note that the
         # first factor (in the region) touching the most variables determines
@@ -79,7 +79,7 @@ class Strategy(object):
             self.into[t].append(s)
             self.outfrom[s].append(t)
 
-    def get_regions_with_var(self, variable) -> Iterable[Tuple[int, Region, VarBase]]:
+    def get_regions_with_var(self, variable) -> Iterable[Tuple[int, Region, Var]]:
         for rid, r in enumerate(self.regions):
             for v in r.variables:
                 if variable.origin.overlaps(v):
