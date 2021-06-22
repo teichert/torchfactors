@@ -48,4 +48,9 @@ def test_multi_factor():
     assert f.shape == (3, 4, 10, 5)
 
 
-test_multi_factor()
+def test_bad_multi_factor():
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
+    v2 = TensorVar(torch.ones(4, 4), domain=Range(10))
+    with pytest.raises(ValueError):
+        # batch dims don't match
+        TensorFactor([v1, v2])

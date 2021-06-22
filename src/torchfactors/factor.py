@@ -29,7 +29,7 @@ class Factor:
             variables = (variables,)
         self.variables = variables
         for v in self.variables[1:]:
-            if v.shape != self.variables[1].shape:
+            if v.shape != self.variables[0].shape:
                 raise ValueError("all variables must have the same shape (domains can vary)")
 
     def __iter__(self) -> Iterator[Var]:
