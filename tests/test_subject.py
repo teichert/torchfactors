@@ -65,6 +65,39 @@ def test_stacked():
     assert b.list('id1') == [3, 4]
     assert c.list('id1') == [5]
 
+    assert a.id2 == 6
+    assert b.id2 == 8
+    assert c.id2 == 0
+    assert a.list('id2') == [6, 7]
+    assert b.list('id2') == [8, 9]
+    assert c.list('id2') == [0]
+
+    assert a.observations.shape == (2, 7)
+    assert b.observations.shape == (2, 8)
+    assert c.observations.shape == (1, 1)
+
+    assert a.hidden.shape == (2, 7)
+    assert b.hidden.shape == (2, 8)
+    assert c.hidden.shape == (1, 1)
+
+    x1, x2 = a.unstack()
+    assert x1.id1 == 1
+    assert x1.id2 == 6
+
+    assert x2.id1 == 2
+    assert x2.id2 == 7
+
+    assert x1.observations.shape == (7,)
+    assert x2.observations.shape == (4,)
+    assert x1.hidden.shape == (7,)
+    assert x2.hidden.shape == (4,)
+
+    assert x1.observations.tensor.shape == (7,)
+    assert x2.observations.tensor.shape == (4,)
+
+    assert x1.observations.usage.shape == (7,)
+    assert x2.observations.usage.shape == (4,)
+
 
 #     assert u.observations.domain == Range[10]
 #     assert u.hidden.domain == Range[4]

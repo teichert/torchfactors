@@ -8,7 +8,7 @@ from typing import (Dict, FrozenSet, Generic, List, Sequence, TypeVar, Union,
 from torch.utils.data import DataLoader, Dataset
 
 from .domain import Domain
-from .variable import TensorVar, VarField, VarUsage
+from .variable import TensorVar, Var, VarField, VarUsage
 
 SubjectType = TypeVar('SubjectType', bound='Subject')
 
@@ -108,6 +108,36 @@ class Subject:
             out.__lists[attr_name] = [
                 getattr(subject, attr_name)
                 for subject in subjects]
+        return out
+
+    def unstack(self: SubjectType) -> List[SubjectType]:
+        generic_fields = set(field.name for field in fields(Subject))
+        my_fields = set(field.name for field in fields(self)) - self.__vars - generic_fields
+        if self.__vars:
+            first_var_fieldname = next(iter(self.__vars))
+            first_var = cast(Var, getattr(self, first_var_fieldname))
+            batch_size = first_var.shape[0]
+        elif my_fields:
+            first_fieldname = next(iter(my_fields))
+            first_field = cast(list, self.list(first_fieldname))
+            batch_size = len(first_field)
+        else:
+            raise ValueError("You need to have at least one field to unstack")
+
+        out = [copy.copy(self) for _ in range(batch_size)]
+        for obj in out:
+            obj.is_stacked = False
+            # obj.__lists = {}
+            # obj.__vars = frozenset()
+        for var_fieldname in self.__vars:
+            joined = cast(TensorVar, getattr(self, var_fieldname))
+            split = joined.unstack()
+            for obj, val in zip(out, split):
+                setattr(obj, var_fieldname, val)
+        for other_fieldname in my_fields:
+            split = cast(list, self.list(other_fieldname))
+            for obj, val in zip(out, split):
+                setattr(obj, other_fieldname, val)
         return out
 
     @ staticmethod

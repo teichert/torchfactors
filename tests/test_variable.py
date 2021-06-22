@@ -201,6 +201,22 @@ def test_pad_and_stack():
     assert (v.usage == LATENT).sum() == (3 * 4 + 2 * 10 + 4 * 7)
     assert v.shape == (3, 4, 10)
 
+    a, b, c = v.unstack()
+    assert a.domain == Range[4]
+    assert (a.usage == LATENT).sum() == 3 * 4
+    assert a.shape == (3, 4)
+
+    assert b.domain == Range[4]
+    assert (b.usage == LATENT).sum() == 2 * 10
+    assert b.shape == (2, 10)
+
+    assert c.domain == Range[4]
+    assert (c.usage == LATENT).sum() == 4 * 7
+    assert c.shape == (4, 7)
+
+    with pytest.raises(ValueError):
+        a.unstack()
+
 
 def test_var_field():
     v = VarField()

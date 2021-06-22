@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import Callable, List, Optional, Tuple, Union, cast
+from typing import Callable, List, Optional, Sequence, Tuple, Union, cast
 
 import torch
 import typing_extensions
@@ -275,6 +275,12 @@ class VarField(Var):
         raise NotImplementedError("var fields don't actually have a tensor")
 
 
+def as_ndslice(shape: ShapeType) -> NDSlice:
+    return tuple(
+        slice(dim_size)
+        for dim_size in shape)
+
+
 class TensorVar(Var):
     """
     Represents a tensor wrapped with domain and usage information.
@@ -290,7 +296,8 @@ class TensorVar(Var):
     def __init__(self, domain: Domain = Domain.OPEN,
                  usage: Union[VarUsage, Tensor, None] = None,
                  tensor: Optional[Tensor] = None,
-                 info: typing_extensions._AnnotatedAlias = None):
+                 info: typing_extensions._AnnotatedAlias = None,
+                 stack_shapes: Optional[Sequence[ShapeType]] = None):
         """
         when the shape is another variable object, that indicates that this variable object
         is being
@@ -303,6 +310,7 @@ class TensorVar(Var):
         else:
             self._usage = usage
         self._info = info
+        self._stack_shapes = stack_shapes
 
     @__init__.register
     def _dom_tensor_usage(self, domain: Domain,
@@ -368,8 +376,9 @@ class TensorVar(Var):
         first = batch[0]
         first_tensor = first.tensor
         dtype = first_tensor.dtype
-        shapes = torch.vstack([torch.tensor(x.shape) for x in batch])
-        max_shape = torch.max(shapes, 0).values
+        stack_shapes = [x.shape for x in batch]
+        shapes = [torch.tensor(shape) for shape in stack_shapes]
+        max_shape = torch.max(torch.vstack(shapes), 0).values
         stacked_tensors = first_tensor.new_full(
             (batch_size, *max_shape), fill_value=pad_value, dtype=dtype)
         stacked_usages = first_tensor.new_full(
@@ -382,7 +391,26 @@ class TensorVar(Var):
             stacked_usages[[i, *x_indexs]] = x.usage
             # mask[[i, *x_indexs]] = tensor.new_ones(tensor.shape)
         # Var(stacked, )
-        return TensorVar(first.domain, tensor=stacked_tensors, usage=stacked_usages)
+        return TensorVar(first.domain, tensor=stacked_tensors,
+                         usage=stacked_usages, stack_shapes=stack_shapes)
+
+    def unstack(self):
+        if (self._tensor is None or
+            self._usage is None or
+            self._stack_shapes is None or
+                isinstance(self._usage, VarUsage)):
+            raise ValueError('Cannot unstack a non-stacked variable')
+        tensors = self._tensor.unbind()
+        usages = self._usage.unbind()
+        return [
+            TensorVar(
+                domain=self.domain,
+                usage=usage[as_ndslice(shape)],
+                tensor=tensor[as_ndslice(shape)],
+                info=self._info)
+            for usage, tensor, shape
+            in zip(usages, tensors, self._stack_shapes)
+        ]
 
     def _get_original_tensor(self) -> Tensor:
         return self.tensor
