@@ -32,4 +32,4 @@ def test_bad_tensor_factor():
         TensorFactor(v, torch.rand(3, 4, 9))
 
 
-# test_factor()
+test_factor()
