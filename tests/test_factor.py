@@ -31,3 +31,11 @@ def test_bad_tensor_factor():
     v = TensorVar(t, domain=Range(10))
     with pytest.raises(ValueError):
         TensorFactor(v, torch.rand(3, 4, 9))
+
+
+def test_init_tensor_factor():
+    t = torch.ones(3, 4)
+    v = TensorVar(t, domain=Range(10))
+    f = TensorFactor(v)
+    assert f.dense.shape == (3, 4, 10)
+    assert (f.dense == 0).all()
