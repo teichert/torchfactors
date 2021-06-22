@@ -7,14 +7,14 @@ import torchfactors as tx
 
 @dataclass
 class Utterance(tx.Subject):
-    items: tx.TensorVar = tx.TensorVar(tx.Range[5])  # TensorType['batch': ..., 'index', int]
+    items: tx.TensorVar = tx.TensorVar(tx.Range(5))  # TensorType['batch': ..., 'index', int]
 
 
 class MyModel(tx.Model[Utterance]):
 
     def factors(self, subject: Utterance):
         items = subject.items
-        hidden = tx.TensorVar(items.tensor, tx.VarUsage.LATENT, tx.Range[100])
+        hidden = tx.TensorVar(items.tensor, tx.VarUsage.LATENT, tx.Range(100))
         for i in range(len(items.tensor)):
             if i > 0:
                 yield tx.LinearFactor([hidden[i], hidden[i-1]], self.namespace('transition'))

@@ -14,7 +14,7 @@ def test_usage1():
 
 def test_variable():
     t = torch.ones(3, 4)
-    v = TensorVar(t, Range[4])
+    v = TensorVar(t, Range(4))
     assert len(v.domain) == 4
     assert v.tensor is t
     assert v.shape == (3, 4)
@@ -28,7 +28,7 @@ def test_variable():
 
 def test_shape():
     t = torch.ones(3, 4)
-    v = TensorVar(t, Range[4])
+    v = TensorVar(t, Range(4))
     v2 = v[1:3, 2:4]
     assert v2.original_tensor is t
     assert v2.ndslice == (slice(1, 3), slice(2, 4))
@@ -43,7 +43,7 @@ def test_shape():
 
 def test_usage3():
     t = torch.ones(3, 4)
-    v = TensorVar(t, Range[4])
+    v = TensorVar(t, Range(4))
     v.set_usage(ANNOTATED)
     assert (v.usage == ANNOTATED).all()
     v[1, 2:4].set_usage(OBSERVED)
@@ -52,7 +52,7 @@ def test_usage3():
 
 def test_clamp():
     t = torch.ones(3, 4)
-    v = TensorVar(t, Range[4])
+    v = TensorVar(t, Range(4))
     v2 = v[2, :]
     with pytest.raises(ValueError):
         v2.set_usage(OBSERVED)
@@ -93,7 +93,7 @@ def test_compose():
 
 def test_nested():
     t = torch.zeros(4, 10, 12, 7)
-    v = TensorVar(t, Range[4])
+    v = TensorVar(t, Range(4))
     va = v[:, 3, 3:9][2, 1:3, :5]
     va.set_tensor(1)
     assert va.shape == (2, 5)
@@ -113,7 +113,7 @@ def test_nested():
 
 def test_domain():
     t = torch.ones(3, 4)
-    v = TensorVar(t, Range[4])
+    v = TensorVar(t, Range(4))
     v2 = v[2:, :]
     assert v2.domain == v.domain
 
@@ -121,27 +121,27 @@ def test_domain():
 def test_eq():
     t = torch.ones(3, 4)
     t2 = torch.ones(3, 4)
-    v1 = TensorVar(t, Range[4])
-    v2 = TensorVar(t, Range[4])
+    v1 = TensorVar(t, Range(4))
+    v2 = TensorVar(t, Range(4))
     v3 = v1[2:, :]
     v4 = v2[2:, :]
     assert v1 == v2
     assert v3 == v4
     assert v1 != v3
-    v5 = TensorVar(t2, Range[4])
+    v5 = TensorVar(t2, Range(4))
     assert v1 != v5
 
 
 def test_dict():
     t = torch.ones(3, 4)
     t2 = torch.ones(3, 4)
-    v1 = TensorVar(t, Range[4])
-    v2 = TensorVar(t, Range[4])
+    v1 = TensorVar(t, Range(4))
+    v2 = TensorVar(t, Range(4))
     assert hash(v1) == hash(v2)
     v3 = v1[2:, :]
     v4 = v2[2:, :]
     assert hash(v3) == hash(v4)
-    v5 = TensorVar(t2, Range[4])
+    v5 = TensorVar(t2, Range(4))
     d: Dict[Var, Tuple[int, ...]] = dict()
     d[v1] = (1, 2)
     d[v3] = (3, 4)
@@ -155,7 +155,7 @@ def test_dict():
 
 def test_var_from_tensor_usage():
     t = torch.ones(3, 4)
-    v = TensorVar(Range[4], t)
+    v = TensorVar(Range(4), t)
     assert v.tensor is t
     assert list(v.domain) == [0, 1, 2, 3]
     v.set_usage(DEFAULT)
@@ -165,7 +165,7 @@ def test_var_from_tensor_usage():
 
 def test_var_from_tensor_usage_dom():
     t = torch.ones(3, 4)
-    v = TensorVar(t, LATENT, Range[4])
+    v = TensorVar(t, LATENT, Range(4))
     assert v.tensor is t
     assert list(v.domain) == [0, 1, 2, 3]
     assert v.usage.shape == t.shape
@@ -174,7 +174,7 @@ def test_var_from_tensor_usage_dom():
 
 def test_var_from_usage_tensor_dom():
     t = torch.ones(3, 4)
-    v = TensorVar(LATENT, t, Range[4])
+    v = TensorVar(LATENT, t, Range(4))
     assert v.tensor is t
     assert list(v.domain) == [0, 1, 2, 3]
     assert v.usage.shape == t.shape
@@ -183,7 +183,7 @@ def test_var_from_usage_tensor_dom():
 
 def test_var_from_usage_dom_tensor():
     t = torch.ones(3, 4)
-    v = TensorVar(LATENT, Range[4], t)
+    v = TensorVar(LATENT, Range(4), t)
     assert v.tensor is t
     assert list(v.domain) == [0, 1, 2, 3]
     assert v.usage.shape == t.shape
@@ -192,25 +192,25 @@ def test_var_from_usage_dom_tensor():
 
 def test_pad_and_stack():
     vs = [
-        TensorVar(LATENT, Range[4], torch.ones(3, 4)),
-        TensorVar(LATENT, Range[4], torch.ones(2, 10)),
-        TensorVar(LATENT, Range[4], torch.ones(4, 7)),
+        TensorVar(LATENT, Range(4), torch.ones(3, 4)),
+        TensorVar(LATENT, Range(4), torch.ones(2, 10)),
+        TensorVar(LATENT, Range(4), torch.ones(4, 7)),
     ]
     v = TensorVar.pad_and_stack(vs)
-    assert v.domain == Range[4]
+    assert v.domain == Range(4)
     assert (v.usage == LATENT).sum() == (3 * 4 + 2 * 10 + 4 * 7)
     assert v.shape == (3, 4, 10)
 
     a, b, c = v.unstack()
-    assert a.domain == Range[4]
+    assert a.domain == Range(4)
     assert (a.usage == LATENT).sum() == 3 * 4
     assert a.shape == (3, 4)
 
-    assert b.domain == Range[4]
+    assert b.domain == Range(4)
     assert (b.usage == LATENT).sum() == 2 * 10
     assert b.shape == (2, 10)
 
-    assert c.domain == Range[4]
+    assert c.domain == Range(4)
     assert (c.usage == LATENT).sum() == 4 * 7
     assert c.shape == (4, 7)
 

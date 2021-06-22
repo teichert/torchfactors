@@ -27,13 +27,13 @@ def test_subject_good():
 def test_basic():
     @dataclass
     class Utterance(Subject):
-        observations: Var = VarField(Range[10], OBSERVED)
-        hidden: Var = VarField(Range[4], LATENT, shape=observations)
+        observations: Var = VarField(Range(10), OBSERVED)
+        hidden: Var = VarField(Range(4), LATENT, shape=observations)
 
     v = TensorVar(torch.tensor([2, 0, 1, 2, 3, 8]))
     u = Utterance(v)
-    assert u.observations.domain == Range[10]
-    assert u.hidden.domain == Range[4]
+    assert u.observations.domain == Range(10)
+    assert u.hidden.domain == Range(4)
     assert u.observations.shape == (6,)
     assert u.hidden.shape == (6,)
     assert (u.observations.usage == OBSERVED).all()
@@ -44,8 +44,8 @@ def test_implicit():
     with pytest.raises(ValueError):
         @dataclass
         class Utterance(Subject):
-            observations: Var = VarField(Range[10], OBSERVED)
-            other: Var = VarField(Range[4], OBSERVED, shape=observations)
+            observations: Var = VarField(Range(10), OBSERVED)
+            other: Var = VarField(Range(4), OBSERVED, shape=observations)
 
         Utterance(TensorVar(torch.tensor([1, 3, 2, 4, 3, 5, 4]))),
 
@@ -53,7 +53,7 @@ def test_implicit():
 def test_only_implicit():
     @dataclass
     class Utterance(Subject):
-        v: Var = VarField(Range[4], LATENT, shape=(3, 4), init=torch.ones)
+        v: Var = VarField(Range(4), LATENT, shape=(3, 4), init=torch.ones)
 
     u = Utterance()
     assert (u.v.tensor == 1).sum() == 3 * 4
@@ -64,7 +64,7 @@ def test_no_shape():
     with pytest.raises(ValueError):
         @dataclass
         class Utterance(Subject):
-            v: Var = VarField(Range[4], LATENT)
+            v: Var = VarField(Range(4), LATENT)
 
         Utterance()
 
@@ -73,7 +73,7 @@ def test_stack_zero():
     with pytest.raises(ValueError):
         @dataclass
         class Utterance(Subject):
-            v: Var = VarField(Range[4], LATENT)
+            v: Var = VarField(Range(4), LATENT)
 
         Utterance.stack([])
 
@@ -81,7 +81,7 @@ def test_stack_zero():
 def test_stack_twice():
     @dataclass
     class Utterance(Subject):
-        v: Var = VarField(Range[4], LATENT, shape=(3, 4))
+        v: Var = VarField(Range(4), LATENT, shape=(3, 4))
 
     u = Utterance.stack([Utterance()])
     with pytest.raises(ValueError):
@@ -115,8 +115,8 @@ def test_no_fields():
 def test_clamp_annotated():
     @dataclass
     class Utterance(Subject):
-        items1: Var = VarField(Range[4], ANNOTATED)
-        items2: Var = VarField(Range[4], ANNOTATED)
+        items1: Var = VarField(Range(4), ANNOTATED)
+        items2: Var = VarField(Range(4), ANNOTATED)
 
     u = Utterance(TensorVar(torch.ones(10)), TensorVar(torch.ones(5)))
     assert (u.items1.usage == ANNOTATED).sum() == 10
@@ -140,8 +140,8 @@ def test_stacked():
     class Utterance(Subject):
         id1: int
         id2: int
-        observations: Var = VarField(Range[10], OBSERVED)
-        hidden: Var = VarField(Range[4], LATENT, shape=observations)
+        observations: Var = VarField(Range(10), OBSERVED)
+        hidden: Var = VarField(Range(4), LATENT, shape=observations)
 
     data = [
         Utterance(1, 6, TensorVar(torch.tensor([1, 3, 2, 4, 3, 5, 4]))),
@@ -195,8 +195,8 @@ def test_stacked():
     assert x2.observations.usage.shape == (4,)
 
 
-#     assert u.observations.domain == Range[10]
-#     assert u.hidden.domain == Range[4]
+#     assert u.observations.domain == Range(10)
+#     assert u.hidden.domain == Range(4)
 #     assert u.observations.shape == (6,)
 #     assert u.hidden.shape == (6,)
 #     assert (u.observations.usage == OBSERVED).all()
