@@ -6,12 +6,18 @@ from torch import Tensor
 
 from ..factor import DensableFactor
 
-# Note: linear factor with no inputs is the version of this that gets the
-# parameters from the model
-
 
 @ dataclass
 class TensorFactor(DensableFactor):
+    r"""
+    A factor that is fully specified by a single, fixed tensor. The tensor
+    should assign a (log) score for each possible joint configuration of (the
+    last dimension of ) variables. (reminder: all variables should match in all
+    but the last dimension.) (For a paramterized tensor (e.g. bias), use a
+    linear factor with no inputs.)
+
+    """
+
     AUTO: ClassVar[Tensor] = torch.tensor(0.0)
     tensor: Tensor = AUTO
 

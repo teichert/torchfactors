@@ -45,41 +45,95 @@ class Factor:
     def free_energy(self, other_energy: Sequence[Factor], messages: Sequence[Factor]
                     ) -> Tensor:
         """
-        an estimate of the contribution of this factor to the -log z;
-        it is the entropy minus the average energy
-        under a distribution given by the normalized product of all energy
-        factors and all messages
+        Returns an estimate of the additive contribution of this factor to the
+        total free energy of a collection of factors.
+
+        The exact free energy of the system is the negative log partition
+        function.  The partition function is the constant factor Z that would
+        normalize the scores to sum to one.  With appropriate grouping of
+        factors, it is possible to compute the exact free energy of the system
+        in terms of free energies of groups by subtracting out double-counted
+        groups.  The free energy of a particular group with respect to the
+        entire system is a function of the scores of each joint configuration of
+        the group as well as an estimate of the marginal probability of each
+        group configuration under the full system.
+
+        In this function, the group configuration scores are specified via
+        "commanding factor" (self) and the `other_energy` factors whier are all
+        multiplied together to produce a score for each joint configuration. The
+        marginal probabilities are additionally specified by the `messages`
+        which are multiplied to the commander and other_energy factors, with the
+        output being normalized to produce a distribution over the
+        configurations.
+
+        Given these computed configuration scores and marginal probabilities
+        (known as beliefs).  The group free energy is simply the entropy of the
+        belief minus the average log score.  (Be aware that our ipmlementation
+        deals with scores and in log-space to begin with.) A
+        separate free_energy is computed for each batch_dimension so the shape
+        of the output tensor should be the batch_shape.
         """
         raise NotImplementedError("don't know how to do queries on this")
 
     def dense(self) -> Tensor:
+        r"""
+        Returns a tensor representing the factor (should have the same shape as
+        the factor and dimensions should correspond to the variables in the same
+        order as given by the factor).
+        """
         raise NotImplementedError("don't know how to give a dense version of this")
 
     @cached_property
     def out_shape(self):
+        r"""
+        The shape of the output configuration scores (the joint sizes from the
+        last dimension of each variable input to the factor).
+        """
         return tuple([len(t.domain) for t in self.variables])
 
     @cached_property
     def shape(self):
-        return tuple(*self.batches_shape, *self.out_shape)
+        r"""
+        Returns the shape of the (possibly implicit) tensor that would represent this tensor
+        """
+        return tuple(*self.batch_shape, *self.out_shape)
 
     @cached_property
     def cells(self):
+        r"""
+        The number of cells in the (possibly implicit) tensor that would
+        represent this tensor
+        """
         return math.prod(self.shape)
 
     @cached_property
     def batch_cells(self):
-        return math.prod(self.batches_shape)
+        r"""
+        The number of elements in a single batch (in contrast to the number of
+        variable configurations per element).
+        """
+        return math.prod(self.batch_shape)
 
     @cached_property
-    def batches_shape(self):
+    def batch_shape(self):
+        r"""
+        The shape of the dimensions of the implicit tensor corresponding to
+        various elements in a single batch as opposed to alternative
+        configurations of a single element of the batch. (All dimensions but the
+        last of each input variable are treated as independent elements of the
+        same batch.)
+        """
         # should be the same for all variables (maybe worth checking?)
         first = self.variables[0]
         return tuple(first.tensor.shape[:-1])
 
-    @cached_property
+    @property
     def num_batch_dims(self):
-        return len(self.batches_shape)
+        r"""
+        The number of dimensions dedicated to distinguishing elements of a
+        single batch (vs distinguishing configurations of a single element).
+        """
+        return len(self.batch_shape)
 
     # @property
     # def excluded_mask(self):

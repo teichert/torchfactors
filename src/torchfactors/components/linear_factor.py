@@ -22,7 +22,7 @@ class LinearFactor(DensableFactor):
 
     @ cached_property
     def in_shape(self):
-        return tuple(self.input.shape[len(self.batches_shape):])
+        return tuple(self.input.shape[len(self.batch_shape):])
 
     @ cached_property
     def in_cells(self):
@@ -43,7 +43,7 @@ class LinearFactor(DensableFactor):
                                    bias=self.bias))
         input = self.input
         if not input.shape:
-            input = input.expand((*self.batches_shape, 1))
+            input = input.expand((*self.batch_shape, 1))
         else:
-            input = input.reshape((*self.batches_shape, -1))
+            input = input.reshape((*self.batch_shape, -1))
         return m(input).reshape(self.shape)
