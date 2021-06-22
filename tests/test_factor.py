@@ -84,3 +84,13 @@ def test_multi_factor_bad_2vars():
     with pytest.raises(ValueError):
         # missing the brackets around the variables makes things ambiguous
         f.product_marginals(v1, v2)
+
+
+# def test_normalize():
+#     Factor.normalize()
+#     v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
+#     v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+#     f = TensorFactor([v1, v2])
+#     with pytest.raises(ValueError):
+#         # missing the brackets around the variables makes things ambiguous
+#         f.product_marginals(v1, v2)

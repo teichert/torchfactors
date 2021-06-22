@@ -271,6 +271,10 @@ class Factor:
 
     @ staticmethod
     def normalize(tensor: Tensor, num_batch_dims=0) -> Tensor:
+        r"""
+        for each of the batch entries, normalizes the following dimensions so that the
+        values logsumexp up to 0.
+        """
         num_dims = len(tensor.shape)
 
         # normalize by subtracting out the sum of the last |V| dimensions

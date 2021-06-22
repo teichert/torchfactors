@@ -234,3 +234,45 @@ def test_var_field():
         v.original_tensor
     with pytest.raises(NotImplementedError):
         v.ndslice
+
+
+def test_grad_through_stack():
+    vs = [
+        TensorVar(LATENT, Range(4), torch.ones(3, 4, requires_grad=True)),
+        TensorVar(LATENT, Range(4), torch.ones(2, 10, requires_grad=True)),
+        TensorVar(LATENT, Range(4), torch.ones(4, 7, requires_grad=True)),
+    ]
+    v = TensorVar.pad_and_stack(vs)
+    (v.tensor[v.usage == LATENT].sum() * 2).backward()
+    assert (vs[0].tensor.grad == 2).all()
+    assert (vs[1].tensor.grad == 2).all()
+    assert (vs[2].tensor.grad == 2).all()
+
+
+def test_grad_through_and_unstack():
+    vs = [
+        TensorVar(LATENT, Range(4), torch.ones(3, 4, requires_grad=True)),
+        TensorVar(LATENT, Range(4), torch.ones(2, 10, requires_grad=True)),
+        TensorVar(LATENT, Range(4), torch.ones(4, 7, requires_grad=True)),
+    ]
+    v = TensorVar.pad_and_stack(vs)
+    v_outs = v.unstack()
+    for i, vout in enumerate(v_outs):
+        vout.tensor.prod().backward(retain_graph=True)
+
+    assert (vs[0].tensor.grad == 1).all()
+    assert (vs[1].tensor.grad == 1).all()
+    assert (vs[2].tensor.grad == 1).all()
+
+# # This one doesn't work
+# def test_grad_through_and_unstack2():
+#     vs = [
+#         TensorVar(LATENT, Range(4), torch.ones(3, 4, requires_grad=True)),
+#         TensorVar(LATENT, Range(4), torch.ones(2, 10, requires_grad=True)),
+#         TensorVar(LATENT, Range(4), torch.ones(4, 7, requires_grad=True)),
+#     ]
+#     v = TensorVar.pad_and_stack(vs)
+#     v_outs = v.unstack()
+#     for i, vout in enumerate(v_outs):
+#         vout.tensor.prod().backward()
+#         assert (vs[i].tensor.grad == 1).all()
