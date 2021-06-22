@@ -34,8 +34,8 @@ class FactorGraph:
     def __iter__(self) -> Iterator[Factor]:
         return iter(self.factors)
 
-    def full_region(self, node_ids: Sequence[int]
-                    ) -> List[int]:
+    def region_variable_ids(self, node_ids: Sequence[int]
+                            ) -> List[int]:
         return list(set([
             node_id
             for node_id in node_ids
@@ -58,5 +58,5 @@ class FactorGraph:
                          ) -> List[Var]:
         return [
             self.variables[node_id - self.num_factors]
-            for node_id in self.full_region(node_ids)
+            for node_id in self.region_variable_ids(node_ids)
         ]

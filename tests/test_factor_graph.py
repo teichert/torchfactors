@@ -27,5 +27,12 @@ def test_factor_graph():
         fg.varids[vs[1]], fg.varids[vs[2]]
     ]
 
+    assert list(fg) == factors
+    v1 = fg.varids[vs[1]]
+    region = [1, v1, 3]
+    assert set(fg.region_variable_ids(region)) == set([
+        *fg.neighbors[1], *fg.neighbors[3]
+    ])
 
-test_factor_graph()
+    assert set(fg.region_factors(region)) == {factors[1], factors[3]}
+    assert set(fg.region_variables(region)) == {vs[1], vs[2], vs[3], vs[4]}
