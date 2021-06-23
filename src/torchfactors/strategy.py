@@ -103,12 +103,22 @@ class Strategy(object):
             self.outfrom[s].append(t)
 
     def get_regions_with_vars(self, variable: Var) -> Iterable[Tuple[int, Region, Sequence[Var]]]:
+        r"""
+        Generates a list of all of the regions that overlap with the given variable.
+        Each entry specifies the region_id, the region itself, and the list of variables
+        in the region that overlap with `variable`
+        """
         for rid, r in enumerate(self.regions):
             vs = [v for v in r.variables if variable.overlaps(v)]
             if vs:
                 yield rid, r, vs
 
     def reachable_from(self, i: int) -> Iterable[int]:
+        r"""
+        Generates a list of all of the region ids that are reachable from the
+        region id `i` via the directed edges in the region graph (`i` is always
+        included)
+        """
         yield i
         for t in self.outfrom[i]:
             yield from self.reachable_from(t)
