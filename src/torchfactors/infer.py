@@ -55,8 +55,9 @@ class BPInference:
 
         Returns the normalized belief corresponding to
         """
-        if isinstance(variables, Var):
-            variables = (variables,)
+        # if isinstance(variables, Var):
+        #     variables = (variables,)
+        assert not isinstance(variables, Var)
         if len(variables) != 1:
             raise ValueError("not ready to handle multi-variable belief queries")
         variable = variables[0]
@@ -165,18 +166,18 @@ def product_marginals(factor_graph: FactorGraph, *queries: Sequence[Var],
     with the exception of a query for () which is used to represent a request
     for the log partition function. If normalize is False,
     then the partition function will be used to unnormalize
-    the normalized belief by dividing by the global z:
-    b = m / z => m = b / z
+    the normalized belief.
+    The idea is that the normalized belief came from dividing the unnormalized by Z,
+    so I get the unnormalized back by multiplying by Z:
+    b = m / z => m = b * z
     """
     check_queries(queries)
     if strategy is None:
         strategy = BetheGraph(factor_graph)
-    if not queries:
-        queries = ((),)
     # query_list = [(q,) if isinstance(q, VarBase) else q for q in queries]
     bp = BPInference(factor_graph, strategy)
     bp.run()
-    if normalize or () in queries:
+    if () in queries or not normalize:
         logz = bp.logz()
     responses: List[Tensor] = []
     for query in queries:
@@ -185,7 +186,7 @@ def product_marginals(factor_graph: FactorGraph, *queries: Sequence[Var],
         else:
             belief = bp.belief(query)
             if not normalize:
-                belief = belief / logz
+                belief = belief + logz
             responses.append(belief)
     if len(responses) == 1 and not force_multi:
         return responses[0]
