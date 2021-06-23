@@ -118,4 +118,5 @@ class Strategy(object):
         returns the set of edges s->t such that s is not reachable from i,
         but t is. (i.e. the set of edges that poke into the region of i)
         """
-        return [(s, t) for t in self.reachable_from(i) for s in self.into[t]]
+        from_i = set(self.reachable_from(i))
+        return [(s, t) for t in from_i for s in self.into[t] if s not in from_i]
