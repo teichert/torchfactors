@@ -8,6 +8,10 @@ from torchfactors.variable import Var
 from ..factor import Factor
 
 
+def float_zeros(shape: ShapeType):
+    return torch.zeros(shape).float()
+
+
 class TensorFactor(Factor):
     r"""
     A factor that is fully specified by a single, fixed tensor. The tensor
@@ -20,7 +24,7 @@ class TensorFactor(Factor):
 
     def __init__(self, variables: Union[Var, Sequence[Var]],
                  tensor: Optional[Tensor] = None,
-                 init: Callable[[ShapeType], Tensor] = torch.zeros):
+                 init: Callable[[ShapeType], Tensor] = float_zeros):
         super().__init__(variables)
         if tensor is None:
             tensor = init(self.shape)

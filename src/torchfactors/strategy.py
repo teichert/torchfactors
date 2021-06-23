@@ -15,21 +15,21 @@ from .variable import Var
 cache = lru_cache(maxsize=None)
 
 
-@ dataclass
+@dataclass
 class Region(object):
     factor_graph: FactorGraph
     factor_graph_nodes: Tuple[int, ...]
     counting_number: float
 
-    @ cached_property
+    @cached_property
     def variables(self) -> Sequence[Var]:
         return self.factor_graph.region_variables(self.factor_graph_nodes)
 
-    @ cached_property
+    @cached_property
     def factors(self) -> Sequence[Factor]:
         return self.factor_graph.region_factors(self.factor_graph_nodes)
 
-    @ cached_property
+    @cached_property
     def factor_set(self) -> FrozenSet[Factor]:
         return frozenset(self.factors)
 
@@ -37,14 +37,22 @@ class Region(object):
                           queries: Sequence[Sequence[Var]] = (()),
                           other_factors: Sequence[Factor] = (()),
                           exclude: Optional[Region] = None):
-        return self.marginals_closure(queries, exclude=exclude)
+        r"""
+        analogous to the function with the same name on the Factor class except with a slightly
+        different interface (to avoid needing to special-case or risk errors) and with the
+        ability to exclude the factors from a particular region
+        """
+        return self.marginals_closure(queries, other_factors=other_factors, exclude=exclude)()
 
-    @ cache
     def marginals_closure(self,
                           queries: Sequence[Sequence[Var]] = (()),
                           other_factors: Sequence[Factor] = (()),
                           exclude: Optional[Region] = None
                           ) -> Callable[[], Sequence[Tensor]]:
+        r"""
+        returns the function that will compute the product_marginals given the current
+        values of the input factors
+        """
         # factors appearing in the excluded region are excluded note that the
         # first factor (in the region) touching the most variables determines
         # how the inference is done (if this needs to be modified, then have
@@ -56,14 +64,28 @@ class Region(object):
             list(surviving_factors[ix:]) + list(other_factors)
         return controller.marginals_closure(*queries, other_factors=input_factors)
 
-    # TODO: here
-    def free_energy(self, messages: Sequence['Factor']) -> Tensor:
-        # _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(self.factors))
-        pass
+    def free_energy(self, messages: Sequence[Factor]) -> Tensor:
+        """
+        analogous to the function with the same name on the Factor class; the
+        messages are include in the product when computing the belief; no other
+        energy functions are allowed; uses the factor within the region that has the
+        largest number of participating variables
+        """
+        _, ix, controller = max((len(f), i, f) for i, f in enumerate(self.factors))
+        return controller.free_energy(messages=messages)
 
 
-@ dataclass
+@dataclass
 class Strategy(object):
+    r"""
+    Represents a strategy for approximate (or exact) inference on a factor
+    graph. Specifically, it is a region-graph approximation: Regions of the
+    factor graph are specified and directed edges from super regions to sub
+    regions are given.  Each region is made up of 0 or more factors (and all the
+    varibles they touch) and 0 or more additional variables.  Each region also
+    specified a counting number which should be such that each node in the graph
+    is counted exactly once.
+    """
     regions: List[Region]
     edges: List[Tuple[int, int]]
 

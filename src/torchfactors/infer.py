@@ -82,8 +82,8 @@ class BPInference:
         targets = [self.strategy.regions[target_id] for target_id in target_ids]
         out_messages = [self.messages[source_id, target_id] for target_id in target_ids]
         in_messages = self.in_messages(source_id)
-        compute_numerators = source.marginals_closure(
-            in_messages, *[out.variables for out in out_messages])
+        compute_numerators = source.marginals_closure([out.variables for out in out_messages],
+                                                      other_factors=in_messages)
 
         pokes_s = self.strategy.penetrating_edges(source_id)
         set_pokes_s = set(pokes_s)
@@ -93,7 +93,8 @@ class BPInference:
             for target_id in target_ids
         ]
         compute_denominators = [
-            target_region.marginals_closure(denom_messages, source, out_message.variables)
+            target_region.marginals_closure([out_message.variables], other_factors=denom_messages,
+                                            exclude=source)
             for target_region, denom_messages, out_message
             in zip(targets, divide_out_messages, out_messages)]
 
