@@ -60,11 +60,17 @@ def test_parameters():
     assert (model.namespace('emission').parameter() == 0.0).all()
     assert model.namespace('transition').parameter().shape == (5, 5)
     assert (model.namespace('transition').parameter() != 0.0).all()
+    with pytest.raises(KeyError):
+        # has different shape than before
+        model.namespace('transition').parameter((2, 10))
 
 
 def test_parameters2():
     m = Model[Any]()
     ns_a = m.namespace('a')
+    with pytest.raises(KeyError):
+        # no parameter with this key
+        ns_a.parameter()
     ns_a_b = ns_a.namespace('b')
     assert ns_a.parameter((3, 3)).shape == (3, 3)
     assert ns_a_b.parameter((4, 6)).shape == (4, 6)
@@ -74,8 +80,13 @@ def test_parameters2():
 
 def test_modules():
     m = Model[Any]()
+    with pytest.raises(KeyError):
+        # need to specify a factory if not already built for that key
+        m.namespace('root').module()
+
     module = m.namespace('root').module(lambda: torch.nn.Linear(4, 5, bias=False))
     with pytest.raises(KeyError):
+        # this key has been used for a module rather than a param
         m.namespace('root').parameter()
     module2 = m.namespace('root').module()
     assert module is module2
