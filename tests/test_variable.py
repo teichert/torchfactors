@@ -24,12 +24,14 @@ def test_variable():
     assert (v.usage == VarUsage.OBSERVED).all()
     assert v.ndslice == (...,)
     assert v.original_tensor is t
+    assert v.origin is v
 
 
 def test_shape():
     t = torch.ones(3, 4)
     v = TensorVar(t, Range(4))
     v2 = v[1:3, 2:4]
+    assert v2.origin is v
     assert v2.original_tensor is t
     assert v2.ndslice == (slice(1, 3), slice(2, 4))
     assert t.sum() == 3*4
@@ -216,6 +218,8 @@ def test_var_field():
         v.original_tensor
     with pytest.raises(NotImplementedError):
         v.ndslice
+    with pytest.raises(NotImplementedError):
+        v.origin
 
 
 def test_grad_through_stack():
