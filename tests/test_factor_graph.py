@@ -11,7 +11,7 @@ def test_factor_graph():
         for _ in range(n)
     ]
     factors = [
-        tx.TensorFactor([vs[i], vs[i+1]], init=tx.utils.ndrange)
+        tx.TensorFactor([vs[i], vs[i+1]], init=tx.utils.ndarange)
         for i in range(n - 1)
     ]
     fg = FactorGraph(factors)

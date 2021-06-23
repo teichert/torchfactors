@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import Callable, List, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, List, Optional, Sequence, Union, cast
 
 import torch
 import typing_extensions
@@ -10,7 +10,8 @@ from multimethod import multidispatch as overload
 from torch import Size, Tensor
 
 from .domain import Domain
-from .types import NDSlice, ShapeType, SliceType
+from .types import NDSlice, ShapeType
+from .utils import as_ndrange, compose, ndslices_overlap
 
 Tensorable = Union[Tensor, int, float, bool]
 
@@ -122,6 +123,18 @@ class Var(ABC):
     @abstractmethod
     def _get_domain(self) -> Domain: ...
 
+    @abstractmethod
+    def _get_origin(self) -> TensorVar: ...
+
+    def overlaps(self, other: Var) -> bool:
+        return (
+            self.origin is other.origin and
+            ndslices_overlap(self.ndslice, other.ndslice, self.origin.shape))
+
+    @property
+    def origin(self) -> TensorVar:
+        return self._get_origin()
+
     # @property
     def get_usage(self) -> Tensor:
         return self._get_usage()
@@ -164,41 +177,6 @@ class Var(ABC):
         return hash(self.hash_key())
 
 
-def as_range(one_slice: slice, length: int) -> range:
-    """returns a range representing the same subset of integers as the given
-    slice assuming the given length"""
-    return range(length)[one_slice]
-
-
-def as_ndrange(ndslice: NDSlice, shape: ShapeType):
-    if isinstance(ndslice, tuple):
-        if len(ndslice) == 1 and ndslice[0] is ...:
-            return tuple(as_range(slice(None), length)
-                         for length in shape)
-        else:
-            return tuple(as_range(one_slice, length)
-                         for one_slice, length in zip(ndslice, shape))
-
-
-def compose_single(lhs: SliceType, rhs: SliceType, length: int):
-    out = as_range(cast(slice, lhs), length)[rhs]
-    return out if isinstance(out, int) else slice(out.start, out.stop, out.step)
-
-
-def compose(shape: ShapeType, first: NDSlice, second: NDSlice):
-    def ensure_tuple(ndslice) -> Tuple[SliceType, ...]:
-        return ndslice if isinstance(ndslice, tuple) else (ndslice,)
-
-    first = ensure_tuple(first)
-    second = ensure_tuple(second)
-
-    out = list(first) + [slice(None)] * (len(shape) - len(first))
-    remaining_dims = [i for i, s in enumerate(out) if isinstance(s, slice)]
-    for i, rhs in zip(remaining_dims, second):
-        out[i] = compose_single(out[i], rhs, length=shape[i])
-    return tuple(out)
-
-
 class VarBranch(Var):
     r"""
     Represents a subset of a variable tensor
@@ -207,6 +185,9 @@ class VarBranch(Var):
     def __init__(self, root: TensorVar, ndslice: NDSlice):
         self.root = root
         self.__ndslice = ndslice
+
+    def _get_origin(self) -> TensorVar:
+        return self.root
 
     def __getitem__(self, ndslice: NDSlice) -> Var:
         return VarBranch(self.root, compose(self.root.tensor.shape, self.ndslice, ndslice))
@@ -252,6 +233,9 @@ class VarField(Var):
         self._shape = shape
         self._init = init
         self._info = info
+
+    def _get_origin(self) -> TensorVar:
+        raise NotImplementedError("var fields don't actually have an origin")
 
     def _get_tensor(self) -> Tensor:
         raise NotImplementedError("var fields don't actually have a tensor")
@@ -311,6 +295,9 @@ class TensorVar(Var):
             self._usage = usage
         self._info = info
         self._stack_shapes = stack_shapes
+
+    def _get_origin(self) -> TensorVar:
+        return self
 
     @__init__.register
     def _dom_tensor_usage(self, domain: Domain,

@@ -102,19 +102,18 @@ class Strategy(object):
             self.into[t].append(s)
             self.outfrom[s].append(t)
 
-    def get_regions_with_var(self, variable) -> Iterable[Tuple[int, Region, Var]]:
+    def get_regions_with_vars(self, variable: Var) -> Iterable[Tuple[int, Region, Sequence[Var]]]:
         for rid, r in enumerate(self.regions):
-            for v in r.variables:
-                if variable.origin.overlaps(v):
-                    yield rid, r, v
-                    break  # go to the next region
+            vs = [v for v in r.variables if variable.overlaps(v)]
+            if vs:
+                yield rid, r, vs
 
-    def reachable_from(self, i) -> Iterable[int]:
+    def reachable_from(self, i: int) -> Iterable[int]:
         yield i
         for t in self.outfrom[i]:
             yield from self.reachable_from(t)
 
-    def penetrating_edges(self, i) -> Iterable[Tuple[int, int]]:
+    def penetrating_edges(self, i: int) -> Iterable[Tuple[int, int]]:
         r"""
         returns the set of edges s->t such that s is not reachable from i,
         but t is. (i.e. the set of edges that poke into the region of i)

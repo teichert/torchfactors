@@ -56,12 +56,14 @@ class BPInference:
         Returns the normalized belief corresponding to
         """
         t = torch.zeros(variable.original_tensor.shape + (len(variable.domain),))
-        bel = torch.zeros_like(t)
-        for region_id, region, v in self.strategy.get_regions_with_var(variable):
-            t[v.ndslice] += 1
-            bel[v.ndslice] += region.product_marginals([(v,)],
-                                                       other_factors=self.in_messages(region_id))[0]
-        return (bel / t)[variable.ndslice]
+        full_belief = torch.zeros_like(t)
+        for region_id, region, vs in self.strategy.get_regions_with_vars(variable):
+            region_beliefs = region.product_marginals([(v,) for v in vs],
+                                                      other_factors=self.in_messages(region_id))[0]
+            for v, region_belief in zip(vs, region_beliefs):
+                t[v.ndslice] += 1
+                full_belief[v.ndslice] += region_belief
+        return (full_belief / t)[variable.ndslice]
 
     def message(self, key: Tuple[int, int]) -> TensorFactor:
         try:

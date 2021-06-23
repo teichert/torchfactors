@@ -9,7 +9,7 @@ from .infer import marginals
 from .model import Model
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
-from .utils import ndrange
+from .utils import ndarange
 from .variable import TensorVar, Var, VarBranch, VarField, VarUsage
 
 PADDING = VarUsage.PADDING
@@ -33,6 +33,6 @@ __all__ = [
     'Model',
     'FactorGraph',
     'marginals',
-    'ndrange',
+    'ndarange',
     'BetheGraph',
 ]

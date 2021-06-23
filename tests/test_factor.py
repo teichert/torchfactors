@@ -2,14 +2,14 @@ import math
 
 import pytest
 import torch
-from torchfactors import Range, TensorFactor, TensorVar, ndrange
+from torchfactors import Range, TensorFactor, TensorVar, ndarange
 from torchfactors.factor import Factor
 
 
 def test_factor():
     t = torch.ones(3, 4)
     v = TensorVar(t, domain=Range(10))
-    factor_tensor = ndrange(3, 4, 10).log()
+    factor_tensor = ndarange(3, 4, 10).log()
     f: Factor = TensorFactor(v, factor_tensor)
     assert f.shape == (3, 4, 10)
     assert f.batch_cells == 3 * 4
