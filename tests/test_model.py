@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable
 
+import pytest
 from torchfactors import LATENT, Factor, Model, Range, Subject, Var, VarField
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.model import ParamNamespace
@@ -49,7 +50,21 @@ def test_parameters():
 
     model = Chain2()
     list(model(Seq()))
-    print(list(model.parameters()))
+    assert len(list(model.parameters())) == 2
+    with pytest.raises(KeyError):
+        # cannot get transition as a module since it was used as a parameter
+        model.namespace('transition').module()
+
+    assert model.namespace('emission').parameter().shape == (5,)
+    assert (model.namespace('emission').parameter() == 0.0).all()
+    assert model.namespace('transition').parameter().shape == (5, 5)
+    assert (model.namespace('transition').parameter() != 0.0).all()
 
 
-test_parameters()
+def test_parameters2():
+    m = Model[Any]()
+    ns_a = m.namespace('a')
+    ns_a_b = ns_a.namespace('b')
+    assert ns_a.parameter((3, 3)).shape == (3, 3)
+    assert ns_a_b.parameter((4, 6)).shape == (4, 6)
+    ns_a.parameter()

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
-                    Optional, TypeVar)
+                    Optional, TypeVar, overload)
 
 import torch
+# from multimethod import multidispatch as overload
+from multimethod import multimethod
 from torch import Tensor
 from torch.nn import Module, ModuleDict, ParameterDict
 from torch.nn.init import xavier_uniform_, zeros_
@@ -33,10 +35,11 @@ class ParamNamespace:
         return ParamNamespace(
             model=self.model, key=(self.key, key))
 
-    def parameter(self, shape: ShapeType,
-                  initialization: Optional[Callable[[Tensor], None]
-                                           ] = None
-                  ) -> Tensor:
+    @multimethod
+    def _parameter(self, shape: ShapeType,
+                   initialization: Optional[Callable[[Tensor], None]
+                                            ] = None
+                   ) -> Parameter:
         if initialization is None:
             if len([d for d in list(torch.Size(shape)) if d > 1]) < 2:
                 def initialization(t): return zeros_(t)
@@ -50,7 +53,23 @@ class ParamNamespace:
             return Parameter(tensor)
         return self.model._get_param(self.key, check_shape=shape, default_factory=gen_param)
 
-    def module(self, constructor: Optional[Callable[[], torch.nn.Module]] = None):
+    @_parameter.register
+    def get_saved_parameter(self) -> Parameter:
+        return self.model._get_param(self.key)
+
+    # # extra stubs and ignores are in here to help vscode intellisense work without making mypy mad
+    @overload
+    def parameter(self, shape: ShapeType,
+                  initialization: Optional[Callable[[Tensor], None]] = None
+                  ) -> Parameter: ...
+
+    @overload
+    def parameter(self) -> Parameter: ...
+
+    def parameter(self, *args, **kwargs):
+        return self._parameter(*args, **kwargs)
+
+    def module(self, constructor: Optional[Callable[[], torch.nn.Module]] = None) -> Module:
         return self.model._get_module(self.key, default_factory=constructor)
 
 
@@ -94,7 +113,7 @@ class Model(torch.nn.Module, Generic[T]):
         else:
             param = self._model_parameters[repr]
             if check_shape is not None and check_shape != param.shape:
-                raise ValueError(
+                raise KeyError(
                     f"This key has already been used with different shape: "
                     f"{check_shape} vs {param.shape}")
             return param
