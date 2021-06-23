@@ -14,6 +14,14 @@ from .utils import replace_negative_infinities
 from .variable import Var
 
 
+def check_queries(queries: Sequence[Sequence[Var]]):
+    if not queries or isinstance(queries[0], Var):
+        raise ValueError("each query needs to be a sequence of Vars "
+                         "(did you forget the brackets around your single variable groups?) "
+                         "consider using product_marginal() if you only have one variable "
+                         "or if you want to just get the partition function.")
+
+
 # @dataclass
 class Factor:
     r"""
@@ -62,11 +70,7 @@ class Factor:
         The partition function can be queried via an empty tuple of variables.
         If no queries are specified, then the partition function is queried.
         """
-        if not queries or isinstance(queries[0], Var):
-            raise ValueError("each query needs to be a sequence of Vars "
-                             "(did you forget the brackets around your single variable groups?) "
-                             "consider using product_marginal() if you only have one variable "
-                             "or if you want to just get the partition function.")
+        check_queries(queries)
         return self.marginals_closure(*queries, other_factors=other_factors)()
 
     @cached_property
@@ -248,7 +252,7 @@ class Factor:
         query given the current values of the factors.
 
         """
-
+        check_queries(queries)
         batch_dims = [object() for _ in range(self.num_batch_dims)]
 
         def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:

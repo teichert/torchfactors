@@ -6,8 +6,10 @@ from itertools import chain
 from typing import (Callable, FrozenSet, Iterable, Iterator, List, Optional,
                     Sequence, Tuple)
 
+import torch
 from torch import Tensor
 
+from .components.tensor_factor import TensorFactor
 from .factor import Factor
 from .factor_graph import FactorGraph
 from .variable import Var
@@ -51,7 +53,8 @@ class Region(object):
                           ) -> Callable[[], Sequence[Tensor]]:
         r"""
         returns the function that will compute the product_marginals given the current
-        values of the input factors
+        values of the input factors;
+        What is the product of zero things? Must be 1.
         """
         # factors appearing in the excluded region are excluded note that the
         # first factor (in the region) touching the most variables determines
@@ -59,7 +62,12 @@ class Region(object):
         # your strategy create subclasses of region that override this behavior)
         surviving_factors = list((self.factor_set - exclude.factor_set)
                                  if exclude is not None else self.factor_set)
+        if not surviving_factors:
+            def return_uniforms():
+                return [TensorFactor(query).dense for query in queries]
+            return return_uniforms
         _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(surviving_factors))
+
         input_factors = list(surviving_factors[:ix]) + \
             list(surviving_factors[ix:]) + list(other_factors)
         return controller.marginals_closure(*queries, other_factors=input_factors)
@@ -67,12 +75,17 @@ class Region(object):
     def free_energy(self, messages: Sequence[Factor]) -> Tensor:
         """
         analogous to the function with the same name on the Factor class; the
-        messages are include in the product when computing the belief; no other
+        messages are included in the product when computing the belief; no other
         energy functions are allowed; uses the factor within the region that has the
         largest number of participating variables
         """
-        _, ix, controller = max((len(f), i, f) for i, f in enumerate(self.factors))
-        return controller.free_energy(messages=messages)
+        factors = self.factors
+        if not factors:
+            factors = [TensorFactor(self.variables, init=torch.zeros)]
+        _, ix, controller = max((len(f), i, f) for i, f in enumerate(factors))
+        other_factors = list(factors[:ix]) + list(factors[ix:])
+        return controller.free_energy(other_energy=other_factors,
+                                      messages=messages)
 
 
 @dataclass

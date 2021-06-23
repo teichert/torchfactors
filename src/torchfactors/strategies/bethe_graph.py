@@ -5,6 +5,13 @@ from ..strategy import Region, Strategy
 
 
 def BetheGraph(graph: FactorGraph) -> Strategy:
+    r"""
+    Returns the bethe graph region graph: A region for every factor and a
+        separate region for each variable. Factor regions (including variables
+        that they touch) point to each variable region for any variable touched
+        by the factor. Inference with this strategy is equivalent to vanilla
+        belief propagation.
+    """
     # TODO: add in blank factors for queries if necessary
     return Strategy(
         regions=[

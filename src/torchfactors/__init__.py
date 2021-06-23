@@ -5,7 +5,7 @@ from .components.tensor_factor import TensorFactor
 from .domain import Domain, Range, SeqDomain
 from .factor import Factor
 from .factor_graph import FactorGraph
-from .infer import marginals
+from .infer import product_marginal, product_marginals
 from .model import Model
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
@@ -32,7 +32,7 @@ __all__ = [
     'LinearFactor',
     'Model',
     'FactorGraph',
-    'marginals',
+    'product_marginals', 'product_marginal',
     'ndarange',
     'BetheGraph',
 ]
