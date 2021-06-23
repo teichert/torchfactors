@@ -7,6 +7,8 @@ from typing import (Dict, FrozenSet, Generic, List, Sequence, TypeVar, Union,
 
 from torch.utils.data import DataLoader, Dataset
 
+from torchfactors.types import ShapeType
+
 from .domain import Domain
 from .variable import TensorVar, Var, VarField, VarUsage
 
@@ -66,7 +68,7 @@ class Subject:
                         # source should already have tensor with shape by now
                         var_instance._tensor = var_field._init(source_var.shape)
                     elif var_field._shape is not None:
-                        var_instance._tensor = var_field._init(var_field._shape)
+                        var_instance._tensor = var_field._init(cast(ShapeType, var_field._shape))
                     else:
                         raise ValueError(
                             "need to specify an actual tensor (or a shape)"

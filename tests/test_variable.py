@@ -265,3 +265,13 @@ def test_grad_through_and_unstack():
 #     for i, vout in enumerate(v_outs):
 #         vout.tensor.prod().backward()
 #         assert (vs[i].tensor.grad == 1).all()
+
+
+def test_var_field_order():
+    v = VarField(OBSERVED, Range(10))
+    assert v._usage == OBSERVED
+    assert v._domain == Range(10)
+
+    v = VarField(Range(10), OBSERVED)
+    assert v._usage == OBSERVED
+    assert v._domain == Range(10)

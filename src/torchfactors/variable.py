@@ -223,19 +223,119 @@ class VarBranch(Var):
 
 
 class VarField(Var):
+    r"""
+    A field (in a dataclass Subject) that is a place-holder for a Variable and holds
+    information that does not have to be provided on individual examples
+    """
 
-    @multimethod  # type: ignore[misc]
-    def __init__(self,
-                 domain: Domain = Domain.OPEN,
-                 usage: Optional[VarUsage] = VarUsage.DEFAULT,
-                 shape: Union[Var, ShapeType, None] = None,
-                 init: Callable[[ShapeType], Tensor] = torch.zeros,
-                 info: typing_extensions._AnnotatedAlias = None):
+    @multimethod
+    def ___init__(self,
+                  domain: Domain = Domain.OPEN,
+                  usage: Optional[VarUsage] = VarUsage.DEFAULT,
+                  shape: Union[Var, ShapeType, None] = None,
+                  init: Callable[[ShapeType], Tensor] = torch.zeros,
+                  info: typing_extensions._AnnotatedAlias = None):
         self._domain = domain
         self._usage = usage
         self._shape = shape
         self._init = init
         self._info = info
+
+    # @___init__.register
+    # def ___init_domain_shape(self,
+    #                          domain: Domain,
+    #                          shape: Union[Var, ShapeType],
+    #                          usage: Optional[VarUsage] = VarUsage.DEFAULT,
+    #                          init: Callable[[ShapeType], Tensor] = torch.zeros,
+    #                          info: typing_extensions._AnnotatedAlias = None):
+    #     self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
+
+    @___init__.register
+    def ___init_usage_domain(self,
+                             usage: VarUsage,
+                             domain: Domain = Domain.OPEN,
+                             shape: Union[Var, ShapeType, None] = None,
+                             init: Callable[[ShapeType], Tensor] = torch.zeros,
+                             info: typing_extensions._AnnotatedAlias = None):
+        self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
+
+    # @___init__.register
+    # def ___init_usage_shape(self,
+    #                         usage: VarUsage,
+    #                         shape: Union[Var, ShapeType],
+    #                         domain: Domain = Domain.OPEN,
+    #                         init: Callable[[ShapeType], Tensor] = torch.zeros,
+    #                         info: typing_extensions._AnnotatedAlias = None):
+    #     self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
+
+    # @___init__.register
+    # def ___init_shape_usage(self,
+    #                         shape: Union[Var, ShapeType],
+    #                         usage: Optional[VarUsage] = VarUsage.DEFAULT,
+    #                         domain: Domain = Domain.OPEN,
+    #                         init: Callable[[ShapeType], Tensor] = torch.zeros,
+    #                         info: typing_extensions._AnnotatedAlias = None):
+    #     self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
+
+    # @___init__.register
+    # def ___shape_domain(self,
+    #                     shape: Union[Var, ShapeType],
+    #                     domain: Domain,
+    #                     usage: Optional[VarUsage] = VarUsage.DEFAULT,
+    #                     init: Callable[[ShapeType], Tensor] = torch.zeros,
+    #                     info: typing_extensions._AnnotatedAlias = None):
+    #     self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
+
+    @overload
+    def __init__(self,
+                 domain: Domain = Domain.OPEN,
+                 usage: Optional[VarUsage] = VarUsage.DEFAULT,
+                 shape: Union[Var, ShapeType, None] = None,
+                 init: Callable[[ShapeType], Tensor] = torch.zeros,
+                 info: typing_extensions._AnnotatedAlias = None): ...
+
+    # @overload
+    # def __init__(self,
+    #              domain: Domain = Domain.OPEN,
+    #              shape: Union[Var, ShapeType, None] = None,
+    #              usage: Optional[VarUsage] = VarUsage.DEFAULT,
+    #              init: Callable[[ShapeType], Tensor] = torch.zeros,
+    #              info: typing_extensions._AnnotatedAlias = None): ...
+
+    @overload
+    def __init__(self,
+                 usage: Optional[VarUsage] = VarUsage.DEFAULT,
+                 domain: Domain = Domain.OPEN,
+                 shape: Union[Var, ShapeType, None] = None,
+                 init: Callable[[ShapeType], Tensor] = torch.zeros,
+                 info: typing_extensions._AnnotatedAlias = None): ...
+
+    # @overload
+    # def __init__(self,
+    #              usage: Optional[VarUsage] = VarUsage.DEFAULT,
+    #              shape: Union[Var, ShapeType, None] = None,
+    #              domain: Domain = Domain.OPEN,
+    #              init: Callable[[ShapeType], Tensor] = torch.zeros,
+    #              info: typing_extensions._AnnotatedAlias = None): ...
+
+    # @overload
+    # def __init__(self,
+    #              shape: Union[Var, ShapeType, None] = None,
+    #              usage: Optional[VarUsage] = VarUsage.DEFAULT,
+    #              domain: Domain = Domain.OPEN,
+    #              init: Callable[[ShapeType], Tensor] = torch.zeros,
+    #              info: typing_extensions._AnnotatedAlias = None): ...
+
+    # @overload
+    # def __init__(self,
+    #              shape: Union[Var, ShapeType, None] = None,
+    #              domain: Domain = Domain.OPEN,
+    #              usage: Optional[VarUsage] = VarUsage.DEFAULT,
+    #              init: Callable[[ShapeType], Tensor] = torch.zeros,
+    #              info: typing_extensions._AnnotatedAlias = None): ...
+
+    def __init__(self, *args, **kwargs):
+        self.___init__(*args, **kwargs)
 
     def _get_origin(self) -> TensorVar:
         raise NotImplementedError("var fields don't actually have an origin")

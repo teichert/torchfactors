@@ -1,57 +1,58 @@
 from dataclasses import dataclass
+from typing import Iterable
 
 import torch
 
 import torchfactors as tx
+from torchfactors.components.linear_factor import LinearFactor
+from torchfactors.factor import Factor
 
 
 @dataclass
-class Utterance(tx.Subject):
-    items: tx.TensorVar = tx.TensorVar(tx.Range(5))  # TensorType['batch': ..., 'index', int]
+class TrueCaseExample(tx.Subject):
+    """
+    Model where a latent state is uses the lower_case letter to predict
+    whether or not it should be upper cased
+    """
+    lower_cased: tx.Var = tx.VarField(tx.OBSERVED, tx.Range(255))
+    is_upper: tx.Var = tx.VarField(tx.ANNOTATED, tx.Range(2))
+    hidden: tx.Var = tx.VarField(tx.ANNOTATED, tx.Range(10), shape=lower_cased)
+
+    @classmethod
+    def from_str(cls, input: str):
+        with_start_and_end = [-1, *[ord(ch) for ch in input.lower()], -1]
+        return cls(
+            lower_cased=tx.TensorVar(torch.tensor(with_start_and_end)),
+            is_upper=tx.TensorVar(torch.tensor([False, *[ch.isupper() for ch in input], False])))
+
+    @property
+    def true_cased(self) -> str:
+        chars = [chr(ch) for ch in self.lower_cased.tensor[1:-1]]
+        return ''.join(ch.upper() if ui else ch
+                       for ch, ui in zip(chars, self.is_upper.tensor[1:-1]))
+
+    def __len__(self) -> int:
+        return self.lower_cased.shape[-1]
 
 
-class MyModel(tx.Model[Utterance]):
-
-    def factors(self, subject: Utterance):
-        items = subject.items
-        hidden = tx.TensorVar(items.tensor, tx.VarUsage.LATENT, tx.Range(100))
-        for i in range(len(items.tensor)):
-            if i > 0:
-                yield tx.LinearFactor(self.namespace('transition'), hidden[i], hidden[i-1])
-            yield tx.LinearFactor(self.namespace('emission'), hidden[i], items[i])
+x = TrueCaseExample.from_str("This is a test! Yes! Yes!")
 
 
-loader = Utterance.data_loader(batch_size=3, data=[
-    Utterance(items=tx.TensorVar(torch.ones(n)))
-    for n in range(4, 10)
-])
-model = MyModel()
-for u in loader:
-    grounded = tx.FactorGraph(model(u))
-    # u.items[[3, 4, 5]].usage = tx.VarUsage.CLAMPED
-    # u.items[[3, 4, 5]].usage = tx.VarUsage.ANNOTATED
-    u.clamp_annotated()
-    u.unclamp_annotated()
-    logz = tx.product_marginal(grounded)
-    print(logz)
-# logz = log_einsum(grounded, [()])
-# all_log_probs = log_einsum(grounded, u.items)
-# one_log_probs = log_einsum(grounded, u.items[0])
-# print(list(model.parameters()))
+class TrueCaser(tx.Model[TrueCaseExample]):
+    def factors(self, x: TrueCaseExample) -> Iterable[Factor]:
+        for i in range(len(x)):
+            yield LinearFactor(
+                self.namespace('emission'),
+                x.hidden[..., i], x.is_upper[..., i],
+                input=x.lower_cased.tensor[..., i])
+        for i in range(len(x) - 1):
+            yield LinearFactor(
+                self.namespace('transition'),
+                x.hidden[..., i], x.hidden[..., i + 1])
 
 
-# class MyClass:
-#     def __init__(self, a: str):
-#         self.a = a
+true_caser = TrueCaser()
 
-#     @property
-#     def a(self) -> int:
-#         return self._a
-
-#     @a.setter
-#     def a(self, s: str):
-#         self._a = int(s)
-
-
-# a = MyClass("78")
-# assert a.a == 78
+fg = tx.FactorGraph(true_caser(x))
+print(x.true_cased)
+print(fg)

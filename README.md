@@ -14,7 +14,9 @@ python -m pip install git+ssh://git@github.com/teichert/torchfactors
 ### Imports
 
 ```python
+import torch
 import torchfactors as tx
+
 from dataclasses import dataclass
 ```
 
@@ -23,9 +25,9 @@ from dataclasses import dataclass
 ```python
 # @dataclass
 # class TrueCaseSubject:
-#     lower_cased: torch.Tensor # TensorType["example": ..., "character", int]
-#     hidden: torch.Tensor # TensorType["example": ..., "character", int]
-#     is_upper: torch.Tensor # TensorType["example": ..., "character", bool]
+#     lower_cased: torch.Tensor  # TensorType["example": ..., "character", int]
+#     hidden: torch.Tensor  # TensorType["example": ..., "character", int]
+#     is_upper: torch.Tensor  # TensorType["example": ..., "character", bool]
 
 #     @staticmethod
 #     def make(input: str):
