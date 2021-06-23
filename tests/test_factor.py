@@ -93,3 +93,11 @@ def test_normalize():
     assert out.isclose(expected).all()
 
 # TODO: test where they vary accross batch dims
+
+
+def test_bad_variables():
+    with pytest.raises(TypeError):
+        # cannot pass more than one variable without putting them into a sequence
+        v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
+        v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+        TensorFactor(v1, v2)

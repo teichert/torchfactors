@@ -112,6 +112,9 @@ class Var(ABC):
     def _get_tensor(self) -> Tensor: ...
 
     @abstractmethod
+    def __getitem__(self, ndslice: NDSlice) -> Var: ...
+
+    @abstractmethod
     def _set_tensor(self, value: Tensorable): ...
 
     @abstractmethod
@@ -256,6 +259,9 @@ class VarField(Var):
         raise NotImplementedError("var fields don't actually have a tensor")
 
     def _get_ndslice(self) -> NDSlice:
+        raise NotImplementedError("var fields don't actually have a tensor")
+
+    def __getitem__(self, ndslice: NDSlice) -> Var:
         raise NotImplementedError("var fields don't actually have a tensor")
 
 

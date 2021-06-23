@@ -25,7 +25,10 @@ class ParamNamespace:
         self.model = model
         self.key = key
 
-    def namespace(self, key: Hashable) -> 'ParamNamespace':
+    def namespace(self, key: Hashable) -> ParamNamespace:
+        r"""
+        Returns a new namespace branch labeled with the given key
+        """
         return ParamNamespace(
             model=self.model, key=(self.key, key))
 

@@ -220,6 +220,8 @@ def test_var_field():
         v.ndslice
     with pytest.raises(NotImplementedError):
         v.origin
+    with pytest.raises(NotImplementedError):
+        v[3]
 
 
 def test_grad_through_stack():

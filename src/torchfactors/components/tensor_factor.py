@@ -28,6 +28,10 @@ class TensorFactor(Factor):
         super().__init__(variables)
         if tensor is None:
             tensor = init(self.shape)
+        elif isinstance(tensor, Var):
+            raise TypeError("It looks like you passed in multiple variables but forgot to "
+                            "put them into a sequence (please but brackets around "
+                            "your list of variables).")
         if tensor.shape != self.shape:
             raise ValueError("you didn't provide a tensor with the correct shape")
         self.tensor = tensor
