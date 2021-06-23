@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Sequence, TypeVar
+from typing import ClassVar, Sequence, TypeVar, overload
 
-from multimethod import multidispatch as overload
+from multimethod import multimethod
 
 T = TypeVar('T')
 
@@ -90,13 +90,22 @@ class _Range:
             key.stop if key.stop is not None else 0,
             key.step if key.step is not None else 1))
 
-    @overload
-    def __call__(self, start: int, stop: int, step: int = 1) -> Domain:
+    @multimethod
+    def ___call__(self, start: int, stop: int, step: int = 1) -> Domain:
         return SeqDomain(range(start, stop, step))
 
-    @__call__.register
-    def __call_with_one(self, stop: int) -> Domain:
+    @___call__.register
+    def _(self, stop: int) -> Domain:
         return SeqDomain(range(stop))
+
+    @overload
+    def __call__(self, start: int, stop: int, step: int = 1) -> Domain: ...
+
+    @overload
+    def __call__(self, stop: int) -> Domain: ...
+
+    def __call__(self, *args, **kwargs):
+        return self.___call__(*args, **kwargs)
 
 
 Range = _Range()

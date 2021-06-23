@@ -32,7 +32,7 @@ def test_infer():
 
     with pytest.raises(ValueError):
         # should have used product_marginal instead
-        product_marginals(fg, a)
+        product_marginals(fg, a)  # type: ignore
 
     with pytest.raises(ValueError):
         product_marginal(fg, (a, b), strategy=strategy)

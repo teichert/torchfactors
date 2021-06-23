@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import Callable, List, Optional, Sequence, Union, cast
+from typing import Callable, List, Optional, Sequence, Union, cast, overload
 
 import torch
 import typing_extensions
-from multimethod import multidispatch as overload
+from multimethod import multimethod
 from torch import Size, Tensor
 
 from .domain import Domain
@@ -224,7 +224,7 @@ class VarBranch(Var):
 
 class VarField(Var):
 
-    @overload  # type: ignore[misc]
+    @multimethod  # type: ignore[misc]
     def __init__(self,
                  domain: Domain = Domain.OPEN,
                  usage: Optional[VarUsage] = VarUsage.DEFAULT,
@@ -282,12 +282,12 @@ class TensorVar(Var):
 
     """
 
-    @overload  # type: ignore[misc]
-    def __init__(self, domain: Domain = Domain.OPEN,
-                 usage: Union[VarUsage, Tensor, None] = None,
-                 tensor: Optional[Tensor] = None,
-                 info: typing_extensions._AnnotatedAlias = None,
-                 stack_shapes: Optional[Sequence[ShapeType]] = None):
+    @multimethod
+    def ___init__(self, domain: Domain = Domain.OPEN,
+                  usage: Union[VarUsage, Tensor, None] = None,
+                  tensor: Optional[Tensor] = None,
+                  info: typing_extensions._AnnotatedAlias = None,
+                  stack_shapes: Optional[Sequence[ShapeType]] = None):
         """
         when the shape is another variable object, that indicates that this variable object
         is being
@@ -302,34 +302,65 @@ class TensorVar(Var):
         self._info = info
         self._stack_shapes = stack_shapes
 
-    def _get_origin(self) -> TensorVar:
-        return self
-
-    @__init__.register
+    @___init__.register
     def _dom_tensor_usage(self, domain: Domain,
                           tensor: Tensor,
                           usage: Union[VarUsage, Tensor, None] = None):
-        self.__init__(domain, usage, tensor)  # type: ignore[misc]
+        self.___init__(domain, usage, tensor)
 
-    @__init__.register
+    @___init__.register
     def _tensor_dom_usage(self, tensor: Tensor, domain: Domain = Domain.OPEN,
                           usage: Union[VarUsage, Tensor, None] = None):
-        self.__init__(domain, usage, tensor)  # type: ignore[misc]
+        self.___init__(domain, usage, tensor)
 
-    @__init__.register
+    @___init__.register
     def _tensor_usage_dom(self, tensor: Tensor, usage: Union[VarUsage, Tensor],
                           domain: Domain = Domain.OPEN):
-        self.__init__(domain, usage, tensor)  # type: ignore[misc]
+        self.___init__(domain, usage, tensor)
 
-    @__init__.register
+    @___init__.register
     def _usage_dom_tensor(self, usage: VarUsage, domain: Domain = Domain.OPEN,
                           tensor: Optional[Tensor] = None):
-        self.__init__(domain, usage, tensor)  # type: ignore[misc]
+        self.___init__(domain, usage, tensor)
 
-    @__init__.register
+    @___init__.register
     def _usage_tensor_dom(self, usage: VarUsage, tensor: Tensor,
                           domain: Domain = Domain.OPEN):
-        self.__init__(domain, usage, tensor)  # type: ignore[misc]
+        self.___init__(domain, usage, tensor)
+
+    @overload
+    def __init__(self, domain: Domain = Domain.OPEN,
+                 usage: Union[VarUsage, Tensor, None] = None,
+                 tensor: Optional[Tensor] = None,
+                 info: typing_extensions._AnnotatedAlias = None,
+                 stack_shapes: Optional[Sequence[ShapeType]] = None): ...
+
+    @overload
+    def __init__(self, domain: Domain,
+                 tensor: Tensor,
+                 usage: Union[VarUsage, Tensor, None] = None): ...
+
+    @overload
+    def __init__(self, tensor: Tensor, domain: Domain = Domain.OPEN,
+                 usage: Union[VarUsage, Tensor, None] = None): ...
+
+    @overload
+    def __init__(self, tensor: Tensor, usage: Union[VarUsage, Tensor],
+                 domain: Domain = Domain.OPEN): ...
+
+    @overload
+    def __init__(self, usage: VarUsage, domain: Domain = Domain.OPEN,
+                 tensor: Optional[Tensor] = None): ...
+
+    @overload
+    def __init__(self, usage: VarUsage, tensor: Tensor,
+                 domain: Domain = Domain.OPEN): ...
+
+    def __init__(self, *args, **kwargs):
+        self.___init__(*args, **kwargs)
+
+    def _get_origin(self) -> TensorVar:
+        return self
 
     def __getitem__(self, ndslice: NDSlice) -> Var:
         return VarBranch(root=self, ndslice=ndslice)

@@ -12,7 +12,7 @@ def test_factor():
     factor_tensor = ndarange(3, 4, 10).log()
     with pytest.raises(TypeError):
         # needs to name factor_tensor argument since it comes after varargs
-        TensorFactor(v, factor_tensor)
+        TensorFactor(v, factor_tensor)  # type: ignore
     f: Factor = TensorFactor(v, tensor=factor_tensor)
     assert f.shape == (3, 4, 10)
     assert f.batch_cells == 3 * 4
@@ -87,7 +87,7 @@ def test_multi_factor_bad_2vars():
     f = TensorFactor(v1, v2)
     with pytest.raises(ValueError):
         # missing the brackets around the variables makes things ambiguous
-        f.product_marginals(v1, v2)
+        f.product_marginals(v1, v2)  # type: ignore
 
 
 def test_normalize():

@@ -1,25 +1,37 @@
 import math
 from itertools import chain
-from typing import Tuple, cast
+from typing import Tuple, cast, overload
 
-from multimethod import multidispatch as overload
+from multimethod import multidispatch
 from torch import Tensor, arange
 from torch.types import Number
 
 from .types import NDSlice, ShapeType, SliceType
 
 
-@overload
-def ndarange(shape: ShapeType):
+@multidispatch
+def _ndarange(shape: ShapeType) -> Tensor:
     r"""
     returns a sufficiently sized arange() that has been reshaped to the specified shape
     """
     return arange(math.prod(shape)).reshape(shape)
 
 
-@ndarange.register
-def non_tuple(*shape: int):
-    return ndarange(shape)
+@_ndarange.register
+def _(*shape: int) -> Tensor:
+    return _ndarange(shape)
+
+
+@overload
+def ndarange(shape: ShapeType) -> Tensor: ...
+
+
+@overload
+def ndarange(*shape: int) -> Tensor: ...
+
+
+def ndarange(*args, **kwargs):
+    return _ndarange(*args, **kwargs)
 
 
 def replace_negative_infinities(t: Tensor, replacement: Number = 0.0) -> Tensor:

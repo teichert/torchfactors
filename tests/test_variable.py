@@ -252,6 +252,7 @@ def test_grad_through_and_unstack():
     assert (vs[1].tensor.grad == 1).all()
     assert (vs[2].tensor.grad == 1).all()
 
+
 # # This one doesn't work
 # def test_grad_through_and_unstack2():
 #     vs = [
