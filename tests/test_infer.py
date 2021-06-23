@@ -50,6 +50,3 @@ def test_infer():
     logz, marg_a = product_marginals(fg, (), (a,), normalize=False)
     assert logz.exp().isclose(torch.tensor(10. * 9 * 8))
     assert (marg_a == math.log(9*8)).all()
-
-
-test_infer()
