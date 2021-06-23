@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
-                    Optional, TypeVar, overload)
+from typing import (Callable, Generic, Hashable, Iterable, List, Optional,
+                    TypeVar, overload)
 
 import torch
 # from multimethod import multidispatch as overload
@@ -11,7 +11,6 @@ from torch.nn import Module, ModuleDict, ParameterDict
 from torch.nn.init import xavier_uniform_, zeros_
 from torch.nn.parameter import Parameter
 
-from .domain import Domain
 from .factor import Factor
 from .types import ShapeType
 
@@ -77,23 +76,24 @@ class Model(torch.nn.Module, Generic[T]):
 
     def __init__(self):
         super(Model, self).__init__()
-        self._model_factor_generators: List[Callable[[T], Iterable[Factor]]] = []
-        self._model_domains: Dict[Hashable, Domain] = {}
+        # self._model_factor_generators: List[Callable[[T], Iterable[Factor]]] = []
+        # self._model_domains: Dict[Hashable, Domain] = {}
         self._model_parameters = ParameterDict()
         self._model_modules = ModuleDict()
 
-    def domain(self, key: Hashable) -> Domain:
-        return self._model_domains.setdefault(key, Domain.OPEN)
+    # def domain(self, key: Hashable) -> Domain:
+    #     return self._model_domains.setdefault(key, Domain.OPEN)
 
     def namespace(self, key) -> ParamNamespace:
         return ParamNamespace(self, key)
 
-    def factors_from(self, factor_generator: Callable[[T], Iterable[Factor]]) -> None:
-        self._model_factor_generators.append(factor_generator)
+    # def factors_from(self, factor_generator: Callable[[T], Iterable[Factor]]) -> None:
+    #     self._model_factor_generators.append(factor_generator)
 
     def factors(self, subject: T) -> Iterable[Factor]:
-        for gen in self._model_factor_generators:
-            yield from gen(subject)
+        return []
+        # for gen in self._model_factor_generators:
+        #     yield from gen(subject)
 
     def _get_param(self, key: Hashable, check_shape: Optional[ShapeType] = None,
                    default_factory: Optional[Callable[[], Parameter]] = None

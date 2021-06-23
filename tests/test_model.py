@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 import pytest
+import torch
 from torchfactors import LATENT, Factor, Model, Range, Subject, Var, VarField
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.model import ParamNamespace
@@ -68,3 +69,16 @@ def test_parameters2():
     assert ns_a.parameter((3, 3)).shape == (3, 3)
     assert ns_a_b.parameter((4, 6)).shape == (4, 6)
     ns_a.parameter()
+    assert list(m(object())) == []
+
+
+def test_modules():
+    m = Model[Any]()
+    module = m.namespace('root').module(lambda: torch.nn.Linear(4, 5, bias=False))
+    with pytest.raises(KeyError):
+        m.namespace('root').parameter()
+    module2 = m.namespace('root').module()
+    assert module is module2
+    params = list(module2.parameters())
+    assert len(params) == 1
+    assert params[0].T.shape == (4, 5)
