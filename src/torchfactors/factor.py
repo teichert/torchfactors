@@ -118,6 +118,14 @@ class Factor:
         return math.prod(self.shape)
 
     @cached_property
+    def out_cells(self):
+        r"""
+        The number of cells in the (possibly implicit) output for each batch
+        element
+        """
+        return math.prod(self.out_shape)
+
+    @cached_property
     def batch_cells(self):
         r"""
         The number of elements in a single batch (in contrast to the number of

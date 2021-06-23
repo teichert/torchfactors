@@ -21,6 +21,10 @@ class LinearFactor(Factor):
         self.input = input
         self.bias = bias
         self.params = params
+        if input.shape:
+            if (len(input.shape) < self.num_batch_dims or
+                    input.shape[:self.num_batch_dims] != self.batch_shape):
+                raise ValueError("prefix dimensions of input must match batch_dims")
 
     @ cached_property
     def in_shape(self):
@@ -41,11 +45,11 @@ class LinearFactor(Factor):
         m = self.params.module(lambda:
                                torch.nn.Linear(
                                    in_features=self.in_cells,
-                                   out_features=self.cells,
+                                   out_features=self.out_cells,
                                    bias=self.bias))
         input = self.input
         if not input.shape:
-            input = input.expand((*self.batch_shape, 1))
+            input = input.expand((*self.batch_shape, self.in_cells))
         else:
             input = input.reshape((*self.batch_shape, -1))
         return m(input).reshape(self.shape)
