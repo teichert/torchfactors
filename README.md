@@ -121,3 +121,12 @@ make doc # creates html documentation
 ## Style
 Unless otherwise specified, let's follow [this guide](https://luminousmen.com/post/the-ultimate-python-style-guidelines).
 
+
+# Using the Library
+
+## Writing new Factors
+We recommend that the paramters to your factor initialization adhere to the following:
+- do not have positional arguments that are sequences
+- have the last positional argument be a varargs for the variables that will be involved in the factore
+- have additional information be specified by name listed after the varargs
+

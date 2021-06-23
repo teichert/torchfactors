@@ -14,7 +14,7 @@ def test_strategy():
         for _ in range(n)
     ]
     factors = [
-        tx.TensorFactor([vs[i], vs[i+1]])
+        tx.TensorFactor(vs[i], vs[i+1])
         for i in range(n - 1)
     ]
     fg = FactorGraph(factors)
@@ -48,7 +48,7 @@ def test_strategy():
 def test_strategy_schedule():
     v1 = TensorVar(torch.ones(3, 4).float(), tx.Range(5), tx.LATENT)
     v2 = TensorVar(torch.ones(3, 4).float(), tx.Range(5), tx.LATENT)
-    factors = [tx.TensorFactor([v1, v2])]
+    factors = [tx.TensorFactor(v1, v2)]
     fg = FactorGraph(factors)
     bg = BetheGraph(fg)
     schedule = list(bg)

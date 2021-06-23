@@ -18,8 +18,8 @@ def test_infer():
         TensorFactor(a),
         TensorFactor(b),
         TensorFactor(c),
-        TensorFactor([a, b]),
-        TensorFactor([b, c])])
+        TensorFactor(a, b),
+        TensorFactor(b, c)])
     strategy = BetheGraph(fg)
     logz = product_marginal(fg, strategy=strategy)
     assert logz.exp().isclose(torch.tensor(10. * 9 * 8))

@@ -9,6 +9,7 @@ import torch
 from torch import Tensor
 
 from torchfactors import einsum
+from torchfactors.types import ShapeType
 
 from .utils import replace_negative_infinities
 from .variable import Var
@@ -33,9 +34,15 @@ class Factor:
     as input and a set of (einsum style) queries to respond to.
     """
 
-    def __init__(self, variables: Union[Var, Sequence[Var]]):
-        if isinstance(variables, Var):
-            variables = (variables,)
+    def __init__(self, variables: Sequence[Var]):
+        # if isinstance(variables, Var):
+        #     variables = (variables,)
+        for v in variables:
+            if not isinstance(v, Var):
+                raise TypeError(
+                    f"it looks like you passed in a {type(v)} rather than a Var; "
+                    "If the parameters comes after varargs, make sure to name it. "
+                    "e.g. TensorFactor(v, tensor=t)")
         self.variables = variables
         for v in self.variables[1:]:
             if v.shape != self.variables[0].shape:
@@ -73,13 +80,27 @@ class Factor:
         check_queries(queries)
         return self.marginals_closure(*queries, other_factors=other_factors)()
 
+    @staticmethod
+    def out_shape_from_variables(variables: Sequence[Var]) -> ShapeType:
+        return tuple([len(t.domain) for t in variables])
+
+    @staticmethod
+    def batch_shape_from_variables(variables: Sequence[Var]) -> ShapeType:
+        first = variables[0]
+        return tuple(first.tensor.shape)
+
+    @staticmethod
+    def shape_from_variables(variables: Sequence[Var]) -> ShapeType:
+        return tuple([*Factor.batch_shape_from_variables(variables),
+                      *Factor.out_shape_from_variables(variables)])
+
     @cached_property
     def out_shape(self):
         r"""
         The shape of the output configuration scores (the joint sizes from the
         last dimension of each variable input to the factor).
         """
-        return tuple([len(t.domain) for t in self.variables])
+        return Factor.out_shape_from_variables(self.variables)
 
     @cached_property
     def shape(self):
@@ -116,8 +137,7 @@ class Factor:
         [and thus the output dimensions] need not be consitent.)
         """
         # should be the same for all variables (maybe worth checking?)
-        first = self.variables[0]
-        return tuple(first.tensor.shape)
+        return Factor.batch_shape_from_variables(self.variables)
 
     @property
     def num_batch_dims(self):

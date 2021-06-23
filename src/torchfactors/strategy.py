@@ -64,7 +64,7 @@ class Region(object):
                                  if exclude is not None else self.factor_set)
         if not surviving_factors:
             def return_uniforms():
-                return [TensorFactor(query).dense for query in queries]
+                return [TensorFactor(*query).dense for query in queries]
             return return_uniforms
         _, ix, controller = max((len(f.variables), i, f) for i, f in enumerate(surviving_factors))
 
@@ -81,7 +81,7 @@ class Region(object):
         """
         factors = self.factors
         if not factors:
-            factors = [TensorFactor(self.variables, init=torch.zeros)]
+            factors = [TensorFactor(*self.variables, init=torch.zeros)]
         _, ix, controller = max((len(f), i, f) for i, f in enumerate(factors))
         other_factors = list(factors[:ix]) + list(factors[ix:])
         return controller.free_energy(other_energy=other_factors,

@@ -1,24 +1,20 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 from functools import cached_property
-from typing import Sequence, Union
 
 import torch
 from torch import Tensor
-
 from torchfactors.factor import Factor
 from torchfactors.model import ParamNamespace
 from torchfactors.variable import Var
 
 
-@ dataclass
 class LinearFactor(Factor):
 
     def __init__(self,
-                 variables: Union[Var, Sequence[Var]],
                  params: ParamNamespace,
+                 *variables: Var,
                  input: Tensor = torch.tensor(0.0),
                  bias: bool = True):
         super().__init__(variables)

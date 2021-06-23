@@ -6,6 +6,7 @@ from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
 import torch
 from torch import Tensor
 from torch.nn import Module, ModuleDict, ParameterDict
+from torch.nn.init import xavier_uniform_, zeros_
 from torch.nn.parameter import Parameter
 
 from .domain import Domain
@@ -21,7 +22,7 @@ class ParamNamespace:
     with a unique key and the Model that actually stores everything
     """
 
-    def __init__(self, model: 'Model', key: Hashable):
+    def __init__(self, model: Model, key: Hashable):
         self.model = model
         self.key = key
 
@@ -34,8 +35,14 @@ class ParamNamespace:
 
     def parameter(self, shape: ShapeType,
                   initialization: Optional[Callable[[Tensor], None]
-                                           ] = torch.nn.init.kaiming_uniform_
+                                           ] = None
                   ) -> Tensor:
+        if initialization is None:
+            if len([d for d in list(torch.Size(shape)) if d > 1]) < 2:
+                def initialization(t): return zeros_(t)
+            else:
+                def initialization(t): return xavier_uniform_(t)
+
         def gen_param():
             tensor = torch.zeros(shape)
             if initialization is not None:

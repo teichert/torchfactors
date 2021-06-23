@@ -17,8 +17,8 @@ class MyModel(tx.Model[Utterance]):
         hidden = tx.TensorVar(items.tensor, tx.VarUsage.LATENT, tx.Range(100))
         for i in range(len(items.tensor)):
             if i > 0:
-                yield tx.LinearFactor([hidden[i], hidden[i-1]], self.namespace('transition'))
-            yield tx.LinearFactor([hidden[i], items[i]], self.namespace('emission'))
+                yield tx.LinearFactor(self.namespace('transition'), hidden[i], hidden[i-1])
+            yield tx.LinearFactor(self.namespace('emission'), hidden[i], items[i])
 
 
 loader = Utterance.data_loader(batch_size=3, data=[

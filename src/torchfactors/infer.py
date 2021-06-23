@@ -83,7 +83,7 @@ class BPInference:
             _, t = key
             return self.messages.setdefault(
                 key, TensorFactor(
-                    self.strategy.regions[t].variables,
+                    *self.strategy.regions[t].variables,
                     init=torch.zeros))
 
     def in_messages(self, region_id):
