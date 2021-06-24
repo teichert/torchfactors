@@ -6,6 +6,8 @@ import torch
 import torchfactors as tx
 from torchfactors.components.linear_factor import LinearFactor
 from torchfactors.factor import Factor
+from torchfactors.inferencers.bp import BP
+from torchfactors.model_inferencer import ModelInferencer
 
 
 @dataclass
@@ -52,7 +54,7 @@ class TrueCaser(tx.Model[TrueCaseExample]):
 
 
 true_caser = TrueCaser()
-
-fg = tx.FactorGraph(true_caser(x))
-print(x.true_cased)
-print(fg)
+bp = ModelInferencer(true_caser, BP())
+print(bp.product_marginal(x))
+print(bp.product_marginals(x))
+print(bp.predict(x).true_cased)

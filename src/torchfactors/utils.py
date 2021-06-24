@@ -61,6 +61,28 @@ def ndslices_overlap(lhs: NDSlice, rhs: NDSlice, shape: ShapeType) -> bool:
             return False
     return True
 
+# TODO: instead, just get the overlap
+# def ndslices_overlap(lhs: NDSlice, rhs: NDSlice, shape: ShapeType) -> bool:
+#     r"""
+#     Returns true if the lhs slice overlaps at all with the rhs slice
+#     """
+#     def ints_to_ranges(ndrange):
+#         for a in ndrange:
+#             if isinstance(a, range):
+#                 yield a
+#             else:
+#                 yield range(a, a + 1)
+#     lhs_range = list(ints_to_ranges(as_ndrange(lhs, shape)))
+#     rhs_range = list(ints_to_ranges(as_ndrange(rhs, shape)))
+#     # doesn't overlap if any slices are empty (need to check this since one
+#     # slice might only be partial)
+#     if any(a.start == a.stop for a in chain(lhs_range, rhs_range)):
+#         return False
+#     for a, b in zip(lhs_range, rhs_range):
+#         if a.start >= b.stop or a.stop <= b.start:
+#             return False
+#     return True
+
 
 def as_range(one_slice: slice, length: int) -> range:
     """returns a range representing the same subset of integers as the given

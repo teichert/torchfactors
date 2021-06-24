@@ -1,11 +1,10 @@
 from typing import Callable, Optional
 
 import torch
-from torch import Tensor
-from torchfactors.types import ShapeType
-from torchfactors.variable import Var
 
 from ..factor import Factor
+from ..types import ShapeType
+from ..variable import Var
 
 
 def float_zeros(shape: ShapeType):
@@ -23,8 +22,8 @@ class TensorFactor(Factor):
     """
 
     def __init__(self, *variables: Var,
-                 tensor: Optional[Tensor] = None,
-                 init: Callable[[ShapeType], Tensor] = float_zeros):
+                 tensor: Optional[torch.Tensor] = None,
+                 init: Callable[[ShapeType], torch.Tensor] = float_zeros):
         super().__init__(variables)
         if tensor is None:
             tensor = init(self.shape)

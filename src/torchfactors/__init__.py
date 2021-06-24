@@ -5,8 +5,10 @@ from .components.tensor_factor import TensorFactor
 from .domain import Domain, Range, SeqDomain
 from .factor import Factor
 from .factor_graph import FactorGraph
-from .infer import product_marginal, product_marginals
+from .inferencer import Inferencer
+from .inferencers.bp import BP
 from .model import Model
+from .model_inferencer import ModelInferencer
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
 from .utils import ndarange
@@ -28,11 +30,12 @@ __all__ = [
     'PADDING', 'LATENT', 'ANNOTATED', 'CLAMPED', 'OBSERVED', 'DEFAULT',
     'Subject',
     'Factor',
-    'TensorFactor',
-    'LinearFactor',
+    'TensorFactor', 'LinearFactor',
     'Model',
     'FactorGraph',
-    'product_marginals', 'product_marginal',
     'ndarange',
     'BetheGraph',
+    'Inferencer',
+    'ModelInferencer',
+    'BP',
 ]

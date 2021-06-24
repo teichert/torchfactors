@@ -201,3 +201,32 @@ def test_stacked():
 #     assert u.hidden.shape == (6,)
 #     assert (u.observations.usage == OBSERVED).all()
 #     assert (u.hidden.usage == LATENT).all()
+
+
+def test_variables():
+    @dataclass
+    class Utterance(Subject):
+        id1: int
+        id2: int
+        observations: Var = VarField(Range(10), OBSERVED)
+        hidden: Var = VarField(Range(4), LATENT, shape=observations)
+
+    class Middle(Utterance):
+        test: int = 10
+
+    @dataclass
+    class ExtendedUtterance(Middle):
+        other1: Var = VarField()
+        other2: Var = VarField()
+
+    u = ExtendedUtterance(
+        3, 4,
+        TensorVar(torch.ones(3)),
+        other1=TensorVar(torch.ones(9)),
+        other2=TensorVar(torch.ones(10)))
+
+    assert len(u.variables) == 4
+    assert u.variables[0].domain == Range(10)
+    assert u.variables[1].domain == Range(4)
+    assert u.variables[2].tensor.shape == (9,)
+    assert u.variables[3].tensor.shape == (10,)

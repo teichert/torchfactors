@@ -4,10 +4,10 @@ import math
 from functools import cached_property
 
 import torch
-from torch import Tensor
-from torchfactors.factor import Factor
-from torchfactors.model import ParamNamespace
-from torchfactors.variable import Var
+
+from ..factor import Factor
+from ..model import ParamNamespace
+from ..variable import Var
 
 
 class LinearFactor(Factor):
@@ -15,7 +15,7 @@ class LinearFactor(Factor):
     def __init__(self,
                  params: ParamNamespace,
                  *variables: Var,
-                 input: Tensor = torch.tensor(0.0),
+                 input: torch.Tensor = torch.tensor(0.0),
                  bias: bool = True):
         super().__init__(variables)
         self.input = input
@@ -34,7 +34,7 @@ class LinearFactor(Factor):
     def in_cells(self):
         return math.prod(self.in_shape)
 
-    def dense_(self) -> Tensor:
+    def dense_(self) -> torch.Tensor:
         r"""returns a tensor that characterizes this factor;
 
         the factor's variable-domains dictate the number and
@@ -52,4 +52,4 @@ class LinearFactor(Factor):
             input = input.expand((*self.batch_shape, self.in_cells))
         else:
             input = input.reshape((*self.batch_shape, -1))
-        return m(input).reshape(self.shape)
+        return m(input.float()).reshape(self.shape)

@@ -7,9 +7,8 @@ from typing import (Dict, FrozenSet, Generic, List, Sequence, TypeVar, Union,
 
 from torch.utils.data import DataLoader, Dataset
 
-from torchfactors.types import ShapeType
-
 from .domain import Domain
+from .types import ShapeType
 from .variable import TensorVar, Var, VarField, VarUsage
 
 SubjectType = TypeVar('SubjectType', bound='Subject')
@@ -33,12 +32,13 @@ class ListDataset(Dataset, Generic[ExampleType]):
 class Subject:
     is_stacked: bool = field(init=False, default=False)
     __lists: Dict[str, List[object]] = field(init=False, default_factory=dict)
-    __vars: FrozenSet = field(init=False, default=frozenset())
+    __varset: FrozenSet = field(init=False, default=frozenset())
 
     def list(self, key: str) -> List[object]:
         return self.__lists[key]
 
     def init_variables(self):
+        self.__variables: List[Var] = []
         cls = type(self)
         vars = []
         cls_attr_id_to_var: Dict[int, TensorVar] = {}
@@ -78,7 +78,13 @@ class Subject:
                 if var_instance.usage is None:
                     var_instance.usage = var_field._usage
                 vars.append(attr_name)
-        self.__vars = frozenset(vars)
+                self.__variables.append(var_instance)
+        self.__varset = frozenset(vars)
+
+    @property
+    def variables(self):
+        r"""returns a list of all variable fields defined for this subjec"""
+        return self.__variables
 
     # if this object has been stacked, then:
     # 1) (it will know it and not allow stacking again for now)
@@ -86,6 +92,7 @@ class Subject:
     # 3) other values will take the value of the first object, but
     #    --- the full list will be accessible via stacked.list(stacked.item)
     #
+
     @staticmethod
     def stack(subjects: Sequence[SubjectType]) -> SubjectType:
         if not subjects:
@@ -99,8 +106,8 @@ class Subject:
         out.is_stacked = True
         # cls = type(out)
         generic_fields = set(field.name for field in fields(Subject))
-        my_fields = set(field.name for field in fields(first)) - first.__vars - generic_fields
-        for attr_name in first.__vars:
+        my_fields = set(field.name for field in fields(first)) - first.__varset - generic_fields
+        for attr_name in first.__varset:
             # attr = cast(TensorVar, getattr(out, attr_name))
             stacked = TensorVar.pad_and_stack([
                 cast(TensorVar, getattr(subject, attr_name))
@@ -115,9 +122,9 @@ class Subject:
 
     def unstack(self: SubjectType) -> List[SubjectType]:
         generic_fields = set(field.name for field in fields(Subject))
-        my_fields = set(field.name for field in fields(self)) - self.__vars - generic_fields
-        if self.__vars:
-            first_var_fieldname = next(iter(self.__vars))
+        my_fields = set(field.name for field in fields(self)) - self.__varset - generic_fields
+        if self.__varset:
+            first_var_fieldname = next(iter(self.__varset))
             first_var = cast(Var, getattr(self, first_var_fieldname))
             batch_size = first_var.shape[0]
         elif my_fields:
@@ -132,7 +139,7 @@ class Subject:
             obj.is_stacked = False
             # obj.__lists = {}
             # obj.__vars = frozenset()
-        for var_fieldname in self.__vars:
+        for var_fieldname in self.__varset:
             joined = cast(TensorVar, getattr(self, var_fieldname))
             split = joined.unstack()
             for obj, val in zip(out, split):
@@ -171,11 +178,11 @@ class Subject:
         #     return
 
     def clamp_annotated(self) -> None:
-        for attr_name in self.__vars:
+        for attr_name in self.__varset:
             cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
 
     def unclamp_annotated(self) -> None:
-        for attr_name in self.__vars:
+        for attr_name in self.__varset:
             cast(TensorVar, getattr(self, attr_name)).unclamp_annotated()
 
     def __post_init__(self):

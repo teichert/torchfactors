@@ -4,15 +4,14 @@ from functools import lru_cache
 from typing import Callable, Dict, List, Sequence, Tuple, Union
 
 import torch
-from torch import Tensor
 
-from torchfactors.factor import Factor, check_queries
-
-from .components.tensor_factor import TensorFactor
-from .factor_graph import FactorGraph
-from .strategies.bethe_graph import BetheGraph
-from .strategy import Strategy
-from .variable import Var
+from ..components.tensor_factor import TensorFactor
+from ..factor import Factor
+from ..factor_graph import FactorGraph
+from ..inferencer import Inferencer
+from ..strategies.bethe_graph import BetheGraph
+from ..strategy import Strategy
+from ..variable import Var
 
 cache = lru_cache(maxsize=None)
 
@@ -32,7 +31,7 @@ class BPInference:
         # self.message_inputs: List[List[Factor]] = []
         # )]
 
-    def logz(self) -> Tensor:
+    def logz(self) -> torch.Tensor:
         region_free_energies = []
         for rid, r in enumerate(self.strategy.regions):
             region_free_energies.append(
@@ -40,7 +39,7 @@ class BPInference:
             )
         return -torch.stack(region_free_energies, -1).sum(dim=-1)
 
-    def belief(self, variables: Union[Var, Sequence[Var]]) -> Tensor:
+    def belief(self, variables: Union[Var, Sequence[Var]]) -> torch.Tensor:
         r"""
         Each input variable has a tensor and an ndslice (or None to represent a
         request for the estimate of log Z); for each, we will return a tensor
@@ -61,7 +60,8 @@ class BPInference:
         if len(variables) != 1:
             raise ValueError("not ready to handle multi-variable belief queries")
         variable = variables[0]
-        t = torch.zeros(variable.original_tensor.shape + (len(variable.domain),))
+        # TODO: this could be a lot more efficient
+        t = torch.zeros(variable.origin.shape + (len(variable.domain),))
         full_belief = torch.zeros_like(t)
         for region_id, region, vs in self.strategy.get_regions_with_vars(variable):
             region_beliefs = region.product_marginals([(v,) for v in vs],
@@ -138,89 +138,27 @@ class BPInference:
             self.update_messages_from_regionf(s, tuple(ts))()
 
 
-def product_marginal(factor_graph: FactorGraph, query: Union[Sequence[Var], Var, None] = None,
-                     strategy: Strategy = None, normalize=True
-                     ) -> Tensor:
-    r"""
-    convenience method for a single product_marginal query
-    """
-    if query is None:
-        query = ()
-    elif isinstance(query, Var):
-        query = (query,)
-    out, = product_marginals(factor_graph,
-                             query, strategy=strategy,
-                             force_multi=True, normalize=normalize)
-    return out
+class BP(Inferencer):
 
+    def __init__(self, strategy: Callable[[FactorGraph], Strategy] = BetheGraph):
+        self.strategy_factory = strategy
 
-# TODO: handle queries that are not in the graph
-def product_marginals(factor_graph: FactorGraph, *queries: Sequence[Var],
-                      strategy: Strategy = None, force_multi=False, normalize=True
-                      ) -> Union[Sequence[Tensor], Tensor]:
-    r"""
-    Returns marginals corresponding to the specified queries.
-    These Given a factor_graph and a strategy (default it bethe-graph).
-    If `normalize` is specified as True (note, this is usually more efficient
-    than not normalizing), then each marginal tensor will logsumexp to 0
-    with the exception of a query for () which is used to represent a request
-    for the log partition function. If normalize is False,
-    then the partition function will be used to unnormalize
-    the normalized belief.
-    The idea is that the normalized belief came from dividing the unnormalized by Z,
-    so I get the unnormalized back by multiplying by Z:
-    b = m / z => m = b * z
-    """
-    check_queries(queries)
-    if strategy is None:
-        strategy = BetheGraph(factor_graph)
-    # query_list = [(q,) if isinstance(q, VarBase) else q for q in queries]
-    bp = BPInference(factor_graph, strategy)
-    bp.run()
-    if () in queries or not normalize:
-        logz = bp.logz()
-    responses: List[Tensor] = []
-    for query in queries:
-        if query == ():
-            responses.append(logz)
-        else:
-            belief = bp.belief(query)
-            if not normalize:
-                belief = belief + logz
-            responses.append(belief)
-    if len(responses) == 1 and not force_multi:
-        return responses[0]
-    return responses
-
-    # dataclass_transform worked for VSCode autocomplete without single dispatch,
-    # but didn't work with single dispatch nor was it recognized by mypy;
-    # see:
-    #
-    # _T = TypeVar("_T")
-
-    # def __dataclass_transform__(
-    #     *,
-    #     eq_default: bool = True,
-    #     order_default: bool = False,
-    #     kw_only_default: bool = False,
-    #     field_descriptors: Tuple[Union[type, Callable[..., Any]], ...] = (()),
-    # ) -> Callable[[_T], _T]:
-    #     # If used within a stub file, the following implementation can be
-    #     # replaced with "...".
-    #     return lambda a: a
-
-    # # @singledispatch
-    # # # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
-    # # def subject(stackable: bool = False):
-    # #     def wrapped(cls: type):
-    # #         cls = subject(cls)
-    # #         # do other stuff
-    # #         return cls
-    # #     return wrapped
-
-    # # @subject.register
-    # # @__dataclass_transform__(order_default=True, field_descriptors=(Variable))
-    # @__dataclass_transform__(order_default=True, field_descriptors=(Var,))
-    # def subject(cls: type):
-    #     setattr(cls, '__post_init__', Subject.init_variables)
-    #     return dataclass(cls)
+    # TODO: handle queries that are not in the graph
+    def product_marginals_(self, factors: Sequence[Factor], *queries: Sequence[Var],
+                           normalize=True) -> Sequence[torch.Tensor]:
+        fg = FactorGraph(factors)
+        strategy = self.strategy_factory(fg)
+        bp = BPInference(fg, strategy)
+        bp.run()
+        if () in queries or not normalize:
+            logz = bp.logz()
+        responses: List[torch.Tensor] = []
+        for query in queries:
+            if query == ():
+                responses.append(logz)
+            else:
+                belief = bp.belief(query)
+                if not normalize:
+                    belief = belief + logz
+                responses.append(belief)
+        return responses

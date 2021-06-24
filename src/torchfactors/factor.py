@@ -8,14 +8,13 @@ from typing import Callable, Iterator, Sequence, Union
 import torch
 from torch import Tensor
 
-from torchfactors import einsum
-from torchfactors.types import ShapeType
-
+from .einsum import compile_obj_equation, log_einsum
+from .types import ShapeType
 from .utils import replace_negative_infinities
 from .variable import Var
 
 
-def check_queries(queries: Sequence[Sequence[Var]]):
+def check_queries(queries: Sequence[Union[Var, Sequence[Var]]]):
     if not queries or isinstance(queries[0], Var):
         raise ValueError("each query needs to be a sequence of Vars "
                          "(did you forget the brackets around your single variable groups?) "
@@ -286,7 +285,7 @@ class Factor:
         def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
             return tuple([*batch_dims, *objs])
 
-        equation = einsum.compile_obj_equation(
+        equation = compile_obj_equation(
             [with_batch_dims(self.variables)] +
             [with_batch_dims(other.variables)
              for other in other_factors],
@@ -299,7 +298,7 @@ class Factor:
             # meaning that it doesn't impact the product
             input_tensors = [self.dense] + [f.dense
                                             for f in other_factors]
-            return einsum.log_einsum(equation, *input_tensors)
+            return log_einsum(equation, *input_tensors)
         return f
 
     @ staticmethod
