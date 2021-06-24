@@ -54,6 +54,6 @@ def test_predict_simple():
     assert coin.tensor == 0
     bp.predict(factors)
     assert coin.tensor == 1
-
-
-test_predict_simple()
+    factor.tensor = torch.tensor([3, 1]).log()
+    bp.predict(factors)
+    assert coin.tensor == 0
