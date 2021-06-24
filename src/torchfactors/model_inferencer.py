@@ -9,7 +9,7 @@ from .subject import SubjectType
 from .variable import Var
 
 
-class ModelInferencer(Generic[SubjectType]):
+class System(Generic[SubjectType]):
     r"""
     Knows how to get marginals of variables in the given subject
     and/or how to predict an annotated copy given an input subject

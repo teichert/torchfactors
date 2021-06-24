@@ -8,7 +8,7 @@ from .factor_graph import FactorGraph
 from .inferencer import Inferencer
 from .inferencers.bp import BP
 from .model import Model
-from .model_inferencer import ModelInferencer
+from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
 from .utils import ndarange
@@ -36,6 +36,6 @@ __all__ = [
     'ndarange',
     'BetheGraph',
     'Inferencer',
-    'ModelInferencer',
+    'System',
     'BP',
 ]

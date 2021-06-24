@@ -7,7 +7,7 @@ import torchfactors as tx
 from torchfactors.components.linear_factor import LinearFactor
 from torchfactors.factor import Factor
 from torchfactors.inferencers.bp import BP
-from torchfactors.model_inferencer import ModelInferencer
+from torchfactors.model_inferencer import System
 
 
 @dataclass
@@ -54,7 +54,7 @@ class TrueCaser(tx.Model[TrueCaseExample]):
 
 
 true_caser = TrueCaser()
-bp = ModelInferencer(true_caser, BP())
+bp = System(true_caser, BP())
 print(bp.product_marginal(x))
 print(bp.product_marginals(x))
 print(bp.predict(x).true_cased)

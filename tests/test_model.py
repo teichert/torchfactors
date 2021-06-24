@@ -3,7 +3,7 @@ from typing import Any, Iterable
 
 import pytest
 import torch
-from torchfactors import LATENT, Factor, Model, Range, Subject, Var, VarField
+from torchfactors import (LATENT, Factor, Model, Range, Subject, Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.model import ParamNamespace
 
@@ -93,3 +93,7 @@ def test_modules():
     params = list(module2.parameters())
     assert len(params) == 1
     assert params[0].T.shape == (4, 5)
+
+
+# def test_model_inferencer():
+#     system = System(model=Chain(), inferencer=BP())
