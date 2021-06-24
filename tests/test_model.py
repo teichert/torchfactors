@@ -97,3 +97,4 @@ def test_modules():
 
 # def test_model_inferencer():
 #     system = System(model=Chain(), inferencer=BP())
+#     out = system.predict(Seq())

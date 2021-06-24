@@ -40,6 +40,15 @@ def replace_negative_infinities(t: Tensor, replacement: Number = 0.0) -> Tensor:
     return t.nan_to_num(nan=float('nan'), posinf=float('inf'), neginf=replacement)
 
 
+def ndslices_cat(lhs: NDSlice, rhs: NDSlice) -> NDSlice:
+    r"""returns the concatenation of two ndslices"""
+    if not isinstance(lhs, (list, tuple)):
+        lhs = (lhs,)
+    if not isinstance(rhs, (list, tuple)):
+        rhs = (rhs,)
+    return tuple(lhs) + tuple(rhs)
+
+
 def ndslices_overlap(lhs: NDSlice, rhs: NDSlice, shape: ShapeType) -> bool:
     r"""
     Returns true if the lhs slice overlaps at all with the rhs slice

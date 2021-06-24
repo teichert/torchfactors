@@ -51,10 +51,10 @@ class Inferencer(ABC):
 
     def predict(self, factors: Iterable[Factor]) -> None:
         wrapped_factors = list(factors)
-        all_variables = list(set(list(v for f in wrapped_factors for v in f)))
+        all_variables = list(set(list(v.origin for f in wrapped_factors for v in f)))
         self.predict_(list(factors), all_variables)
 
     def predict_(self, factors: Sequence[Factor], variables: Sequence[Var]) -> None:
-        marginals = self.product_marginals_(factors, variables)
+        marginals = self.product_marginals_(factors, *[(v,) for v in variables])
         for marginal, variable in zip(marginals, variables):
             variable.tensor = marginal.argmax()

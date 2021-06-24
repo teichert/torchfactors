@@ -67,9 +67,9 @@ class BPInference:
             region_beliefs = region.product_marginals([(v,) for v in vs],
                                                       other_factors=self.in_messages(region_id))
             for v, region_belief in zip(vs, region_beliefs):
-                t[v.ndslice] += 1
-                full_belief[v.ndslice] += region_belief
-        out = (full_belief / t)[variable.ndslice]
+                t[v.out_slice] += 1
+                full_belief[v.out_slice] += region_belief
+        out = (full_belief / t)[variable.out_slice]
         return Factor.normalize(out, len(variable.tensor.shape))
 
     def message(self, key: Tuple[int, int]) -> TensorFactor:
@@ -130,8 +130,8 @@ class BPInference:
                     numerators, out_messages, compute_denominators):
                 denominator = compute_denominator()[0]
                 # - and + rather than / and * since this is in log space
-                out.tensor.data = Factor.normalize(numerator - denominator,
-                                                   num_batch_dims=out.num_batch_dims)
+                out.tensor = Factor.normalize(numerator - denominator,
+                                              num_batch_dims=out.num_batch_dims)
         return f
 
     def run(self):

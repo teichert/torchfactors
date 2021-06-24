@@ -11,7 +11,7 @@ from torch import Size, Tensor
 
 from .domain import Domain
 from .types import NDSlice, ShapeType
-from .utils import as_ndrange, compose, ndslices_overlap
+from .utils import as_ndrange, compose, ndslices_cat, ndslices_overlap
 
 Tensorable = Union[Tensor, int, float, bool]
 
@@ -178,6 +178,10 @@ class Var(ABC):
 
     def __hash__(self) -> int:
         return hash(self.hash_key())
+
+    @property
+    def out_slice(self) -> NDSlice:
+        return ndslices_cat(self.ndslice, (slice(None),))
 
 
 class VarBranch(Var):
