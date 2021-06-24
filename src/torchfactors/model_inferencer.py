@@ -26,7 +26,7 @@ class ModelInferencer(Generic[SubjectType]):
         """
         x = copy.deepcopy(x)
         factors = list(self.model(x))
-        self.inferencer.predict_(factors, x.variables)
+        self.inferencer.predict(factors)
         return x
 
     def product_marginal(self, x: SubjectType, query: Union[Sequence[Var], Var, None] = None,
