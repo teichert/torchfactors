@@ -2,6 +2,7 @@
 from functools import singledispatch
 from typing import Dict, Hashable, List, Sequence, Tuple, Union
 
+import torch
 import torch_semiring_einsum as tse  # type: ignore
 from torch import Tensor
 
@@ -13,13 +14,14 @@ class MultiEquation(object):
 
 @singledispatch
 def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 1):
+    # return log_einsum2(compiled_equation, *tensors, block_size=block_size)
     return tse.log_einsum(compiled_equation, *tensors, block_size=block_size)
 
 
 @log_einsum.register
 def _from_multi(compiled_equation: MultiEquation,
                 *tensors: Tensor, block_size: int = 1):
-    return tuple(tse.log_einsum(eq, *tensors, block_size=block_size)
+    return tuple(log_einsum(eq, *tensors, block_size=block_size)
                  for eq in compiled_equation.equations)
 
 
@@ -71,25 +73,25 @@ def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
         return equations[0]
 
 
-# def logsumexp(a, dims):
-#     if dims:
-#         return torch.logsumexp(a, dim=dims)
-#     else:
-#         return a
+def logsumexp(a, dims):
+    if dims:
+        return torch.logsumexp(a, dim=dims)
+    else:
+        return a
 
 
-# def logsumadd_(a, b):
-#     torch.logaddexp(a, b, out=a)
+def logsumadd_(a, b):
+    torch.logaddexp(a, b, out=a)
 
 
-# def log_einsum2(
-#         equation: tse.equation.Equation,
-#         *args: torch.Tensor,
-#         block_size: int) -> torch.Tensor:
-#     def callback(compute_sum):
-#         return compute_sum(logsumadd_, logsumexp, tse.utils.add_in_place)
+def log_einsum2(
+        equation: tse.equation.Equation,
+        *args: torch.Tensor,
+        block_size: int) -> torch.Tensor:
+    def callback(compute_sum):
+        return compute_sum(logsumadd_, logsumexp, tse.utils.add_in_place)
 
-#     return tse.semiring_einsum_forward(equation, args, block_size, callback)
+    return tse.semiring_einsum_forward(equation, args, block_size, callback)
 
 
 # # def log_expectation_exp_einsum2(

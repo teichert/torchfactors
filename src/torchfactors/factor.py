@@ -312,8 +312,7 @@ class Factor:
         # normalize by subtracting out the sum of the last |V| dimensions
         variable_dims = list(range(num_batch_dims, num_dims))
         normalizer = torch.logsumexp(tensor, dim=variable_dims)
-        tensor -= normalizer[(...,) + (None,) * (num_dims - num_batch_dims)]
-        return tensor
+        return tensor - normalizer[(...,) + (None,) * (num_dims - num_batch_dims)]
 
     def free_energy(self,
                     other_energy: Sequence[Factor] = (),
