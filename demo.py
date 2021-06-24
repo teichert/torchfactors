@@ -16,7 +16,7 @@ class TrueCaseExample(tx.Subject):
     """
     lower_cased: tx.Var = tx.VarField(tx.OBSERVED, tx.Range(255))
     is_upper: tx.Var = tx.VarField(tx.ANNOTATED, tx.Range(2))
-    hidden: tx.Var = tx.VarField(tx.ANNOTATED, tx.Range(10), shape=lower_cased)
+    hidden: tx.Var = tx.VarField(tx.LATENT, tx.Range(10), shape=lower_cased)
 
     @classmethod
     def from_str(cls, input: str):

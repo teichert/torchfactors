@@ -70,12 +70,23 @@ def as_range(one_slice: slice, length: int) -> range:
 
 def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> Tuple[range, ...]:
     if isinstance(ndslice, (tuple, list)):
-        if len(ndslice) == 1 and ndslice[0] is ...:
-            return tuple(as_range(slice(None), length)
-                         for length in shape)
+        if not ndslice:
+            return ()
         else:
-            return tuple(as_range(one_slice, length)
-                         for one_slice, length in zip(ndslice, shape))
+            first_slice = ndslice[0]
+            if first_slice is ...:
+                if ... in ndslice[1:]:
+                    raise ValueError("only one set of ellises allowed in an ndslice")
+                dims_left = len(shape)
+                slices_left = len(ndslice) - 1
+                dots_dims = dims_left - slices_left
+                return (
+                    tuple([range(length) for length in shape[:dots_dims]]) +
+                    as_ndrange(ndslice[1:], shape[dots_dims:]))
+            else:
+                return (
+                    (as_range(first_slice, shape[0]),) +
+                    as_ndrange(ndslice[1:], shape[1:]))
     else:
         raise NotImplementedError("haven't implemented support for that kind of ndslice")
 

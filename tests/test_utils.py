@@ -41,3 +41,15 @@ def test_ndslices_overlap():
 def test_ndslice_bad():
     with pytest.raises(NotImplementedError):
         as_ndrange(8, shape=(10,))
+
+
+def test_asndrange_dots():
+    shape = (10, 11, 12, 13, 14)
+    out = as_ndrange([slice(3, 6), ..., 5], shape=shape)
+    assert out == (range(3, 6), range(11), range(12), range(13), 5)
+
+
+def test_asndrange_bad_dots():
+    shape = (10, 11, 12, 13, 14)
+    with pytest.raises(ValueError):
+        as_ndrange([slice(3, 6), ..., 2, ..., 5], shape=shape)
