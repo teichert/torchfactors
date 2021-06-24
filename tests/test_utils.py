@@ -1,7 +1,7 @@
 import pytest
 from torch import arange
 from torchfactors.utils import (as_ndrange, compose, compose_single, ndarange,
-                                ndslices_overlap)
+                                ndslices_cat, ndslices_overlap)
 
 
 def test_compose_single():
@@ -53,3 +53,10 @@ def test_asndrange_bad_dots():
     shape = (10, 11, 12, 13, 14)
     with pytest.raises(ValueError):
         as_ndrange([slice(3, 6), ..., 2, ..., 5], shape=shape)
+
+
+def test_ndslices_cat():
+    assert ndslices_cat(1, 3) == (1, 3)
+    assert ndslices_cat(1, (slice(None), 3)) == (1, slice(None), 3)
+    assert ndslices_cat((1, 3), 2) == (1, 3, 2)
+    assert ndslices_cat((1, 3), (9, 2)) == (1, 3, 9, 2)

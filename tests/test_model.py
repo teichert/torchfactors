@@ -3,7 +3,9 @@ from typing import Any, Iterable
 
 import pytest
 import torch
-from torchfactors import (LATENT, Factor, Model, Range, Subject, Var, VarField)
+from torch.nn import functional as F
+from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
+                          Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.model import ParamNamespace
 
@@ -95,6 +97,53 @@ def test_modules():
     assert params[0].T.shape == (4, 5)
 
 
-# def test_model_inferencer():
-#     system = System(model=Chain(), inferencer=BP())
-#     out = system.predict(Seq())
+def test_model_inferencer():
+
+    @dataclass
+    class MySubject(Subject):
+        items: Var = VarField(Range(5), LATENT, shape=(10,))
+
+    class MyModel(Model[MySubject]):
+        def factors(self, s: MySubject):
+            first = s.items[..., 0]
+            dom_size = len(first.domain)
+            # the first one should be likely on 3
+            yield TensorFactor(first,
+                               tensor=F.one_hot(torch.tensor(3), dom_size).log())
+
+            n = s.items.shape[-1]
+            # all of them should be the same
+            for i in range(n - 1):
+                cur = s.items[..., i]
+                next = s.items[..., i + 1]
+                yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
+
+    system = System(model=MyModel(), inferencer=BP())
+    out = system.predict(MySubject())
+    assert (out.items.tensor == 3).all()
+
+
+# def test_model_inferencer2():
+
+#     @dataclass
+#     class MySubject(Subject):
+#         items: Var = VarField(Range(5), LATENT, shape=(10,))
+
+#     class MyModel(Model[MySubject]):
+#         def factors(self, s: MySubject):
+#             first = s.items[..., 0]
+#             dom_size = len(first.domain)
+#             # the first one should be likely on 3
+#             yield TensorFactor(first,
+#                                tensor=F.one_hot(torch.tensor(3), dom_size).log())
+
+#             n = s.items.shape[-1]
+#             # all of them should be the same
+#             for i in range(n - 1):
+#                 cur = s.items[..., i]
+#                 next = s.items[..., i + 1]
+#                 yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
+
+#     system = System(model=MyModel(), inferencer=BP())
+#     out = system.predict(MySubject())
+#     assert (out.items.tensor == 3).all()

@@ -57,3 +57,35 @@ def test_predict_simple():
     factor.tensor = torch.tensor([3, 1]).log()
     bp.predict(factors)
     assert coin.tensor == 0
+
+
+def test_predict_simple2():
+    coin = TensorVar(Range(2), torch.tensor(0), ANNOTATED)
+    factor = TensorFactor(coin, tensor=torch.tensor([0, 1]).log())
+    factors = [factor]
+    bp = BP()
+    assert coin.tensor == 0
+    bp.predict(factors)
+    assert coin.tensor == 1
+    factor.tensor = torch.tensor([1, 0]).log()
+    bp.predict(factors)
+    assert coin.tensor == 0
+
+
+def test_predict_simple3():
+    a = TensorVar(Range(2), torch.tensor(0), ANNOTATED)
+    b = TensorVar(Range(2), torch.tensor(0), ANNOTATED)
+    factor = TensorFactor(a, tensor=torch.tensor([0, 1]).log())
+    factors = [
+        factor,
+        TensorFactor(a, b, tensor=torch.eye(2).log())
+    ]
+    bp = BP()
+    bp.predict(factors)
+    assert a.tensor == 1
+    assert b.tensor == 1
+
+    factor.tensor = torch.tensor([1, 0]).log()
+    bp.predict(factors)
+    assert a.tensor == 0
+    assert b.tensor == 0

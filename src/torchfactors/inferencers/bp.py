@@ -128,7 +128,9 @@ class BPInference:
             numerators = compute_numerators()
             for numerator, out, compute_denominator in zip(
                     numerators, out_messages, compute_denominators):
-                denominator = compute_denominator()[0]
+                # keep the nans, but the negative infs can be ignored
+                denominator = compute_denominator()[0].nan_to_num(
+                    nan=float('nan'), posinf=float('inf'), neginf=0)
                 # - and + rather than / and * since this is in log space
                 out.tensor = Factor.normalize(numerator - denominator,
                                               num_batch_dims=out.num_batch_dims)
