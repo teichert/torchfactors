@@ -1,8 +1,10 @@
+import math
 from dataclasses import dataclass
 from typing import Any, Iterable
 
 import pytest
 import torch
+from pytest import approx
 from torch.nn import functional as F
 from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
                           Var, VarField)
@@ -122,28 +124,45 @@ def test_model_inferencer():
     out = system.predict(MySubject())
     assert (out.items.tensor == 3).all()
 
+    # there is only one valid assignment which has a score of 0.0
+    assert system.product_marginal(MySubject()) == 0.0
+    x = MySubject()
+    marg, = system.product_marginals(x, [x.items[..., 2]])
+    assert (marg.exp() == torch.tensor([0, 0, 0, 1, 0])).all()
 
-# def test_model_inferencer2():
 
-#     @dataclass
-#     class MySubject(Subject):
-#         items: Var = VarField(Range(5), LATENT, shape=(10,))
+def test_model_inferencer2():
 
-#     class MyModel(Model[MySubject]):
-#         def factors(self, s: MySubject):
-#             first = s.items[..., 0]
-#             dom_size = len(first.domain)
-#             # the first one should be likely on 3
-#             yield TensorFactor(first,
-#                                tensor=F.one_hot(torch.tensor(3), dom_size).log())
+    @dataclass
+    class MySubject(Subject):
+        items: Var = VarField(Range(5), LATENT, shape=(7,))
 
-#             n = s.items.shape[-1]
-#             # all of them should be the same
-#             for i in range(n - 1):
-#                 cur = s.items[..., i]
-#                 next = s.items[..., i + 1]
-#                 yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
+    class MyModel(Model[MySubject]):
+        def factors(self, s: MySubject):
+            first = s.items[..., 0]
+            dom_size = len(first.domain)
+            # the first one should be likely on 3
+            yield TensorFactor(first,
+                               tensor=(
+                                   F.one_hot(torch.tensor(3), dom_size) +
+                                   F.one_hot(torch.tensor(1), dom_size))
+                               .log())
+            n = s.items.shape[-1]
+            # all of them should be the same
+            for i in range(n - 1):
+                cur = s.items[..., i]
+                next = s.items[..., i + 1]
+                yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
 
-#     system = System(model=MyModel(), inferencer=BP())
-#     out = system.predict(MySubject())
-#     assert (out.items.tensor == 3).all()
+    system = System(model=MyModel(), inferencer=BP())
+    out = system.predict(MySubject())
+    out_t = out.items.tensor
+    assert (out_t == 1).logical_or(out_t == 3).all()
+
+    # there are only 2 options since they all need to be the same
+    logz = system.product_marginal(MySubject())
+    assert float(logz) == approx(math.log(2))
+
+    x = MySubject()
+    marg, = system.product_marginals(x, [x.items[..., 2]])
+    assert (marg.exp() == torch.tensor([0, 0.5, 0, 0.5, 0])).all()

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import Callable, List, Optional, Sequence, Union, cast, overload
+from typing import (Any, Callable, List, Optional, Sequence, Union, cast,
+                    overload)
 
 import torch
 import typing_extensions
@@ -94,15 +95,29 @@ class Var(ABC):
     def shape(self) -> Size:
         return self.tensor.shape
 
-    # @property
-    def get_tensor(self) -> Tensor:
-        return self._get_tensor()
-
-    # @tensor.setter
-    def set_tensor(self, value: Tensorable):
+    def set_tensor(self, value: Tensorable) -> None:
         self._set_tensor(value)
 
-    tensor = property(get_tensor, set_tensor)
+    @property
+    def tensor(self) -> Tensor:
+        return self._get_tensor()
+
+    @tensor.setter
+    def tensor(self, value: Any) -> None:
+        self.set_tensor(cast(Tensorable, value))
+
+    # # @property
+    # def get_tensor(self) -> Tensor:
+    #     return self._get_tensor()
+
+    # # @tensor.setter
+    # def set_tensor(self, value: Tensorable):
+    #     self._set_tensor(value)
+
+    # def set_tensor(self, value: Tensorable):
+    #     self._set_tensor(value)
+
+    # tensor = property(get_tensor, set_tensor)
 
     @property
     def domain(self) -> Domain:
@@ -510,7 +525,7 @@ class TensorVar(Var):
         stacked_tensors = first_tensor.new_full(
             (batch_size, *max_shape), fill_value=pad_value, dtype=dtype)
         stacked_usages = first_tensor.new_full(
-            (batch_size, *max_shape), fill_value=VarUsage.PADDING.value, dtype=int)
+            (batch_size, *max_shape), fill_value=VarUsage.PADDING.value, dtype=torch.int)
         # mask = first_tensor.new_full((batch_size, *max_shape),
         # fill_value=False, dtype=torch.bool)
         for i, x in enumerate(batch):
