@@ -65,7 +65,7 @@ class BPInference:
         full_belief = torch.zeros_like(t)
         for region_id, region, vs in self.strategy.get_regions_with_vars(variable):
             region_beliefs = region.product_marginals([(v,) for v in vs],
-                                                      other_factors=self.in_messages(region_id))[0]
+                                                      other_factors=self.in_messages(region_id))
             for v, region_belief in zip(vs, region_beliefs):
                 t[v.ndslice] += 1
                 full_belief[v.ndslice] += region_belief
@@ -108,16 +108,17 @@ class BPInference:
         compute_numerators = source.marginals_closure([out.variables for out in out_messages],
                                                       other_factors=in_messages)
 
-        pokes_s = self.strategy.penetrating_edges(source_id)
-        set_pokes_s = set(pokes_s)
+        # pokes_s = self.strategy.penetrating_edges(source_id)
+        # set_pokes_s = set(pokes_s)
+        # we will divide out everything but the message of interest
         divide_out_messages = [
             tuple([self.message(m)
-                   for m in self.strategy.penetrating_edges(target_id) if m not in set_pokes_s])
-            for target_id in target_ids
-        ]
+                   for m in self.strategy.penetrating_edges(target_id)
+                   if m != (source_id, target_id)])
+            for target_id in target_ids]
         compute_denominators = [
-            target_region.marginals_closure([out_message.variables], other_factors=denom_messages,
-                                            exclude=source)
+            target_region.marginals_closure([out_message.variables], other_factors=denom_messages)
+            # exclude=source)
             for target_region, denom_messages, out_message
             in zip(targets, divide_out_messages, out_messages)]
 
@@ -129,8 +130,8 @@ class BPInference:
                     numerators, out_messages, compute_denominators):
                 denominator = compute_denominator()[0]
                 # - and + rather than / and * since this is in log space
-                out.tensor.data = numerator - (out.tensor + denominator)
-                out.tensor.data = Factor.normalize(out.tensor, num_batch_dims=out.num_batch_dims)
+                out.tensor.data = Factor.normalize(numerator - denominator,
+                                                   num_batch_dims=out.num_batch_dims)
         return f
 
     def run(self):

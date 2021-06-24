@@ -3,7 +3,7 @@ import math
 import pytest
 import torch
 from torch import tensor
-from torchfactors import BP, Range, TensorVar
+from torchfactors import ANNOTATED, BP, Range, TensorVar
 from torchfactors.components.tensor_factor import TensorFactor
 
 
@@ -44,3 +44,16 @@ def test_infer():
     logz, marg_a = bp.product_marginals(factors, (), (a,), normalize=False)
     assert logz.exp().isclose(torch.tensor(10. * 9 * 8))
     assert (marg_a == math.log(9*8)).all()
+
+
+def test_predict_simple():
+    coin = TensorVar(Range(2), torch.tensor(0), ANNOTATED)
+    factor = TensorFactor(coin, tensor=torch.tensor([1, 3]).log())
+    factors = [factor]
+    bp = BP()
+    assert coin.tensor == 0
+    bp.predict(factors)
+    assert coin.tensor == 1
+
+
+test_predict_simple()
