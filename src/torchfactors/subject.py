@@ -61,7 +61,7 @@ class Subject:
                     var_instance = TensorVar()
                     setattr(self, attr_name, var_instance)
                 cls_attr_id_to_var[id(var_field)] = var_instance
-                if var_instance._tensor is None:
+                if var_field._shape is not None:
                     # shape can be delegated to earlier field
                     if isinstance(var_field._shape, VarField):
                         source_var = cls_attr_id_to_var[id(var_field._shape)]
@@ -69,13 +69,13 @@ class Subject:
                         var_instance._tensor = var_field._init(source_var.shape)
                     elif var_field._shape is not None:
                         var_instance._tensor = var_field._init(cast(ShapeType, var_field._shape))
-                    else:
-                        raise ValueError(
-                            "need to specify an actual tensor (or a shape)"
-                            "for every variable in the subject")
-                if var_instance.domain is Domain.OPEN:
+                elif var_instance._tensor is None:
+                    raise ValueError(
+                        "need to specify an actual tensor (or a shape)"
+                        "for every variable in the subject")
+                if var_field._domain is not Domain.OPEN:
                     var_instance._domain = var_field._domain
-                if var_instance.usage is None:
+                if var_field._usage is not None:
                     var_instance.usage = var_field._usage
                 vars.append(attr_name)
                 self.__variables.append(var_instance)

@@ -9,7 +9,13 @@ from torchfactors.variable import TensorVar, VarField
 
 
 def test_usage1():
-    assert VarUsage.DEFAULT == VarUsage.OBSERVED
+    assert VarUsage.DEFAULT == VarUsage.LATENT
+
+
+def test_set_tensor_with_salar_for_first_time():
+    v = TensorVar(Range(4))
+    v.set_tensor(5)
+    assert v.shape == ()
 
 
 def test_variable():
@@ -52,12 +58,32 @@ def test_usage3():
     assert (v.usage == OBSERVED).sum() == 2
 
 
+def test_bad_var_usage():
+    v = TensorVar(domain=Range(10))
+    with pytest.raises(TypeError):
+        # need to have a usage before you can access it
+        v.usage
+
+
+def test_bad_var_usage2():
+    v = TensorVar(domain=Range(10))
+    with pytest.raises(ValueError):
+        # need to have a tensor before subscripting
+        v[2, :]
+
+
+def test_bad_var_usage3():
+    v = TensorVar(domain=Range(10))
+    v.tensor = torch.ones(4, 5)
+    # need to have a tensor before subscripting
+    v[2, :].set_usage(ANNOTATED)
+    assert (v.usage == ANNOTATED).sum() == 5
+
+
 def test_clamp():
     t = torch.ones(3, 4)
     v = TensorVar(t, Range(4))
     v2 = v[2, :]
-    with pytest.raises(ValueError):
-        v2.set_usage(OBSERVED)
     v.set_usage(OBSERVED)
     # nothing annotated, so nothing clamped
     v.clamp_annotated()
@@ -266,7 +292,6 @@ def test_grad_through_and_unstack():
 #         vout.tensor.prod().backward()
 #         assert (vs[i].tensor.grad == 1).all()
 
-
 def test_var_field_order():
     v = VarField(OBSERVED, Range(10))
     assert v._usage == OBSERVED
@@ -310,6 +335,3 @@ def test_as_used():
         [1, 1, 1, 1, 1]
     ]).log()
     assert torch.allclose(v.usage_mask, expected, equal_nan=True)
-
-
-test_as_used()

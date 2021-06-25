@@ -43,7 +43,7 @@ class VarUsage(IntEnum):
     # only current value should be used (but called clamped to make it easy to change back)
     CLAMPED = 2
     OBSERVED = 3  # should always be clamped
-    DEFAULT = OBSERVED
+    DEFAULT = LATENT
 
 
 class Var(ABC):
@@ -159,7 +159,13 @@ class Var(ABC):
 
     @property
     def usage(self) -> Tensor:
-        return self._get_usage()
+        out = self._get_usage()
+        if isinstance(out, VarUsage):
+            out = torch.full_like(self.tensor, out)
+            self.usage = out
+            # raise TypeError(
+            #     "your variable needs tensor before you can access the tensor-based usage!")
+        return out
 
     @usage.setter
     def usage(self, value: Any) -> None:
@@ -181,7 +187,7 @@ class Var(ABC):
         and nan for padding.
         """
         # ones, one_hots, where one and padding is nan
-        one_hot: Tensor = F.one_hot(self.tensor, len(self.domain)).float()
+        one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
         expanded_usage = self.usage[..., None].expand_as(one_hot)
         return torch.where(
             (expanded_usage == VarUsage.OBSERVED).
@@ -248,9 +254,6 @@ class VarBranch(Var):
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
         if isinstance(value, VarUsage):  # or not value.shape:
-            if self.root.usage is None:
-                raise ValueError(
-                    "you need to set the usage on the root before setting on a branch")
             value = torch.tensor(value)
         self.root.usage[self.ndslice] = cast(Tensor, value.expand_as(self.tensor))
 
@@ -273,7 +276,7 @@ class VarField(Var):
     @multimethod
     def ___init__(self,
                   domain: Domain = Domain.OPEN,
-                  usage: Optional[VarUsage] = VarUsage.DEFAULT,
+                  usage: Optional[VarUsage] = None,
                   shape: Union[Var, ShapeType, None] = None,
                   init: Callable[[ShapeType], Tensor] = torch.zeros,
                   info: typing_extensions._AnnotatedAlias = None):
@@ -423,10 +426,9 @@ class TensorVar(Var):
     `info=TensorType['index', int]`
 
     """
-
     @multimethod
     def ___init__(self, domain: Domain = Domain.OPEN,
-                  usage: Union[VarUsage, Tensor, None] = None,
+                  usage: Union[VarUsage, Tensor] = VarUsage.LATENT,
                   tensor: Optional[Tensor] = None,
                   info: typing_extensions._AnnotatedAlias = None,
                   stack_shapes: Optional[Sequence[ShapeType]] = None):
@@ -437,7 +439,7 @@ class TensorVar(Var):
         self._domain = domain
         self._tensor = tensor
         # can only build usage if there is a tensor
-        if self._tensor is not None and usage is not None:
+        if self._tensor is not None:
             self.set_usage(usage)
         else:
             self._usage = usage
@@ -447,12 +449,12 @@ class TensorVar(Var):
     @___init__.register
     def _dom_tensor_usage(self, domain: Domain,
                           tensor: Tensor,
-                          usage: Union[VarUsage, Tensor, None] = None):
+                          usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT):
         self.___init__(domain, usage, tensor)
 
     @___init__.register
     def _tensor_dom_usage(self, tensor: Tensor, domain: Domain = Domain.OPEN,
-                          usage: Union[VarUsage, Tensor, None] = None):
+                          usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT):
         self.___init__(domain, usage, tensor)
 
     @___init__.register
@@ -472,7 +474,7 @@ class TensorVar(Var):
 
     @overload
     def __init__(self, domain: Domain = Domain.OPEN,
-                 usage: Union[VarUsage, Tensor, None] = None,
+                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT,
                  tensor: Optional[Tensor] = None,
                  info: typing_extensions._AnnotatedAlias = None,
                  stack_shapes: Optional[Sequence[ShapeType]] = None): ...
@@ -480,11 +482,11 @@ class TensorVar(Var):
     @overload
     def __init__(self, domain: Domain,
                  tensor: Tensor,
-                 usage: Union[VarUsage, Tensor, None] = None): ...
+                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT): ...
 
     @overload
     def __init__(self, tensor: Tensor, domain: Domain = Domain.OPEN,
-                 usage: Union[VarUsage, Tensor, None] = None): ...
+                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT): ...
 
     @overload
     def __init__(self, tensor: Tensor, usage: Union[VarUsage, Tensor],
@@ -505,13 +507,21 @@ class TensorVar(Var):
         return self
 
     def __getitem__(self, ndslice: NDSlice) -> Var:
+        if self._tensor is None:
+            raise ValueError("need to have a tensor before subscripting")
         return VarBranch(root=self, ndslice=ndslice)
 
     def _get_tensor(self) -> Tensor:
         return cast(Tensor, self._tensor)
 
     def _set_tensor(self, value: Tensorable):
-        cast(Tensor, self._tensor)[self.ndslice] = value
+        if self._tensor is None:
+            if isinstance(value, Tensor):
+                self._tensor = value
+            else:
+                self._tensor = torch.tensor(value)
+        else:
+            cast(Tensor, self._tensor)[self.ndslice] = value
 
     def _get_usage(self) -> Tensor:
         return cast(Tensor, self._usage)

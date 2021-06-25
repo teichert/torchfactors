@@ -2,13 +2,13 @@ import math
 
 import pytest
 import torch
-from torchfactors import Range, TensorFactor, TensorVar, ndarange
-from torchfactors.factor import Factor
+from torchfactors import (LATENT, Factor, Range, TensorFactor, TensorVar,
+                          ndarange)
 
 
 def test_factor():
     t = torch.ones(3, 4)
-    v = TensorVar(t, domain=Range(10))
+    v = TensorVar(t, Range(10), LATENT)
     factor_tensor = ndarange(3, 4, 10).log()
     with pytest.raises(TypeError):
         # needs to name factor_tensor argument since it comes after varargs

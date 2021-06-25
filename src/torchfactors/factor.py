@@ -46,12 +46,27 @@ class Factor:
         for v in self.variables[1:]:
             if v.shape != self.variables[0].shape:
                 raise ValueError("all variables must have the same shape (domains can vary)")
+        self._usage_equation = self.__vars_equation(
+            [self.variables, *[(v,) for v in self.variables]],
+            [self.variables])
 
     def __iter__(self) -> Iterator[Var]:
         return iter(self.variables)
 
     def __len__(self) -> int:
         return len(self.variables)
+
+    def __vars_equation(self, input_var_groups: Sequence[Sequence[Var]],
+                        output_var_groups: Sequence[Sequence[Var]]):
+        batch_dims = [object() for _ in range(self.num_batch_dims)]
+
+        def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
+            return tuple([*batch_dims, *objs])
+
+        return compile_obj_equation(
+            [with_batch_dims(group) for group in input_var_groups],
+            [with_batch_dims(group) for group in output_var_groups],
+            force_multi=True)
 
     def product_marginal(self, query: Union[Sequence[Var], Var, None] = None,
                          other_factors: Sequence[Factor] = ()
@@ -164,15 +179,22 @@ class Factor:
         the factor and dimensions should correspond to the variables in the same
         order as given by the factor).
         """
-        #
-        # v.as_used for v
-        return self.dense_()
-        # I only care about fixing the output here (don't care about observed
-        # inputs since those have already been clamped and set to nan)
-        # excluded_mask is anything that is clamped or observed and not the
-        # current value as well as anything that is padded and not 0 TODO:
-        # finish this I have a tensor where the value at position x,y is the
-        # index of the z coordinate that I want
+        d = self.dense_()
+        masks = [v.usage_mask for v in self.variables]
+        maksed: Tensor = log_einsum(self._usage_equation, d, *masks)[0]
+        return maksed.nan_to_num(posinf=float('inf'), neginf=float('-inf'))
+
+        # todo: start here do and einsum with all of the usage masks and the
+        # dense factor then replace nans with 1's(that is different that just
+        # having 1s in the mast to begin with because only one var needs to be
+        # padding to send the factor Value to 1)
+        # # v.as_used for v
+        # return self.dense_() I only care about fixing the output here (don't
+        # care about observed inputs since those have already been clamped and
+        # set to nan) excluded_mask is anything that is clamped or observed and
+        # not the current value as well as anything that is padded and not 0
+        # TODO: finish this I have a tensor where the value at position x,y is
+        # the index of the z coordinate that I want
 
         # observed, clamped, and padding should be the only ones allowed
 
@@ -284,16 +306,9 @@ class Factor:
 
         """
         check_queries(queries)
-        batch_dims = [object() for _ in range(self.num_batch_dims)]
-
-        def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
-            return tuple([*batch_dims, *objs])
-
-        equation = compile_obj_equation(
-            [with_batch_dims(self.variables)] +
-            [with_batch_dims(other.variables)
-             for other in other_factors],
-            [with_batch_dims(q) for q in queries], force_multi=True)
+        equation = self.__vars_equation(
+            [self.variables, *[other.variables for other in other_factors]],
+            queries)
 
         def f() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make
