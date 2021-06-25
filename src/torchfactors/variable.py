@@ -96,6 +96,10 @@ class Var(ABC):
     def shape(self) -> Size:
         return self.tensor.shape
 
+    @property
+    def marginal_shape(self) -> Size:
+        return Size([*self.tensor.shape, len(self.domain)])
+
     def set_tensor(self, value: Tensorable) -> None:
         self._set_tensor(value)
 
@@ -181,10 +185,12 @@ class Var(ABC):
     @property
     def usage_mask(self) -> Tensor:
         r"""
-        Returns a tensor of the same shape as
-        the variable marginal would be with
-        (log) 1 for allowed, 0 for not-allowed,
-        and nan for padding.
+        Returns a tensor of the same shape as the variable marginal would be
+        with (log) 1 for allowed, 0 for not-allowed, and nan for padding.
+
+        The idea is that any factors touch any padding variable should be as if
+        they were gone, so the nans are used here and then nans are replaced
+        with 1's after combining all variables
         """
         # ones, one_hots, where one and padding is nan
         one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()

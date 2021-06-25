@@ -182,6 +182,7 @@ class Factor:
         d = self.dense_()
         masks = [v.usage_mask for v in self.variables]
         maksed: Tensor = log_einsum(self._usage_equation, d, *masks)[0]
+        # return maksed.nan_to_num(nan=1, posinf=float('inf'), neginf=float('-inf'))
         return maksed.nan_to_num(posinf=float('inf'), neginf=float('-inf'))
 
         # todo: start here do and einsum with all of the usage masks and the

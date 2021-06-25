@@ -2,8 +2,8 @@ import math
 
 import pytest
 import torch
-from torchfactors import (LATENT, Factor, Range, TensorFactor, TensorVar,
-                          ndarange)
+from torchfactors import (ANNOTATED, CLAMPED, LATENT, OBSERVED, PADDING,
+                          Factor, Range, TensorFactor, TensorVar, ndarange)
 
 
 def test_factor():
@@ -104,3 +104,28 @@ def test_bad_variables():
     v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
     t = TensorFactor(v1, v2)
     assert t.shape == (3, 4, 10, 5)
+
+
+def test_mask():
+    v = TensorVar(tensor=torch.tensor([
+        2,
+        3,
+        1,
+        2,
+        1,
+    ]), domain=Range(5), usage=torch.tensor([
+        ANNOTATED,
+        OBSERVED,
+        LATENT,
+        CLAMPED,
+        PADDING,
+    ]))
+    factor = TensorFactor(v, tensor=torch.full(v.marginal_shape, math.log(3)))
+    out = factor.dense
+    assert out.allclose(torch.tensor([
+        [3, 3, 3, 3, 3],
+        [0, 0, 0, 3, 0],
+        [3, 3, 3, 3, 3],
+        [0, 0, 3, 0, 0],
+        [0, 1, 0, 0, 0],
+    ]).log())
