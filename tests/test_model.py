@@ -4,6 +4,7 @@ from typing import Any, Iterable
 
 import pytest
 import torch
+import torchfactors as tx
 from pytest import approx
 from torch.nn import functional as F
 from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
@@ -54,8 +55,13 @@ def test_parameters():
                                    subject.items[..., index], subject.items[..., index + 1])
 
     model = Chain2()
-    list(model(Seq()))
+
+    # check that system.prime works
+    system = System(model, BP())
+    assert len(list(model.parameters())) == 0
+    system.prime(Seq())
     assert len(list(model.parameters())) == 2
+
     with pytest.raises(KeyError):
         # cannot get transition as a module since it was used as a parameter
         model.namespace('transition').module()
@@ -154,7 +160,8 @@ def test_model_inferencer2():
                 next = s.items[..., i + 1]
                 yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
 
-    system = System(model=MyModel(), inferencer=BP())
+    model = MyModel()
+    system = System(model=model, inferencer=BP())
     out = system.predict(MySubject())
     out_t = out.items.tensor
     assert (out_t == 1).logical_or(out_t == 3).all()
@@ -166,3 +173,30 @@ def test_model_inferencer2():
     x = MySubject()
     marg, = system.product_marginals(x, [x.items[..., 2]])
     assert (marg.exp() == torch.tensor([0, 0.5, 0, 0.5, 0])).all()
+
+
+@dataclass
+class Characters(tx.Subject):
+    char: tx.Var = tx.VarField(tx.Range(255), tx.ANNOTATED)
+
+    @property
+    def view(self) -> str:
+        return ''.join(map(chr, self.char.tensor.tolist()))
+
+    @staticmethod
+    def from_string(text: str) -> 'Characters':
+        text_nums = list(map(ord, text))
+        return Characters(tx.TensorVar(torch.tensor(text_nums)))
+
+
+class Unigrams(tx.Model[Characters]):
+    def factors(self, x: Characters):
+        yield tx.LinearFactor(self.namespace('unigram'), x.char)
+
+
+def test_prime_linear_params():
+    model = Unigrams()
+    system = tx.System(model, tx.BP())
+    assert len(list(model.parameters())) == 0
+    system.prime(Characters.from_string('testing'))
+    assert len(list(model.parameters())) > 0

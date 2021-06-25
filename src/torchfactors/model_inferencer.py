@@ -19,6 +19,14 @@ class System(Generic[SubjectType]):
         self.model = model
         self.inferencer = inferencer
 
+    def prime(self, x: SubjectType) -> None:
+        r"""
+        Applies the model to the given subject without reporting anything.
+        This can be useful for initializing all paramters prior to building
+        an optimizer.
+        """
+        [f.dense for f in self.model(x)]
+
     def predict(self, x: SubjectType) -> SubjectType:
         r"""
         Returns a copy of the subject x with the values of the variables replaced with

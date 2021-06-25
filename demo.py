@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 
 import torch
@@ -14,23 +15,26 @@ def unigram():
         def view(self) -> str:
             return ''.join(map(chr, self.char.tensor.tolist()))
 
+        @staticmethod
+        def from_string(text: str) -> 'Characters':
+            text_nums = list(map(ord, text))
+            return Characters(tx.TensorVar(torch.tensor(text_nums)))
+
     class Unigrams(tx.Model[Characters]):
         def factors(self, x: Characters):
             yield tx.LinearFactor(self.namespace('unigram'), x.char)
 
     model = Unigrams()
     system = tx.System(model, tx.BP())
-
+    single = Characters(tx.TensorVar(torch.tensor([0])))
     # torch.autograd.anomaly_mode.set_detect_anomaly(True)
     with open(__file__) as f:
         text = f.read()
-        print(text)
         text_nums = list(map(ord, text))
-        print(text_nums)
         x = Characters(tx.TensorVar(torch.tensor(text_nums)))
-        print(system.product_marginal(x))
-        optimizer = torch.optim.Adam(model.parameters())
-        for i in range(10):
+        system.prime(x)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1.0)
+        for i in range(100):
             optimizer.zero_grad()
             x.unclamp_annotated()
             logz_free = system.product_marginal(x)
@@ -40,8 +44,15 @@ def unigram():
             print(loss)
             loss.backward()
             optimizer.step()
+            print(system.predict(single).view)
 
-    print(system.predict(Characters(tx.TensorVar(torch.tensor([0])))).view)
+    total = 0.0
+    for k, v in reversed(sorted(
+            enumerate(system.product_marginal(single, single.char).tolist()[0]),
+            key=lambda p: p[1])):
+        print(f'{chr(k)}: {math.exp(v)*100:2.2}')
+        total += math.exp(v)
+    print(total)
 
 
 unigram()
