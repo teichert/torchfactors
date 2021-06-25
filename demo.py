@@ -10,9 +10,17 @@ def unigram():
     class Characters(tx.Subject):
         char: tx.Var = tx.VarField(tx.Range(255), tx.ANNOTATED)
 
+        @property
+        def view(self) -> str:
+            return ''.join(map(chr, self.char.tensor.tolist()))
+
     class Unigrams(tx.Model[Characters]):
         def factors(self, x: Characters):
             yield tx.LinearFactor(self.namespace('unigram'), x.char)
+
+    model = Unigrams()
+    system = tx.System(model, tx.BP())
+
     # torch.autograd.anomaly_mode.set_detect_anomaly(True)
     with open(__file__) as f:
         text = f.read()
@@ -20,11 +28,9 @@ def unigram():
         text_nums = list(map(ord, text))
         print(text_nums)
         x = Characters(tx.TensorVar(torch.tensor(text_nums)))
-        model = Unigrams()
-        system = tx.System(model, tx.BP())
         print(system.product_marginal(x))
         optimizer = torch.optim.Adam(model.parameters())
-        for i in range(100):
+        for i in range(10):
             optimizer.zero_grad()
             x.unclamp_annotated()
             logz_free = system.product_marginal(x)
@@ -34,6 +40,8 @@ def unigram():
             print(loss)
             loss.backward()
             optimizer.step()
+
+    print(system.predict(Characters(tx.TensorVar(torch.tensor([0])))).view)
 
 
 unigram()

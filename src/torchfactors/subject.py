@@ -53,6 +53,11 @@ class Subject:
             var_field = getattr(cls, attr_name)
             if isinstance(var_field, VarField):
                 var_instance = getattr(self, attr_name)
+                if var_instance is not None and not isinstance(var_instance, Var):
+                    raise TypeError(
+                        f"Your subject value corresponding to the variable field: {attr_name} "
+                        f"was not a variable, instead it was a {type(var_instance)}. "
+                        "Did you forget to wrap with a TensorVar?")
                 if not isinstance(var_instance, TensorVar):
                     if var_field._usage != VarUsage.LATENT:
                         raise ValueError("only latent variables can be left implicit; "
@@ -76,7 +81,7 @@ class Subject:
                 if var_field._domain is not Domain.OPEN:
                     var_instance._domain = var_field._domain
                 if var_field._usage is not None:
-                    var_instance.usage = var_field._usage
+                    var_instance.set_usage(var_field._usage)
                 vars.append(attr_name)
                 self.__variables.append(var_instance)
         self.__varset = frozenset(vars)

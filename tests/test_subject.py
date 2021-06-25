@@ -41,12 +41,12 @@ def test_basic():
 
 
 def test_implicit():
-    with pytest.raises(ValueError):
-        @dataclass
-        class Utterance(Subject):
-            observations: Var = VarField(Range(10), OBSERVED)
-            other: Var = VarField(Range(4), OBSERVED, shape=observations)
+    @dataclass
+    class Utterance(Subject):
+        observations: Var = VarField(Range(10), OBSERVED)
+        other: Var = VarField(Range(4), OBSERVED, shape=observations)
 
+    with pytest.raises(ValueError):
         Utterance(TensorVar(torch.tensor([1, 3, 2, 4, 3, 5, 4]))),
 
 
@@ -230,3 +230,13 @@ def test_variables():
     assert u.variables[1].domain == Range(4)
     assert u.variables[2].tensor.shape == (9,)
     assert u.variables[3].tensor.shape == (10,)
+
+
+def test_var_check():
+    @dataclass
+    class MySubject(Subject):
+        v: Var = VarField()
+
+    with pytest.raises(TypeError):
+        # passing in tensor rather than var
+        MySubject(torch.tensor(3.))  # type: ignore
