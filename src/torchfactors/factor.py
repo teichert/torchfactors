@@ -8,7 +8,7 @@ from typing import Callable, Iterator, Sequence, Union
 import torch
 from torch import Tensor
 
-from .einsum import compile_obj_equation, log_einsum
+from .einsum import compile_obj_equation, einsum, log_einsum
 from .types import ShapeType
 from .utils import replace_negative_infinities
 from .variable import Var
@@ -21,8 +21,9 @@ def check_queries(queries: Sequence[Union[Var, Sequence[Var]]]):
                          "consider using product_marginal() if you only have one variable "
                          "or if you want to just get the partition function.")
 
-
 # @dataclass
+
+
 class Factor:
     r"""
     A Factor has a domain which is defined by the set of variables it is
@@ -47,7 +48,7 @@ class Factor:
             if v.shape != self.variables[0].shape:
                 raise ValueError("all variables must have the same shape (domains can vary)")
         self._usage_equation = self.__vars_equation(
-            [self.variables, *[(v,) for v in self.variables]],
+            [(v,) for v in self.variables],
             [self.variables])
 
     def __iter__(self) -> Iterator[Var]:
@@ -57,7 +58,8 @@ class Factor:
         return len(self.variables)
 
     def __vars_equation(self, input_var_groups: Sequence[Sequence[Var]],
-                        output_var_groups: Sequence[Sequence[Var]]):
+                        output_var_groups: Sequence[Sequence[Var]],
+                        force_multi=False):
         batch_dims = [object() for _ in range(self.num_batch_dims)]
 
         def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
@@ -66,7 +68,7 @@ class Factor:
         return compile_obj_equation(
             [with_batch_dims(group) for group in input_var_groups],
             [with_batch_dims(group) for group in output_var_groups],
-            force_multi=True)
+            force_multi=force_multi)
 
     def product_marginal(self, query: Union[Sequence[Var], Var, None] = None,
                          other_factors: Sequence[Factor] = ()
@@ -173,6 +175,16 @@ class Factor:
     def dense_(self) -> Tensor: ...
 
     @property
+    def _is_possible(self) -> Tensor:
+        possibilities = [v.is_possible for v in self.variables]
+        return einsum(self._usage_equation, *possibilities)
+
+    @property
+    def _is_not_padding(self) -> Tensor:
+        not_paddings = [v.is_padding.logical_not() for v in self.variables]
+        return einsum(self._usage_equation, *not_paddings)
+
+    @property
     def dense(self) -> Tensor:
         r"""
         A tensor representing the factor (should have the same shape as
@@ -180,10 +192,21 @@ class Factor:
         order as given by the factor).
         """
         d = self.dense_()
-        masks = [v.usage_mask for v in self.variables]
-        maksed: Tensor = log_einsum(self._usage_equation, d, *masks)[0]
+
+        # really, I think I just want two masks:
+        # 1) possible [clamps, observed, and padding make other things impossible]
+        # 2) padding [padding sets the score to (log) 1]
+        return d.where(
+            self._is_not_padding,
+            torch.zeros_like(d)
+        ).where(
+            self._is_possible,
+            torch.full_like(d, float('-inf'))
+        )
+        # masks = [v.usage_mask for v in self.variables]
+        # maksed: Tensor = log_einsum(self._usage_equation, d, *masks)[0]
         # return maksed.nan_to_num(nan=1, posinf=float('inf'), neginf=float('-inf'))
-        return maksed.nan_to_num(posinf=float('inf'), neginf=float('-inf'))
+        # return maksed.nan_to_num(posinf=float('inf'), neginf=float('-inf'))
 
         # todo: start here do and einsum with all of the usage masks and the
         # dense factor then replace nans with 1's(that is different that just
@@ -309,7 +332,7 @@ class Factor:
         check_queries(queries)
         equation = self.__vars_equation(
             [self.variables, *[other.variables for other in other_factors]],
-            queries)
+            queries, force_multi=True)
 
         def f() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make

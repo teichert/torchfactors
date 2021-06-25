@@ -24,6 +24,11 @@ def _from_multi(compiled_equation: MultiEquation,
                  for eq in compiled_equation.equations)
 
 
+def einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 1):
+    # return log_einsum2(compiled_equation, *tensors, block_size=block_size)
+    return tse.einsum(compiled_equation, *tensors, block_size=block_size)
+
+
 def compile_equation(equation: str, force_multi: bool = False
                      ) -> tse.equation.Equation:
     args_str, outputs_str = equation.split('->', 1)

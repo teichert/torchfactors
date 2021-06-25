@@ -129,3 +129,58 @@ def test_mask():
         [0, 0, 3, 0, 0],
         [0, 1, 0, 0, 0],
     ]).log())
+
+
+def test_mask2():
+    v = TensorVar(tensor=torch.tensor([
+        1,
+        0,
+        1,
+        1,
+        0,
+    ]), domain=Range(2), usage=torch.tensor([
+        PADDING,
+        CLAMPED,
+        ANNOTATED,
+        OBSERVED,
+        LATENT,
+    ]))
+
+    v2 = TensorVar(tensor=torch.tensor([
+        2,
+        1,
+        2,
+        3,
+        1,
+    ]), domain=Range(4), usage=torch.tensor([
+        ANNOTATED,
+        OBSERVED,
+        LATENT,
+        PADDING,
+        CLAMPED,
+    ]))
+
+    factor = TensorFactor(v, v2, tensor=torch.full((5, 2, 4), math.log(3)))
+    out = factor.dense  # in x v x v2
+    assert out.allclose(torch.tensor([
+        [  # P x A
+            [0, 0, 0, 0],
+            [1, 1, 1, 1],
+        ],
+        [  # C x O
+            [0, 3, 0, 0],
+            [0, 0, 0, 0],
+        ],
+        [  # A x L
+            [3, 3, 3, 3],
+            [3, 3, 3, 3],
+        ],
+        [   # O x P
+            [0, 0, 0, 0],
+            [0, 0, 0, 1],
+        ],
+        [  # L x C
+            [0, 3, 0, 0],
+            [0, 3, 0, 0],
+        ],
+    ]).log())

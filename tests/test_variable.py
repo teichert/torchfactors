@@ -322,16 +322,29 @@ def test_as_used():
                       PADDING, PADDING,
                       LATENT, LATENT,
                   ]))
-    expected = torch.tensor([
+    expected_possible = torch.tensor([
         [0, 0, 0, 1, 0],
         [0, 0, 1, 0, 0],
         [1, 1, 1, 1, 1],
         [1, 1, 1, 1, 1],
         [0, 1, 0, 0, 0],
         [0, 0, 1, 0, 0],
-        [float('nan'), 0, 0, 0, 0],
-        [0, 0, 0, float('nan'), 0],
+        [1, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0],
         [1, 1, 1, 1, 1],
         [1, 1, 1, 1, 1]
-    ]).log()
-    assert torch.allclose(v.usage_mask, expected, equal_nan=True)
+    ]).bool()
+    assert (v.is_possible == expected_possible).all()
+    expected_padding = torch.tensor([
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1],
+        [0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0],
+    ]).bool()
+    assert (v.is_padding == expected_padding).all()

@@ -183,27 +183,40 @@ class Var(ABC):
         return self._get_original_tensor()
 
     @property
-    def usage_mask(self) -> Tensor:
-        r"""
-        Returns a tensor of the same shape as the variable marginal would be
-        with (log) 1 for allowed, 0 for not-allowed, and nan for padding.
+    def is_padding(self) -> Tensor:
+        return (self.usage == VarUsage.PADDING)[..., None].expand(self.marginal_shape)
 
-        The idea is that any factors touch any padding variable should be as if
-        they were gone, so the nans are used here and then nans are replaced
-        with 1's after combining all variables
-        """
-        # ones, one_hots, where one and padding is nan
+    @property
+    def is_possible(self) -> Tensor:
         one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
-        expanded_usage = self.usage[..., None].expand_as(one_hot)
-        return torch.where(
-            (expanded_usage == VarUsage.OBSERVED).
-            logical_or(expanded_usage == VarUsage.CLAMPED).
-            logical_or(expanded_usage == VarUsage.PADDING),
-            torch.where(one_hot.logical_and(expanded_usage == VarUsage.PADDING),
-                        torch.full_like(one_hot, float('nan')),
-                        one_hot),
-            torch.ones_like(one_hot)).log()
-        # return self._get_original_tensor()
+        is_fixed = (
+            (self.usage == VarUsage.PADDING).logical_or
+            (self.usage == VarUsage.OBSERVED).logical_or
+            (self.usage == VarUsage.CLAMPED))[..., None].expand_as(one_hot)
+        return one_hot.where(is_fixed, torch.ones_like(one_hot)) != 0
+
+    # @property
+    # def usage_mask(self) -> Tensor:
+    #     r"""
+    #     Returns a tensor of the same shape as the variable marginal would be
+    #     with (log) 1 for allowed, 0 for not-allowed, and nan for padding.
+
+    #     The idea is that any factors touch any padding variable should be as if
+    #     they were gone, so the nans are used here and then nans are replaced
+    #     with 1's after combining all variables
+    #     """
+    #     # ones, one_hots, where one and padding is nan
+    #     one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
+    #     expanded_usage = self.usage[..., None].expand_as(one_hot)
+    #     return torch.where(
+    #         (expanded_usage == VarUsage.OBSERVED).
+    #         logical_or(expanded_usage == VarUsage.CLAMPED).
+    #         logical_or(expanded_usage == VarUsage.PADDING),
+    #         torch.where(one_hot.logical_and(expanded_usage == VarUsage.PADDING),
+    #                     torch.full_like(one_hot, float('nan')),
+    #                     one_hot),
+    #         torch.ones_like(one_hot)).log()
+    #     # return self._get_original_tensor()
 
     def clamp_annotated(self) -> None:
         self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
