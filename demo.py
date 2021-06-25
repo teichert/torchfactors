@@ -13,7 +13,7 @@ def unigram():
     class Unigrams(tx.Model[Characters]):
         def factors(self, x: Characters):
             yield tx.LinearFactor(self.namespace('unigram'), x.char)
-    torch.autograd.anomaly_mode.set_detect_anomaly(True)
+    # torch.autograd.anomaly_mode.set_detect_anomaly(True)
     with open(__file__) as f:
         text = f.read()
         print(text)
