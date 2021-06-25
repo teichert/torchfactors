@@ -9,6 +9,7 @@ import torch
 import typing_extensions
 from multimethod import multimethod
 from torch import Size, Tensor
+from torch.nn import functional as F
 
 from .domain import Domain
 from .types import NDSlice, ShapeType
@@ -171,19 +172,26 @@ class Var(ABC):
     def original_tensor(self) -> Tensor:
         return self._get_original_tensor()
 
-    # @property
-    # def usage_mask(self) -> Tensor:
-    #     r"""
-    #     Returns a tensor of the same shape as
-    #     the variable marginal would be with
-    #     (log) 1 for allowed, 0 for not-allowed,
-    #     and nan for padding.
-    #     """
-    #     # (
-    #     #     (self.usage == VarUsage.OBSERVED).
-    #     #     logical_or(self.usage == VarUsage.CLAMPED).
-    #     #     logical_or(self.usage == VarUsage.PADDING))
-    #     return self._get_original_tensor()
+    @property
+    def usage_mask(self) -> Tensor:
+        r"""
+        Returns a tensor of the same shape as
+        the variable marginal would be with
+        (log) 1 for allowed, 0 for not-allowed,
+        and nan for padding.
+        """
+        # ones, one_hots, where one and padding is nan
+        one_hot: Tensor = F.one_hot(self.tensor, len(self.domain)).float()
+        expanded_usage = self.usage[..., None].expand_as(one_hot)
+        return torch.where(
+            (expanded_usage == VarUsage.OBSERVED).
+            logical_or(expanded_usage == VarUsage.CLAMPED).
+            logical_or(expanded_usage == VarUsage.PADDING),
+            torch.where(one_hot.logical_and(expanded_usage == VarUsage.PADDING),
+                        torch.full_like(one_hot, float('nan')),
+                        one_hot),
+            torch.ones_like(one_hot)).log()
+        # return self._get_original_tensor()
 
     def clamp_annotated(self) -> None:
         self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
