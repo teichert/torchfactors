@@ -182,13 +182,15 @@ class Subject:
 
         #     return
 
-    def clamp_annotated(self) -> None:
+    def clamp_annotated_(self) -> Subject:
         for attr_name in self.__varset:
             cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
+        return self
 
-    def unclamp_annotated(self) -> None:
+    def unclamp_annotated_(self) -> Subject:
         for attr_name in self.__varset:
             cast(TensorVar, getattr(self, attr_name)).unclamp_annotated()
+        return self
 
     def __post_init__(self):
         self.init_variables()

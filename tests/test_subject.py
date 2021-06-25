@@ -123,12 +123,12 @@ def test_clamp_annotated():
     assert (u.items2.usage == ANNOTATED).sum() == 5
     assert (u.items1.usage == CLAMPED).sum() == 0
     assert (u.items2.usage == CLAMPED).sum() == 0
-    u.clamp_annotated()
+    u.clamp_annotated_()
     assert (u.items1.usage == ANNOTATED).sum() == 0
     assert (u.items2.usage == ANNOTATED).sum() == 0
     assert (u.items1.usage == CLAMPED).sum() == 10
     assert (u.items2.usage == CLAMPED).sum() == 5
-    u.unclamp_annotated()
+    u.unclamp_annotated_()
     assert (u.items1.usage == ANNOTATED).sum() == 10
     assert (u.items2.usage == ANNOTATED).sum() == 5
     assert (u.items1.usage == CLAMPED).sum() == 0
