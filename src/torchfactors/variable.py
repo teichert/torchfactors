@@ -153,15 +153,16 @@ class Var(ABC):
     def origin(self) -> TensorVar:
         return self._get_origin()
 
-    # @property
-    def get_usage(self) -> Tensor:
-        return self._get_usage()
-
-    # @get_usage.setter
-    def set_usage(self, value: Union[Tensor, VarUsage]):
+    def set_usage(self, value: Union[Tensor, VarUsage]) -> None:
         self._set_usage(value)
 
-    usage = property(get_usage, set_usage)
+    @property
+    def usage(self) -> Tensor:
+        return self._get_usage()
+
+    @usage.setter
+    def usage(self, value: Any) -> None:
+        self.set_usage(cast(Union[Tensor, VarUsage], value))
 
     @abstractmethod
     def _get_original_tensor(self) -> Tensor: ...
@@ -169,6 +170,20 @@ class Var(ABC):
     @property
     def original_tensor(self) -> Tensor:
         return self._get_original_tensor()
+
+    # @property
+    # def usage_mask(self) -> Tensor:
+    #     r"""
+    #     Returns a tensor of the same shape as
+    #     the variable marginal would be with
+    #     (log) 1 for allowed, 0 for not-allowed,
+    #     and nan for padding.
+    #     """
+    #     # (
+    #     #     (self.usage == VarUsage.OBSERVED).
+    #     #     logical_or(self.usage == VarUsage.CLAMPED).
+    #     #     logical_or(self.usage == VarUsage.PADDING))
+    #     return self._get_original_tensor()
 
     def clamp_annotated(self) -> None:
         self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
@@ -415,7 +430,7 @@ class TensorVar(Var):
         self._tensor = tensor
         # can only build usage if there is a tensor
         if self._tensor is not None and usage is not None:
-            self.usage = usage
+            self.set_usage(usage)
         else:
             self._usage = usage
         self._info = info
@@ -493,7 +508,7 @@ class TensorVar(Var):
     def _get_usage(self) -> Tensor:
         return cast(Tensor, self._usage)
 
-    def _set_usage(self, value: Union[Tensor, VarUsage]):
+    def _set_usage(self, value: Union[Tensor, VarUsage]) -> None:
         if isinstance(value, VarUsage) or not value.shape:
             value = torch.full_like(self.tensor, int(value))
         self._usage = value

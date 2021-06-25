@@ -164,6 +164,8 @@ class Factor:
         the factor and dimensions should correspond to the variables in the same
         order as given by the factor).
         """
+        #
+        # v.as_used for v
         return self.dense_()
         # I only care about fixing the output here (don't care about observed
         # inputs since those have already been clamped and set to nan)
@@ -171,6 +173,35 @@ class Factor:
         # current value as well as anything that is padded and not 0 TODO:
         # finish this I have a tensor where the value at position x,y is the
         # index of the z coordinate that I want
+
+        # observed, clamped, and padding should be the only ones allowed
+
+        # for i, v in enumerate(reversed(self.variables)):
+        #     mask = torch.ones_like(v.tensor, dtype=bool)
+        #     # only keep the values represented in the current tensor
+        #     # for observed, clamped, or padding (not for annotated or latent)
+        #     v.usage_is_fixed
+        #     # TODO: merge in above
+        #     torch.logical_or(
+        #         (v.usage == VarUsage.OBSERVED),
+        #         torch.logical_or(
+        #             (v.usage == VarUsage.CLAMPED),
+        #             (v.usage == VarUsage.PADDING)))
+
+        #      v.usage == VarUsage.PADDING).logical_or(
+        #     (d.movedim(self.num_batch_dims, self.num_batch_dims + i)
+        #       [[((
+        #             v.usage == VarUsage.OBSERVED).logical_or(
+        #             v.usage == VarUsage.CLAMPED).logical_or(
+        #             v.usage == VarUsage.CLAMPED).logical_or(
+        #         v.usage == VarUsage.PADDING) > 0]+[...]]=fl
+
+        # d[self.excluded_mask]=float('-inf')
+        # # clamped_mask is anything that is clamped or observed and is the target
+        # d[self.clamped_mask]=0.0
+        # # padded_mask is anything that is padded and is 0
+        # d[self.padded_mask]=float('nan')
+        # return d
 
         # import math
         # inp = torch.tensor([
@@ -243,33 +274,6 @@ class Factor:
         #         4,  # i2
         #     ],
         # ],
-
-        # for i, v in enumerate(reversed(self.variables)):
-        #     mask = torch.ones_like(v.tensor, dtype=bool)
-        #     # only keep the values represented in the current tensor
-        #     # for observed, clamped, or padding (not for annotated or latent)
-        #     v.usage_is_fixed
-        #     # TODO: merge in above
-        #     torch.logical_or(
-        #         (v.usage == VarUsage.OBSERVED),
-        #         torch.logical_or(
-        #             (v.usage == VarUsage.CLAMPED),
-        #             (v.usage == VarUsage.PADDING)))
-
-        #      v.usage == VarUsage.PADDING).logical_or(
-        #     (d.movedim(self.num_batch_dims, self.num_batch_dims + i)
-        #       [[((
-        #             v.usage == VarUsage.OBSERVED).logical_or(
-        #             v.usage == VarUsage.CLAMPED).logical_or(
-        #             v.usage == VarUsage.CLAMPED).logical_or(
-        #         v.usage == VarUsage.PADDING) > 0]+[...]]=fl
-
-        # d[self.excluded_mask]=float('-inf')
-        # # clamped_mask is anything that is clamped or observed and is the target
-        # d[self.clamped_mask]=0.0
-        # # padded_mask is anything that is padded and is 0
-        # d[self.padded_mask]=float('nan')
-        # return d
 
     def marginals_closure(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
                           ) -> Callable[[], Sequence[Tensor]]:

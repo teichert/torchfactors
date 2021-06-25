@@ -2,8 +2,8 @@ from typing import Dict, Tuple
 
 import pytest
 import torch
-from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED, Var,
-                          VarUsage)
+from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED,
+                          Var, VarUsage)
 from torchfactors.domain import Range
 from torchfactors.variable import TensorVar, VarField
 
@@ -275,3 +275,36 @@ def test_var_field_order():
     v = VarField(Range(10), OBSERVED)
     assert v._usage == OBSERVED
     assert v._domain == Range(10)
+
+
+# def test_as_used():
+#     v = TensorVar(Range(5),
+#                   tensor=torch.tensor([
+#                       3,   # 0
+#                       2,   # 1
+#                       0,   # 0
+#                       1,   # 1
+#                       1,   # 2
+#                       2,   # 3
+#                       0,   # 4
+#                       3,   # 5
+#                       2,   # 6
+#                       0]),  # 7
+#                   usage=torch.tensor([
+#                       OBSERVED, OBSERVED,
+#                       ANNOTATED, ANNOTATED,
+#                       CLAMPED, CLAMPED,
+#                       PADDING, PADDING,
+#                       LATENT, LATENT,
+#                   ]))
+#     assert (v.usage_mask == torch.tensor([
+#         [0, 0, 0, 1, 0],
+#         [0, 0, 1, 0, 0],
+#         [1, 1, 1, 1, 1],
+#         [1, 1, 1, 1, 1],
+#         [0, 1, 0, 0, 0],
+#         [0, 0, 1, 0, 0],
+#         [float('nan'), 0, 0, 0, 0],
+#         [0, 0, 0, float('nan'), 0],
+#         [1, 1, 1, 1, 1]
+#     ]).log()).all()
