@@ -57,4 +57,4 @@ class Inferencer(ABC):
     def predict_(self, factors: Sequence[Factor], variables: Sequence[Var]) -> None:
         marginals = self.product_marginals_(factors, *[(v,) for v in variables])
         for marginal, variable in zip(marginals, variables):
-            variable.tensor = marginal.argmax()
+            variable.tensor = marginal.argmax(-1)

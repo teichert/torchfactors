@@ -3,6 +3,7 @@ from typing import Dict, Tuple
 import pytest
 import torch
 import torchfactors
+import torchfactors as tx
 from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED,
                           PADDING, Var, VarUsage)
 from torchfactors.domain import Range
@@ -363,3 +364,25 @@ def test_as_used():
         [0, 0, 0, 0, 0],
     ]).bool()
     assert (v.is_padding == expected_padding).all()
+
+
+def test_broken_usage():
+    @tx.dataclass
+    class BitLanguageSubject(tx.Subject):
+        bits: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED)  # TensorType[..., len, 8]
+
+        @classmethod
+        def from_string(cls, x: str) -> 'BitLanguageSubject':
+            return BitLanguageSubject(
+                bits=tx.vtensor(
+                    [
+                        [bit == '1' for bit in format(
+                            ord(ch) % (2 ** 8),
+                            '08b')]
+                        for ch in x]))
+    data = BitLanguageSubject.from_string('t')
+    assert (data.bits.usage == tx.ANNOTATED).all()
+    data.clamp_annotated_()
+    assert (data.bits.usage == tx.CLAMPED).all()
+    data.unclamp_annotated_()
+    assert (data.bits.usage == tx.ANNOTATED).all()

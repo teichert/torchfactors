@@ -165,7 +165,7 @@ class Var(ABC):
     def usage(self) -> Tensor:
         out = self._get_usage()
         if isinstance(out, VarUsage):
-            out = torch.full_like(self.tensor, out)
+            out = torch.full_like(self.tensor, out, dtype=torch.int8)
             self.usage = out
             # raise TypeError(
             #     "your variable needs tensor before you can access the tensor-based usage!")
@@ -273,7 +273,7 @@ class VarBranch(Var):
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
         if isinstance(value, VarUsage):  # or not value.shape:
-            value = torch.tensor(value)
+            value = torch.tensor(value, dtype=torch.int8)
         self.root.usage[self.ndslice] = cast(Tensor, value.expand_as(self.tensor))
 
     def _get_domain(self) -> Domain:
@@ -547,7 +547,7 @@ class TensorVar(Var):
 
     def _set_usage(self, value: Union[Tensor, VarUsage]) -> None:
         if isinstance(value, VarUsage) or not value.shape:
-            value = torch.full_like(self.tensor, int(value))
+            value = torch.full_like(self.tensor, int(value), dtype=torch.int8)
         self._usage = value
 
     def _get_domain(self) -> Domain:

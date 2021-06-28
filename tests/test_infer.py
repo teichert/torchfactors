@@ -89,3 +89,24 @@ def test_predict_simple3():
     bp.predict(factors)
     assert a.tensor == 0
     assert b.tensor == 0
+
+
+def test_predict_multi():
+    bits = TensorVar(Range(2), torch.tensor([False, True, False]), ANNOTATED)
+    factors = [
+        TensorFactor(bits[..., 0], tensor=torch.tensor([0, 0.5]).log()),
+        TensorFactor(bits[..., 1], tensor=torch.tensor([0.5, 0]).log()),
+        TensorFactor(bits[..., 2], tensor=torch.tensor([0.5, 0]).log()),
+    ]
+    bp = BP()
+    marginals = bp.product_marginal(factors, bits)
+    assert marginals.allclose(torch.tensor([
+        [0, 1],
+        [1, 0],
+        [1, 0]
+    ]).log())
+    bp.predict(factors)
+    assert (bits.tensor == torch.tensor([True, False, False])).all()
+
+
+test_predict_multi()
