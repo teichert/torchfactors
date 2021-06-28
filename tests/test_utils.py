@@ -1,7 +1,8 @@
 import pytest
+import torch
 from torch import arange
 from torchfactors.utils import (as_ndrange, compose, compose_single, ndarange,
-                                ndslices_cat, ndslices_overlap)
+                                ndslices_cat, ndslices_overlap, outer)
 
 
 def test_compose_single():
@@ -60,3 +61,43 @@ def test_ndslices_cat():
     assert ndslices_cat(1, (slice(None), 3)) == (1, slice(None), 3)
     assert ndslices_cat((1, 3), 2) == (1, 3, 2)
     assert ndslices_cat((1, 3), (9, 2)) == (1, 3, 9, 2)
+
+
+def test_outer2():
+    a = torch.tensor([1, 2, 3])
+    b = torch.tensor([2, 3])
+    out = outer(a, b)
+    assert out.allclose(torch.tensor([
+        [2, 3],
+        [4, 6],
+        [6, 9]
+    ]))
+
+
+def test_outer3():
+    a = torch.tensor([1, 2, 3])
+    b = torch.tensor([2, 3])
+    c = torch.tensor([7, 9])
+    out = outer(a, b, c)
+    assert out.allclose(torch.tensor([
+        [[14, 18], [21, 27]],
+        [[28, 36], [42, 54]],
+        [[42, 54], [63, 81]]
+    ]))
+
+
+def test_outer_batch():
+    a = torch.tensor([[1, 2, 3], [1, 2, 6]])
+    b = torch.tensor([[2, 3], [2, 3]])
+    c = torch.tensor([[7, 9], [7, 9]])
+    out = outer(a, b, c, num_batch_dims=1)
+    expected = torch.tensor([[
+        [[14, 18], [21, 27]],
+        [[28, 36], [42, 54]],
+        [[42, 54], [63, 81]]
+    ], [
+        [[14, 18], [21, 27]],
+        [[28, 36], [42, 54]],
+        [[84, 108], [126, 162]]
+    ]])
+    assert out.allclose(expected)

@@ -34,8 +34,8 @@ class BitLanguageModel(tx.Model[BitLanguageSubject]):
         for i in range(length):
             for bit in range(bits):
                 yield tx.LinearFactor(self.namespace(('bit', bit)), x.bits[..., i, bit])
-            #     yield tx.LinearFactor(self.namespace(('cased-bit', bit)),
-            #                           x.bits[..., i, bit], x.cases[..., i], x.states[..., i])
+                # yield tx.LinearFactor(self.namespace(('cased-bit', bit)),
+                #                       x.bits[..., i, bit], x.cases[..., i], x.states[..., i])
             # yield tx.LinearFactor(self.namespace('case-unary'), x.cases[..., i])
             # yield tx.LinearFactor(self.namespace('state-unary'), x.states[..., i])
             # if i > 0:
@@ -47,10 +47,11 @@ class BitLanguageModel(tx.Model[BitLanguageSubject]):
 
 if __name__ == '__main__':
     text = [
-        "T",
+        "Test",
         # "This is a test. Yes!",
         # "Another test."
     ]
+    torch.set_anomaly_enabled(True)
     subjects = list(map(BitLanguageSubject.from_string, text))
     data = subjects[0]
     # data = BitLanguageSubject.stack(subjects)

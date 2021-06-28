@@ -3,6 +3,7 @@ from itertools import chain
 from typing import Tuple, cast, overload
 
 from multimethod import multidispatch
+from opt_einsum import contract  # type: ignore
 from torch import Tensor, arange
 from torch.types import Number
 
@@ -15,6 +16,16 @@ def _ndarange(shape: ShapeType) -> Tensor:
     returns a sufficiently sized arange() that has been reshaped to the specified shape
     """
     return arange(math.prod(shape)).reshape(shape)
+
+
+def outer(*tensors: Tensor, num_batch_dims=0):
+    return contract(*[arg
+                      for t in tensors
+                      for arg in [t, [*range(num_batch_dims), id(t)]]],
+                    [*range(num_batch_dims), *list(map(id, tensors))],
+                    backend='torch')
+
+    # return torch.stack(torch.meshgrid(*tensors), 0).prod(0)
 
 
 @_ndarange.register

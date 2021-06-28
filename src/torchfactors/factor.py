@@ -335,6 +335,7 @@ class Factor:
 
         """
         check_queries(queries)
+        # return dense_factors_log_einsum([self, *other_factors], queries, force_multi=True)
         equation = self.__vars_equation(
             [self.variables, *[other.variables for other in other_factors]],
             queries, force_multi=True)
@@ -443,3 +444,7 @@ class Factor:
 #     @abstractmethod
 #     def factors(self) -> Iterator[Factor]:
 #         pass
+
+# def dense_factor_log_einsum(factors: Sequence[Factor], *queries: Sequence[Var],
+#                             force_multi=False):
+#     pass
