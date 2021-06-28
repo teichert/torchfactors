@@ -25,6 +25,12 @@ type: pyproject.lock
 	@echo "running type checker..."
 	poetry run python -m mypy . --check-untyped-defs
 
+.PHONY: profile
+profile: pyproject.lock
+	@echo "running profiler..."
+	# poetry run py-spy record -f speedscope --full-filenames --rate 200 -n -- python examples/unigram.py
+	cd examples; poetry run python -m scalene unigram.py --profile-all
+
 .PHONY: doc
 doc: pyproject.lock
 	poetry run python -m pdoc -o ./docs src

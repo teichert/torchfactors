@@ -12,19 +12,19 @@ class MultiEquation(object):
 
 
 @singledispatch
-def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 1):
+def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 50):
     # return log_einsum2(compiled_equation, *tensors, block_size=block_size)
     return tse.log_einsum(compiled_equation, *tensors, block_size=block_size)
 
 
 @log_einsum.register
 def _from_multi(compiled_equation: MultiEquation,
-                *tensors: Tensor, block_size: int = 1):
+                *tensors: Tensor, block_size: int = 50):
     return tuple(log_einsum(eq, *tensors, block_size=block_size)
                  for eq in compiled_equation.equations)
 
 
-def einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 1):
+def einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 50):
     # return log_einsum2(compiled_equation, *tensors, block_size=block_size)
     return tse.einsum(compiled_equation, *tensors, block_size=block_size)
 

@@ -1,7 +1,4 @@
 from dataclasses import dataclass
-from itertools import cycle
-from os import path
-from textwrap import wrap
 from typing import List
 
 import torch
@@ -22,9 +19,15 @@ class Characters(tx.Subject):
         return Characters(tx.TensorVar(torch.tensor(text_nums)))
 
 
-class Unigrams(tx.Model[Characters]):
+class Bigrams(tx.Model[Characters]):
     def factors(self, x: Characters):
-        yield tx.LinearFactor(self.namespace('unigram'), x.char)
+        # yield tx.LinearFactor(self.namespace('unigram'), x.char)
+        # yield tx.LinearFactor(self.namespace('bigram'), x.char[..., :-1], x.char[..., 1:])
+        n = x.char.shape[-1]
+        for i in range(n):
+            yield tx.LinearFactor(self.namespace('unigram'), x.char[..., i])
+            if i + 1 < n:
+                yield tx.LinearFactor(self.namespace('bigram'), x.char[..., i], x.char[..., i+1])
 
 
 def top_chars(character_log_probs: List[float], k: int):
@@ -34,17 +37,21 @@ def top_chars(character_log_probs: List[float], k: int):
 
 
 if __name__ == '__main__':
-    model = Unigrams()
+    model = Bigrams()
     system = tx.System(model, tx.BP())
-    n = 40
-    print(f"rading {path.abspath(__file__)}...")
-    with open(__file__) as f:
-        dataloader = Characters.data_loader([
-            Characters.from_string(text)
-            for text in wrap(f.read(), 1000)])
-        system.prime(next(iter(dataloader)))
+    data = Characters.from_string("this is a test")
+    if True:
+        # n = 5
+
+        # with open(__file__) as f:
+        #     dataloader = Characters.data_loader([
+        #         Characters.from_string(text)
+        #         for text in wrap(f.read(), 5)], batch_size=10)
+        # system.prime(next(iter(dataloader)))
+        system.prime(data)
         optimizer = torch.optim.Adam(model.parameters(), lr=1.0)
-        for i, data in zip(range(n), cycle(dataloader)):
+        # for i, data in zip(range(n), cycle(dataloader)):
+        for i in range(3):
             optimizer.zero_grad()
 
             data.unclamp_annotated_()
@@ -58,7 +65,6 @@ if __name__ == '__main__':
             print(loss)
             loss.backward()
             optimizer.step()
-            loss.grad = None
 
     single_char = Characters.from_string(' ')
     character_probs = system.product_marginal(single_char, single_char.char)[0].exp().tolist()
