@@ -554,7 +554,7 @@ class TensorVar(Var):
         return self._domain
 
     @staticmethod
-    def pad_and_stack(batch: List['TensorVar'], pad_value=-1,
+    def pad_and_stack(batch: List['TensorVar'], pad_value=0,
                       ) -> 'TensorVar':
         """
         given a list of tensors with same number of dimensions but possibly
