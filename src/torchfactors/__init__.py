@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .components.linear_factor import LinearFactor
 from .components.tensor_factor import TensorFactor
 from .domain import Domain, Range, SeqDomain
@@ -12,7 +14,7 @@ from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
 from .utils import ndarange
-from .variable import TensorVar, Var, VarBranch, VarField, VarUsage
+from .variable import TensorVar, Var, VarBranch, VarField, VarUsage, vtensor
 
 PADDING = VarUsage.PADDING
 LATENT = VarUsage.LATENT
@@ -24,9 +26,10 @@ DEFAULT = VarUsage.DEFAULT
 OPEN = Domain.OPEN
 
 __all__ = [
+    'dataclass',
     'Domain', 'SeqDomain', 'Range',
     'OPEN',
-    'VarUsage', 'Var', 'VarBranch', 'VarField', 'TensorVar',
+    'VarUsage', 'Var', 'VarBranch', 'VarField', 'TensorVar', 'vtensor',
     'PADDING', 'LATENT', 'ANNOTATED', 'CLAMPED', 'OBSERVED', 'DEFAULT',
     'Subject',
     'Factor',

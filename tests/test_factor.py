@@ -37,6 +37,13 @@ def test_bad_tensor_factor():
         TensorFactor(v, tensor=torch.rand(3, 4, 9))
 
 
+def test_bad_repeat_var():
+    t = torch.ones(3, 4)
+    v = TensorVar(t, domain=Range(10))
+    with pytest.raises(ValueError):
+        TensorFactor(v, v, tensor=torch.rand(3, 4, 10, 10))
+
+
 def test_init_tensor_factor():
     t = torch.ones(3, 4)
     v = TensorVar(t, domain=Range(10))

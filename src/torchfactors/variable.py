@@ -612,3 +612,7 @@ class TensorVar(Var):
 
     def _get_ndslice(self) -> NDSlice:
         return (...,)
+
+
+def vtensor(data: Any, **kwargs):
+    return TensorVar(torch.tensor(data, **kwargs))

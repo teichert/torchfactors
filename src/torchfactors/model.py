@@ -84,7 +84,7 @@ class Model(torch.nn.Module, Generic[T]):
     # def domain(self, key: Hashable) -> Domain:
     #     return self._model_domains.setdefault(key, Domain.OPEN)
 
-    def namespace(self, key) -> ParamNamespace:
+    def namespace(self, key: Hashable) -> ParamNamespace:
         return ParamNamespace(self, key)
 
     # def factors_from(self, factor_generator: Callable[[T], Iterable[Factor]]) -> None:

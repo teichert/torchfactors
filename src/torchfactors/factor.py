@@ -43,6 +43,9 @@ class Factor:
                     f"it looks like you passed in a {type(v)} rather than a Var; "
                     "If the parameters comes after varargs, make sure to name it. "
                     "e.g. TensorFactor(v, tensor=t)")
+        if len(set(variables)) < len(variables):
+            raise ValueError("It looks like you've used the same variable more than once in "
+                             "this factor (sorry, this is not supported yet).")
         self.variables = variables
         for v in self.variables[1:]:
             if v.shape != self.variables[0].shape:
@@ -50,6 +53,10 @@ class Factor:
         self._usage_equation = self.__vars_equation(
             [(v,) for v in self.variables],
             [self.variables])
+        # if self._usage_equation.input_variables == [[0], [0]]:
+        #     self._usage_equation = self.__vars_equation(
+        #         [(v,) for v in self.variables],
+        #         [self.variables])
 
     def __iter__(self) -> Iterator[Var]:
         return iter(self.variables)
@@ -64,11 +71,9 @@ class Factor:
 
         def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
             return tuple([*batch_dims, *objs])
-
-        return compile_obj_equation(
-            [with_batch_dims(group) for group in input_var_groups],
-            [with_batch_dims(group) for group in output_var_groups],
-            force_multi=force_multi)
+        groups = [with_batch_dims(group) for group in input_var_groups]
+        queries = [with_batch_dims(group) for group in output_var_groups]
+        return compile_obj_equation(groups, queries, force_multi=force_multi)
 
     def product_marginal(self, query: Union[Sequence[Var], Var, None] = None,
                          other_factors: Sequence[Factor] = ()

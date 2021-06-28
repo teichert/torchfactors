@@ -2,6 +2,7 @@ from typing import Dict, Tuple
 
 import pytest
 import torch
+import torchfactors
 from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED,
                           PADDING, Var, VarUsage)
 from torchfactors.domain import Range
@@ -30,6 +31,20 @@ def test_variable():
     assert (v.usage == VarUsage.OBSERVED).all()
     assert v.ndslice == (...,)
     assert v.original_tensor is t
+    assert v.origin is v
+
+
+def test_vtensor():
+    v = torchfactors.vtensor(torch.ones(3, 4).tolist())
+    v._domain = Range(4)
+    assert len(v.domain) == 4
+    assert v.shape == (3, 4)
+    v.set_usage(OBSERVED)
+    assert isinstance(v.usage, torch.Tensor)
+    print(v.usage == VarUsage.OBSERVED)
+    assert (v.usage == VarUsage.OBSERVED).all()
+    assert v.ndslice == (...,)
+    assert v.original_tensor is v.tensor
     assert v.origin is v
 
 
