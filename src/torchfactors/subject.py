@@ -182,12 +182,12 @@ class Subject:
 
         #     return
 
-    def clamp_annotated_(self) -> Subject:
+    def clamp_annotated_(self: SubjectType) -> SubjectType:
         for attr_name in self.__varset:
             cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
         return self
 
-    def unclamp_annotated_(self) -> Subject:
+    def unclamp_annotated_(self: SubjectType) -> SubjectType:
         for attr_name in self.__varset:
             cast(TensorVar, getattr(self, attr_name)).unclamp_annotated()
         return self
@@ -197,7 +197,8 @@ class Subject:
 
     def __init__(self, *args, **kwargs):
         raise ValueError(
-            "shouldn't call this initializer: subclass Subject and use @dataclass decorator")
+            "you shouldn't call this initializer: make a subclass Subject and "
+            "use the @dataclass decorator on it")
 
 
 # def subject(cls):

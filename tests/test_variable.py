@@ -416,3 +416,13 @@ def test_frozen_flex_domain():
         domain.unk]
     assert len(domain) == 4
     assert domain.get_value(100) == domain.unk
+
+
+def test_flatten():
+    v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
+    assert v.flatten().tolist() == [4, 5, 1, 4, 2, 3]
+    v.usage = torch.tensor([
+        [tx.ANNOTATED, tx.LATENT, tx.LATENT],
+        [tx.LATENT, tx.LATENT, tx.ANNOTATED]])
+    assert v.flatten(usage=tx.ANNOTATED).tolist() == [4, 3]
+    assert v.flatten(usage=tx.LATENT).tolist() == [5, 1, 4, 2]

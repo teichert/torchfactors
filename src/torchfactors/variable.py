@@ -246,6 +246,17 @@ class Var(ABC):
     def out_slice(self) -> NDSlice:
         return ndslices_cat(self.ndslice, (slice(None),))
 
+    def flatten(self, usage: Optional[VarUsage] = None) -> Tensor:
+        r"""
+        Returns the flattened underlying tensor.
+        If usage is specified, then only selects those indexes matching
+        the specified usage.
+        """
+        if usage is None:
+            return self.tensor.flatten()
+        else:
+            return self.tensor[self.usage == usage]
+
 
 class VarBranch(Var):
     r"""
@@ -577,7 +588,7 @@ class TensorVar(Var):
         stacked_tensors = first_tensor.new_full(
             (batch_size, *max_shape), fill_value=pad_value, dtype=dtype)
         stacked_usages = first_tensor.new_full(
-            (batch_size, *max_shape), fill_value=VarUsage.PADDING.value, dtype=torch.int)
+            (batch_size, *max_shape), fill_value=VarUsage.PADDING.value, dtype=torch.int8)
         # mask = first_tensor.new_full((batch_size, *max_shape),
         # fill_value=False, dtype=torch.bool)
         for i, x in enumerate(batch):

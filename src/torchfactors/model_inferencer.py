@@ -1,11 +1,11 @@
 import copy
-from typing import Generic, Sequence, Union
+from typing import Generic, Iterable, Sequence, Union, cast
 
 from torch.functional import Tensor
 
 from .inferencer import Inferencer
 from .model import Model
-from .subject import SubjectType
+from .subject import Subject, SubjectType
 from .variable import Var
 
 
@@ -19,13 +19,18 @@ class System(Generic[SubjectType]):
         self.model = model
         self.inferencer = inferencer
 
-    def prime(self, x: SubjectType) -> None:
+    def prime(self, x: Union[SubjectType, Iterable[SubjectType]]) -> None:
         r"""
         Applies the model to the given subject without reporting anything.
         This can be useful for initializing all paramters prior to building
         an optimizer.
         """
-        [f.dense for f in self.model(x)]
+        if isinstance(x, Subject):
+            for f in self.model(cast(SubjectType, x)):
+                f.dense
+        else:
+            for subject in cast(Iterable[SubjectType], x):
+                self.prime(subject)
 
     def predict(self, x: SubjectType) -> SubjectType:
         r"""
