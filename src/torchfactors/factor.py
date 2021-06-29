@@ -8,9 +8,9 @@ from typing import Callable, Iterator, Sequence, Union
 import torch
 from torch import Tensor
 
-from .einsum import compile_obj_equation, einsum, log_einsum
+from .einsum import compile_obj_equation, log_einsum
 from .types import ShapeType
-from .utils import replace_negative_infinities
+from .utils import outer
 from .variable import Var
 
 
@@ -181,13 +181,16 @@ class Factor:
 
     @property
     def _is_possible(self) -> Tensor:
-        possibilities = [v.is_possible for v in self.variables]
-        return einsum(self._usage_equation, *possibilities)
+        # possibilities =
+        # return einsum(self._usage_equation, *possibilities)
+        return outer(*[v.is_possible for v in self.variables], num_batch_dims=self.num_batch_dims)
 
     @property
     def _is_not_padding(self) -> Tensor:
-        not_paddings = [v.is_padding.logical_not() for v in self.variables]
-        return einsum(self._usage_equation, *not_paddings)
+        # not_paddings = [v.is_padding.logical_not() for v in self.variables]
+        # return einsum(self._usage_equation, *not_paddings)
+        return outer(*[v.is_padding.logical_not() for v in self.variables],
+                     num_batch_dims=self.num_batch_dims)
 
     @property
     def dense(self) -> Tensor:
@@ -409,6 +412,11 @@ class Factor:
                              for v in f.variables))
         log_belief = self.product_marginal(variables, other_factors=[*other_energy, *messages])
         log_belief = Factor.normalize(log_belief, num_batch_dims=self.num_batch_dims)
+        # sum_i x_i log y_i =
+        # sum_{i : x_i != 0, y_i >= 0} x_i log y_i + sum_{i : x_i != 0, y_i < 0} x_i log -y_i +
+        # log(b log y) = log b + log y
+
+        # logb + log
         # positives = torch.logsumexp(log_belief.clamp_min(0) +
         #                             torch.where(log_belief >= 0,
         #                             log_belief.clamp_min(0).log(), 0.),
@@ -426,10 +434,24 @@ class Factor:
         # # normalize by subtracting out the sum of the last |V| dimensions
         # variable_dims = list(range(num_batch_dims, num_dims))
         variable_dims = list(range(self.num_batch_dims, len(self.shape)))
-        entropy = torch.sum(belief * replace_negative_infinities(log_belief), dim=variable_dims)
-        avg_energy = torch.sum(
-            belief * replace_negative_infinities(log_potentials), dim=variable_dims)
-        return entropy - avg_energy
+        masked_belief = belief.masked_fill(belief <= 0, 1.0)
+        masked_log_beleif = log_belief.masked_fill(belief <= 0, 0.0)
+        masked_log_potentials = log_potentials.masked_fill(belief <= 0, 0.0)
+        return (masked_belief * (masked_log_beleif - masked_log_potentials)).sum(
+            dim=variable_dims)
+        # terms = belief * (log_belief - log_potentials)
+        # filtered = terms.where((belief > 1).logical_and(log_potentials.exp() > 1),
+        #    torch.zeros_like(belief))
+        # return filtered.sum(dim=variable_dims)
+        # return torch.zeros(self.batch_shape)
+
+        # avg_free = torch.sum((
+        #                       ).where((belief > 0).logical_and(), torch.zeros_like(belief)),
+        # dim=variable_dims)
+        # avg_energy = torch.sum(
+        # belief * replace_negative_infinities(log_potentials), dim=variable_dims)
+        # return avg_free
+        # return log_sum_xlogy(log_belief, log_potentials)
 
 
 # class Factors(ABC, Iterable[Factor]):

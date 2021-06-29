@@ -34,15 +34,15 @@ class BitLanguageModel(tx.Model[BitLanguageSubject]):
         for i in range(length):
             for bit in range(bits):
                 yield tx.LinearFactor(self.namespace(('bit', bit)), x.bits[..., i, bit])
-                # yield tx.LinearFactor(self.namespace(('cased-bit', bit)),
-                #                       x.bits[..., i, bit], x.cases[..., i], x.states[..., i])
-            # yield tx.LinearFactor(self.namespace('case-unary'), x.cases[..., i])
-            # yield tx.LinearFactor(self.namespace('state-unary'), x.states[..., i])
-            # if i > 0:
-            #     # yield tx.LinearFactor(self.namespace('case-pairwise'),
-            #     #                       x.cases[..., i], x.cases[..., i])
-            #     yield tx.LinearFactor(self.namespace('state-pairwise'),
-            #                           x.states[..., i - 1], x.states[..., i])
+                yield tx.LinearFactor(self.namespace(('cased-bit', bit)),
+                                      x.bits[..., i, bit], x.cases[..., i], x.states[..., i])
+            yield tx.LinearFactor(self.namespace('case-unary'), x.cases[..., i])
+            yield tx.LinearFactor(self.namespace('state-unary'), x.states[..., i])
+            if i > 0:
+                # yield tx.LinearFactor(self.namespace('case-pairwise'),
+                #                       x.cases[..., i], x.cases[..., i])
+                yield tx.LinearFactor(self.namespace('state-pairwise'),
+                                      x.states[..., i - 1], x.states[..., i])
 
 
 if __name__ == '__main__':

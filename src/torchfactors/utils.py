@@ -5,7 +5,6 @@ from typing import Tuple, cast, overload
 from multimethod import multidispatch
 from opt_einsum import contract  # type: ignore
 from torch import Tensor, arange
-from torch.types import Number
 
 from .types import NDSlice, ShapeType, SliceType
 
@@ -45,10 +44,10 @@ def ndarange(*args, **kwargs):
     return _ndarange(*args, **kwargs)
 
 
-def replace_negative_infinities(t: Tensor, replacement: Number = 0.0) -> Tensor:
-    r"""returns a version of the given tensor without any negative infinities;
-    where any -infs had bee will be inserted the given replacement"""
-    return t.nan_to_num(nan=float('nan'), posinf=float('inf'), neginf=replacement)
+# def replace_negative_infinities(t: Tensor, replacement: Number = 0.0) -> Tensor:
+#     r"""returns a version of the given tensor without any negative infinities;
+#     where any -infs had bee will be inserted the given replacement"""
+#     return t.nan_to_num(nan=float('nan'), posinf=float('inf'), neginf=replacement)
 
 
 def ndslices_cat(lhs: NDSlice, rhs: NDSlice) -> NDSlice:

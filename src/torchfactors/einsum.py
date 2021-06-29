@@ -2,6 +2,7 @@
 from functools import singledispatch
 from typing import Dict, Hashable, List, Sequence, Tuple, Union
 
+import torch
 import torch_semiring_einsum as tse  # type: ignore
 from torch import Tensor
 
@@ -12,21 +13,23 @@ class MultiEquation(object):
 
 
 @singledispatch
-def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 50):
-    # return log_einsum2(compiled_equation, *tensors, block_size=block_size)
-    return tse.log_einsum(compiled_equation, *tensors, block_size=block_size)
+def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 100):
+    return log_einsum2(compiled_equation, *[t.nan_to_num() for t in tensors],
+                       block_size=block_size)
+    # return tse.log_einsum(compiled_equation, *[t.nan_to_num() for t in tensors],
+    #                       block_size=block_size)
 
 
 @log_einsum.register
 def _from_multi(compiled_equation: MultiEquation,
-                *tensors: Tensor, block_size: int = 50):
+                *tensors: Tensor, block_size: int = 100):
     return tuple(log_einsum(eq, *tensors, block_size=block_size)
                  for eq in compiled_equation.equations)
 
 
-def einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 50):
-    # return log_einsum2(compiled_equation, *tensors, block_size=block_size)
-    return tse.einsum(compiled_equation, *tensors, block_size=block_size)
+# def einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 50):
+#     # return log_einsum2(compiled_equation, *tensors, block_size=block_size)
+#     return tse.einsum(compiled_equation, *tensors, block_size=block_size)
 
 
 def compile_equation(equation: str, force_multi: bool = False
@@ -77,25 +80,29 @@ def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
         return equations[0]
 
 
-# def logsumexp(a, dims):
-#     if dims:
-#         return torch.logsumexp(a, dim=dims)
-#     else:
-#         return a
+def logsumexp(a: Tensor, dims):
+    if dims:
+        return torch.logsumexp(a.nan_to_num(), dim=dims)
+    else:
+        return a
 
 
-# def logsumadd_(a, b):
-#     torch.logaddexp(a, b, out=a)
+# def logsumadd_(a: Tensor, b: Tensor):
+#     torch.logaddexp(a.nan_to_num(), b.nan_to_num(), out=a)
 
 
-# def log_einsum2(
-#         equation: tse.equation.Equation,
-#         *args: torch.Tensor,
-#         block_size: int) -> torch.Tensor:
-#     def callback(compute_sum):
-#         return compute_sum(logsumadd_, logsumexp, tse.utils.add_in_place)
+def log_einsum2(
+        equation: tse.equation.Equation,
+        *args: torch.Tensor,
+        block_size: int) -> torch.Tensor:
+    def callback(compute_sum):
+        return compute_sum(
+            # (lambda a, b: torch.logaddexp(a.nan_to_num(), b.nan_to_num(), out=a)),
+            None,
+            logsumexp,
+            tse.utils.add_in_place)
 
-#     return tse.semiring_einsum_forward(equation, args, block_size, callback)
+    return tse.semiring_einsum_forward(equation, args, block_size, callback)
 
 
 # # def log_expectation_exp_einsum2(
@@ -107,6 +114,38 @@ def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
 
 # #     return tse.semiring_einsum_forward(equation, args, block_size, callback)
 
+# def log_sum_xlogy(logx: Tensor, logy: Tensor, dim: Sequence[int]):
+#     slog1 = torch.ones_like(logx, dtype=torch.bool)
+#     llog1 = logx
+#     slog2 = (logy >= 0)
+#     llog2 = logy.abs().log()
+#     order = llog1 >= llog2
+#     sloga = slog1.where(order, slog2)
+#     lloga = llog1.where(order, llog2)
+#     slogb = slog1.where(order.logical_not(), slog2)
+#     llogb = llog1.where(order.logical_not(), llog2)
+#     sprods = sloga == slogb
+#     lprods = lloga + llogb
+#     zeros = torch.zeros_like(lprods).log()
+#     lpositive = torch.where(sprods, lprods, zeros).logsumexp(dim=dim)
+#     spositive = torch.ones_like(lpositive, dtype=torch.bool)
+#     lnegative = torch.where(sprods.logical_not(), lprods, zeros).logsumexp(dim=dim)
+#     snegative = torch.ones_like(lnegative, dtype=torch.bool).logical_not()
+#     order = lpositive >= lnegative
+#     sloga = spositive.where(order, snegative)
+#     lloga = lpositive.where(order, lnegative)
+#     slogb = spositive.where(order.logical_not(), snegative)
+#     llogb = lpositive.where(order.logical_not(), lnegative)
+#     ssum = sloga
+#     expdiff = (llogb - lloga).exp()
+#     add = sloga == slogb
+#     lsum = lloga + torch.log1p(expdiff.where(add, -expdiff))
+#     out = lsum.exp()
+#     return out.where(ssum, -out)
+
+
+# def sum_xlogx_minus_sum_xlogy(logx: Tensor, logy: Tensor, dim: Sequence[int]):
+#     log_entropy =
 
 # def expectation_forward_sl(equation, *args: torch.Tensor, block_size: int):
 #     r"""
@@ -121,7 +160,7 @@ def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
 #     <p,r>* = <p*, p*.p*.r>
 #     0 = <0,0>
 #     1 = <1,0>
-
+#     (assumes la >= lb)!!
 #     <sa=+, la> + <sb=+, lb> = <+, la + log1p(e^(lb-la))>
 #     # <sa=+, la> + <sb=-, lb> = <+, la + log1p(-e^(lb-la))>
 #     # <sa=-, la> + <sb=+, lb> = <-, la + log1p(-e^(lb-la))>
