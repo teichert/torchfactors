@@ -27,6 +27,14 @@ def outer(*tensors: Tensor, num_batch_dims=0):
     # return torch.stack(torch.meshgrid(*tensors), 0).prod(0)
 
 
+def log_outer_exp(*tensors: Tensor, num_batch_dims=0):
+    args = [arg
+            for t in tensors
+            for arg in [t, [*range(num_batch_dims), id(t)]]]
+    outs = [*range(num_batch_dims), *list(map(id, tensors))]
+    return contract(*args, outs, backend='torchfactors.log_einsum')
+
+
 @_ndarange.register
 def _(*shape: int) -> Tensor:
     return _ndarange(shape)

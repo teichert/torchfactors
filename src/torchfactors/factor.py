@@ -467,6 +467,11 @@ class Factor:
 #     def factors(self) -> Iterator[Factor]:
 #         pass
 
+# import opt_einsum as oe
+
+# # def log_einsum3()
+
+
 # def dense_factor_log_einsum(factors: Sequence[Factor], *queries: Sequence[Var],
 #                             force_multi=False):
 #     pass

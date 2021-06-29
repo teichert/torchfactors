@@ -1,8 +1,10 @@
 import pytest
 import torch
 from torch import arange
-from torchfactors.utils import (as_ndrange, compose, compose_single, ndarange,
-                                ndslices_cat, ndslices_overlap, outer)
+from torchfactors.log_einsum import tensordot
+from torchfactors.utils import (as_ndrange, compose, compose_single,
+                                log_outer_exp, ndarange, ndslices_cat,
+                                ndslices_overlap, outer)
 
 
 def test_compose_single():
@@ -101,3 +103,37 @@ def test_outer_batch():
         [[84, 108], [126, 162]]
     ]])
     assert out.allclose(expected)
+
+
+# import opt_einsum as oe
+
+
+def test_log_outer():
+    a = torch.tensor([1, 2, 3]).log()
+    b = torch.tensor([2, 3]).log()
+    c = torch.tensor([7, 9]).log()
+    out = log_outer_exp(a, b, c).exp()
+    assert out.allclose(torch.tensor([
+        [[14, 18], [21, 27]],
+        [[28, 36], [42, 54]],
+        [[42, 54], [63, 81]]
+    ]).float())
+
+
+def test_log_outer2():
+    a = torch.tensor([[1, 2], [3, 4]]).log()
+    b = torch.tensor([2, 3, 5]).log()
+    out = tensordot(a, b, axes=[[], []]).exp()
+    assert out.allclose(torch.tensor([
+        [[2, 3, 5], [4, 6, 10]],
+        [[6, 9, 15], [8, 12, 20]],
+    ]).float())
+
+
+def test_log_outer3():
+    a = torch.tensor([[1, 2], [3, 4]]).log()
+    b = torch.tensor([2, 3]).log()
+    out = tensordot(a, b, axes=[[1], [0]]).exp()
+    assert out.allclose(torch.tensor([
+        2+6, 6+12,
+    ]).float())
