@@ -386,3 +386,33 @@ def test_broken_usage():
     assert (data.bits.usage == tx.CLAMPED).all()
     data.unclamp_annotated_()
     assert (data.bits.usage == tx.ANNOTATED).all()
+
+
+def test_flex_domain():
+    domain = tx.FlexDomain('property')
+    m = tx.Model[tx.Subject]()
+    input = ['this', 'is', 'this', 'test', 'is', 'this']
+    ids = m.domain_ids(domain, input)
+    values = m.domain_values(domain, ids)
+    assert len(set(ids.tolist())) == 3
+    assert len(domain) == 4
+    assert set(domain) == {domain.unk, 'this', 'is', 'test'}
+    assert values == input
+
+
+def test_frozen_flex_domain():
+    domain = tx.FlexDomain('property')
+    m = tx.Model[tx.Subject]()
+    m.domain_ids(domain, ['this', 'is', 'this', 'test', 'is', 'this'])
+    domain.freeze()
+    ids = m.domain_ids(domain, ['now', 'what', 'is', 'this', 'test', '?'])
+    values = m.domain_values(domain, ids)
+    assert values == [
+        domain.unk,
+        domain.unk,
+        'is',
+        'this',
+        'test',
+        domain.unk]
+    assert len(domain) == 4
+    assert domain.get_value(100) == domain.unk

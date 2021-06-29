@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Sequence, TypeVar, overload
+from typing import ClassVar, Hashable, Sequence, TypeVar, overload
 
 from multimethod import multimethod
 
@@ -37,6 +37,38 @@ class __OpenDomain(Domain):
 
 
 Domain.OPEN = __OpenDomain()
+
+
+class FlexDomain(Domain):
+
+    def __init__(self, name: str):
+        self.name = name
+        self.frozen = False
+        self.unk = object()
+        self.values = [self.unk]
+        self.value_to_id = {self.unk: 0}
+
+    def freeze(self):
+        self.frozen = True
+
+    def get_id(self, value: Hashable) -> int:
+        default = 0 if self.frozen else len(self.values)
+        id = self.value_to_id.setdefault(value, default)
+        if id >= len(self.values):
+            self.values.append(value)
+        return id
+
+    def get_value(self, id: int) -> Hashable:
+        if id < len(self.values):
+            return self.values[id]
+        else:
+            return self.unk
+
+    def __iter__(self):
+        return iter(self.values)
+
+    def __len__(self):
+        return len(self.values)
 
 
 @dataclass(frozen=True)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import (Callable, Generic, Hashable, Iterable, List, Optional,
-                    TypeVar, overload)
+from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
+                    Optional, Sequence, TypeVar, overload)
 
 import torch
 # from multimethod import multidispatch as overload
@@ -11,6 +11,7 @@ from torch.nn import Module, ModuleDict, ParameterDict
 from torch.nn.init import xavier_uniform_, zeros_
 from torch.nn.parameter import Parameter
 
+from .domain import FlexDomain
 from .factor import Factor
 from .types import ShapeType
 
@@ -80,9 +81,15 @@ class Model(torch.nn.Module, Generic[T]):
         # self._model_domains: Dict[Hashable, Domain] = {}
         self._model_parameters = ParameterDict()
         self._model_modules = ModuleDict()
+        self._domains: Dict[str, FlexDomain] = {}
 
-    # def domain(self, key: Hashable) -> Domain:
-    #     return self._model_domains.setdefault(key, Domain.OPEN)
+    def domain_ids(self, domain: FlexDomain, values: Sequence[Hashable]) -> torch.Tensor:
+        domain = self._domains.setdefault(domain.name, domain)
+        return torch.tensor([domain.get_id(value) for value in values])
+
+    def domain_values(self, domain: FlexDomain, ids: torch.Tensor) -> Sequence[Hashable]:
+        domain = self._domains.setdefault(domain.name, domain)
+        return [domain.get_value(id) for id in ids.tolist()]
 
     def namespace(self, key: Hashable) -> ParamNamespace:
         return ParamNamespace(self, key)

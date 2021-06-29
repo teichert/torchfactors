@@ -15,6 +15,7 @@ multimethod = "^1.5"
 torch = "^1.9.0"
 torch-semiring-einsum = "^1.0.0"
 opt-einsum = "^3.3.0"
+pandas = "^1.2.5"
 
 
 [tool.poetry.dev-dependencies]
