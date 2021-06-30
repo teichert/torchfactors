@@ -92,6 +92,11 @@ class Var(ABC):
        those could, in principle, be accessible via the resulting factor graph.
     """
 
+    def __init__(self):
+        self.version = 0
+        self.__cached_possible: Optional[Tensor] = None
+        self.__cached_padding: Optional[Tensor] = None
+
     @property
     def shape(self) -> Size:
         return self.tensor.shape
@@ -109,6 +114,7 @@ class Var(ABC):
 
     @tensor.setter
     def tensor(self, value: Any) -> None:
+        self.clear_cache()
         self.set_tensor(cast(Tensorable, value))
 
     # # @property
@@ -159,6 +165,7 @@ class Var(ABC):
         return self._get_origin()
 
     def set_usage(self, value: Union[Tensor, VarUsage]) -> None:
+        self.clear_cache()
         self._set_usage(value)
 
     @property
@@ -182,18 +189,28 @@ class Var(ABC):
     def original_tensor(self) -> Tensor:
         return self._get_original_tensor()
 
+    def clear_cache(self):
+        self.version += 1
+        self.__cached_padding = None
+        self.__cached_possible = None
+
     @property
     def is_padding(self) -> Tensor:
-        return (self.usage == VarUsage.PADDING)[..., None].expand(self.marginal_shape)
+        if self.__cached_padding is None:
+            self.__cached_padding = (
+                self.usage == VarUsage.PADDING)[..., None].expand(self.marginal_shape)
+        return self.__cached_padding
 
     @property
     def is_possible(self) -> Tensor:
-        one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
-        is_fixed = (
-            (self.usage == VarUsage.PADDING).logical_or
-            (self.usage == VarUsage.OBSERVED).logical_or
-            (self.usage == VarUsage.CLAMPED))[..., None].expand_as(one_hot)
-        return one_hot.where(is_fixed, torch.ones_like(one_hot)) != 0
+        if self.__cached_possible is None:
+            one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
+            is_fixed = (
+                (self.usage == VarUsage.PADDING).logical_or
+                (self.usage == VarUsage.OBSERVED).logical_or
+                (self.usage == VarUsage.CLAMPED))[..., None].expand_as(one_hot)
+            self.__cached_possible = one_hot.where(is_fixed, torch.ones_like(one_hot)) != 0
+        return self.__cached_possible
 
     # @property
     # def usage_mask(self) -> Tensor:
@@ -219,9 +236,11 @@ class Var(ABC):
     #     # return self._get_original_tensor()
 
     def clamp_annotated(self) -> None:
+        self.__cached_possible = None
         self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
 
     def unclamp_annotated(self) -> None:
+        self.__cached_possible = None
         self.usage[self.usage == VarUsage.CLAMPED] = VarUsage.ANNOTATED
 
     @abstractmethod
@@ -264,6 +283,7 @@ class VarBranch(Var):
     """
 
     def __init__(self, root: TensorVar, ndslice: NDSlice):
+        super().__init__()
         self.root = root
         self.__ndslice = ndslice
 
@@ -310,6 +330,7 @@ class VarField(Var):
                   shape: Union[Var, ShapeType, None] = None,
                   init: Callable[[ShapeType], Tensor] = torch.zeros,
                   info: typing_extensions._AnnotatedAlias = None):
+        super().__init__()
         self._domain = domain
         self._usage = usage
         self._shape = shape
@@ -466,6 +487,7 @@ class TensorVar(Var):
         when the shape is another variable object, that indicates that this variable object
         is being
         """
+        super().__init__()
         self._domain = domain
         self._tensor = tensor
         # can only build usage if there is a tensor

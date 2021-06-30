@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from abc import abstractmethod
 from functools import cached_property
-from typing import Callable, Iterator, Sequence, Union
+from typing import Callable, Iterator, List, Optional, Sequence, Union
 
 import torch
 from torch import Tensor
@@ -37,6 +37,7 @@ class Factor:
     def __init__(self, variables: Sequence[Var]):
         # if isinstance(variables, Var):
         #     variables = (variables,)
+        self.cached: Optional[Tensor] = None
         for v in variables:
             if not isinstance(v, Var):
                 raise TypeError(
@@ -57,6 +58,18 @@ class Factor:
         #     self._usage_equation = self.__vars_equation(
         #         [(v,) for v in self.variables],
         #         [self.variables])
+        self.versions: List[int] = []
+        self.update_versions()
+
+    def update_versions(self):
+        self.versions = self.variable_versions()
+
+    def variable_versions(self):
+        return [v.version for v in self.variables]
+
+    @property
+    def _is_stale(self):
+        return self.variable_versions() != self.versions
 
     def __iter__(self) -> Iterator[Var]:
         return iter(self.variables)
@@ -199,18 +212,26 @@ class Factor:
         the factor and dimensions should correspond to the variables in the same
         order as given by the factor).
         """
+        if not self._is_stale and self.cached is not None:
+            return self.cached
         d = self.dense_()
 
         # really, I think I just want two masks:
         # 1) possible [clamps, observed, and padding make other things impossible]
         # 2) padding [padding sets the score to (log) 1]
-        return d.where(
+        # return d.masked_fill(
+        #     self._is_not_padding.logical_not(), 0
+        # ).masked_fill(
+        #     self._is_possible.logical_not(), float('-inf'))
+        self.cached = d.where(
             self._is_not_padding,
             torch.zeros_like(d)
         ).where(
             self._is_possible,
             torch.full_like(d, float('-inf'))
         )
+        self.update_versions()
+        return self.cached
         # masks = [v.usage_mask for v in self.variables]
         # maksed: Tensor = log_einsum(self._usage_equation, d, *masks)[0]
         # return maksed.nan_to_num(nan=1, posinf=float('inf'), neginf=float('-inf'))
