@@ -80,9 +80,10 @@ def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
         return equations[0]
 
 
-def logsumexp(a: Tensor, dims):
-    if dims:
-        return torch.logsumexp(a.nan_to_num(), dim=dims)
+@torch.jit.script
+def logsumexp(a: Tensor, dims: List[int]):
+    if len(dims) > 0:
+        return a.nan_to_num().logsumexp(dim=dims)
     else:
         return a
 
@@ -90,17 +91,99 @@ def logsumexp(a: Tensor, dims):
 # def logsumadd_(a: Tensor, b: Tensor):
 #     torch.logaddexp(a.nan_to_num(), b.nan_to_num(), out=a)
 
+def log_dot(tensors_with_names: List[Tuple[torch.Tensor, List[object]]],
+            queries: List[List[object]]) -> List[torch.Tensor]:
+    named: List[Tensor] = [
+        t.rename(*[f'_{id(name)}' for name in names])
+        for t, names in tensors_with_names]
+    return _log_dot(named, [
+        [f'_{id(name)}' for name in query]
+        for query in queries])
+
+
+@torch.jit.script
+def _log_dot(tensors: Dict[torch.Tensor, List[str]],
+             queries: List[List[str]]) -> List[torch.Tensor]:
+    """
+    Carries out a generalized tensor dot product across multiple named
+    tensors. The dimensions listed in `keep` but not in `exclude` will
+    have a dimension in the output: `None` for no dimensions in
+    output. (default) `"all"` for all dimensions in output. tuple or
+    list of dimensions to explicitly list `keeps` may alternatively be
+    used to specify multiple output dimension collections (this can be
+    more efficient than calling `dot` multiple times.)
+
+    The resulting tensor is constructed by first generating a tensor
+    `FULL` whose dimensions include the union of all input tensor
+    dimensions (dimensions with the same name must match in size). If
+    `multiplication` is specified to be, e.g., `torch.prod`, then the
+    value at a particular index in `FULL` is computed as a product of
+    terms, one for each input tensor, where the term is the value of
+    that tensor at the given index (only using the dimensions
+    available in each respective tensor). Finally, `TMP` is reduced
+    along all but the specified output dimensions using the given
+    `addition` function.
+
+    If ts is a dictionary, then the values are used.
+    """
+    # settle on an order for union of names and get corresponding sizes
+    # name_to_ix: Dict[int, int]
+    # dom = {}
+    # for t in ts:
+    #     if t is None:
+    #         continue
+    #     for name, size in zip(t.names, t.shape):
+    #         dom.setdefault(name, size)
+    # names, sizes = unzip(dom.items(), dw=2)
+    # named.append(t.rename(*str_names))
+    used_names: Dict[str, int] = {}
+    all_names: List[str] = []
+    all_sizes: List[int] = []
+    for t, names in tensors.items():
+        for name, size in zip(names, t.shape):
+            if name not in used_names:
+                used_names[name] = size
+                all_names.append(name)
+                all_sizes.append(size)
+    # uniques: Set[Tuple[str, int]] = set()
+    # name_and_size: List[Tuple[str, int]] = list(uniques.union(*[list(
+    #     zip(t.names, t.shape))
+    #     for t in tensors]))
+    # all_names, all_sizes = zip(*name_and_size)
+    # get all tensors in the same shape:
+    #   match dimensions, make copies to match sizes,
+    #   and remove names since names aren't yet supported for most ops
+    aligned: List[Tensor] = [
+        t.align_to(all_names)
+        .expand(all_sizes)
+        .rename(None) for t in tensors]
+    stacked = torch.stack(aligned)
+    # "multiply" across tensors
+    product = torch.sum(stacked, dim=0).rename(all_names)
+    answers: List[Tensor] = []
+    for query in queries:
+        reduce_along = dict(used_names)
+        for name in query:
+            del reduce_along[name]
+        if len(reduce_along) > 0:
+            reduced = product.logsumexp(dim=list(reduce_along.keys()))
+        else:
+            reduced = product
+        answers.append(reduced.rename(None))
+    return answers
+
 
 def log_einsum2(
         equation: tse.equation.Equation,
         *args: torch.Tensor,
         block_size: int) -> torch.Tensor:
+
     def callback(compute_sum):
         return compute_sum(
             # (lambda a, b: torch.logaddexp(a.nan_to_num(), b.nan_to_num(), out=a)),
             None,
             logsumexp,
-            tse.utils.add_in_place)
+            torch.jit.script(tse.utils.add_in_place))
 
     return tse.semiring_einsum_forward(equation, args, block_size, callback)
 
