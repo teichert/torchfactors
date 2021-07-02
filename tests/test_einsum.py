@@ -1,9 +1,10 @@
 from typing import cast
 
 import torch
-import torch_semiring_einsum as tse  # type: ignore
+import torch_semiring_einsum as tse
+import torchfactors  # type: ignore
 from torchfactors.einsum import (MultiEquation, compile_equation,
-                                 compile_obj_equation, log_dot, log_einsum)
+                                 compile_obj_equation, log_einsum, my_align_to)
 
 
 def test_compile_obj_equation():
@@ -65,6 +66,15 @@ def test_log_einsum_multi():
     assert (jl == torch.tensor(9.0).log()).all()
 
 
+def test_align_to():
+    ab = torch.tensor([
+        [1, 2, 3],
+        [2, 4, 5]
+    ])
+    out = my_align_to(ab, [89, 2], [9, 2, 89, 345])
+    assert out.shape == (1, 3, 2, 1)
+
+
 def test_log_dot():
     ab = torch.tensor([
         [1, 2, 3],
@@ -79,7 +89,7 @@ def test_log_dot():
         [1+4+3, 2+8+12, 3+10+15, 8+6+9],
         [2+8+5, 4+16+20, 6+20+25, 16+12+15]
     ]).float()
-    log_out, = log_dot(
+    log_out, = torchfactors.log_dot(
         [(ab.log(), list('ab')),
          (bc.log(), list('bc'))],
         list('ac'))
@@ -87,4 +97,5 @@ def test_log_dot():
     assert out.allclose(ac_expected)
 
 
-test_log_dot()
+# print(_log_dot.code)
+# print(my_align_to.code)

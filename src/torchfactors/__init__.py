@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from .components.linear_factor import LinearFactor
 from .components.tensor_factor import TensorFactor
 from .domain import Domain, FlexDomain, Range, SeqDomain
+from .einsum import log_dot
 from .factor import Factor
 from .factor_graph import FactorGraph
 from .inferencer import Inferencer
@@ -29,6 +30,7 @@ __all__ = [
     'dataclass',
     'Domain', 'SeqDomain', 'Range', 'FlexDomain',
     'OPEN',
+    'log_dot',
     'VarUsage', 'Var', 'VarBranch', 'VarField', 'TensorVar', 'vtensor',
     'PADDING', 'LATENT', 'ANNOTATED', 'CLAMPED', 'OBSERVED', 'DEFAULT',
     'Subject',

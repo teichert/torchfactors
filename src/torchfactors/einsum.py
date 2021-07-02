@@ -103,7 +103,8 @@ def log_dot(tensors_with_names: List[Tuple[torch.Tensor, List[object]]],
     return _log_dot(tensor_dict, mapped_queries)
 
 
-def align_to(t: Tensor, names: List[int], out_names: List[int]) -> Tensor:
+@torch.jit.script
+def my_align_to(t: Tensor, names: List[int], out_names: List[int]) -> Tensor:
     name_to_ix: Dict[int, int] = {}
     for ix, name in enumerate(names):
         name_to_ix[name] = ix
@@ -118,13 +119,14 @@ def align_to(t: Tensor, names: List[int], out_names: List[int]) -> Tensor:
             num_new += 1
         out_order.append(ix)
 
-    # make it so that names[out_order[i]] == out_names
-    return t[(slice(None),)*len(names)+(None,)*(len(out_names)-len(names))].permute(out_order)
+    for _ in range(len(out_names)-len(names)):
+        t = t.unsqueeze(-1)
+    return t.permute(out_order)
 
 
 @torch.jit.script
-def _log_dot(tensors: Dict[torch.Tensor, List[int]],
-             queries: List[List[int]]) -> List[torch.Tensor]:
+def _log_dot(tensors: Dict[Tensor, List[int]],
+             queries: List[List[int]]) -> List[Tensor]:
     """
     Carries out a generalized tensor dot product across multiple named
     tensors. The dimensions listed in `keep` but not in `exclude` will
@@ -160,7 +162,8 @@ def _log_dot(tensors: Dict[torch.Tensor, List[int]],
     name_to_ix: Dict[int, int] = {}
     all_names: List[int] = []
     all_sizes: List[int] = []
-    for t, names in tensors.items():
+    tensors_and_names: List[Tuple[Tensor, List[int]]] = list(tensors.items())
+    for t, names in tensors_and_names:
         for name, size in zip(names, t.shape):
             if name not in name_to_ix:
                 name_to_ix[name] = len(name_to_ix)
@@ -175,10 +178,15 @@ def _log_dot(tensors: Dict[torch.Tensor, List[int]],
     #   match dimensions, make copies to match sizes,
     #   and remove names since names aren't yet supported for most ops
     aligned: List[Tensor] = []
-    for t in tensors:
-        cur_in_names: List[int] = tensors[t]
-        this_aligned: Tensor = align_to(t, cur_in_names, all_names)
+    # t: Tensor
+    for t, cur_in_names in tensors_and_names:
+        # cur_in_names: List[int] = tensors[t]
+        # out_t: Tensor = my_align_to(torch.rand(3, 4), [2, 3], [2, 3, 4])
+        # this_aligned: Tensor = my_align_to(torch.rand(3, 4), [2, 3], [2, 3, 4])
+        this_aligned: Tensor = my_align_to(t, cur_in_names, all_names)
+        # this_aligned = t
         aligned.append(this_aligned.expand(all_sizes))
+        # aligned.append(torch.rand(3, 5))
     stacked = torch.stack(aligned)
     # "multiply" across tensors
     product = torch.sum(stacked, dim=0)
@@ -201,8 +209,8 @@ def _log_dot(tensors: Dict[torch.Tensor, List[int]],
                 cur_out_names.append(name)
         # cur_names are left and in that order,
         # but they should be in the order given by the query
-        answers.append(align_to(reduced, names=cur_out_names,
-                                out_names=query))
+        out_aligned: Tensor = my_align_to(reduced, cur_out_names, query)
+        answers.append(out_aligned)
     return answers
 
 
