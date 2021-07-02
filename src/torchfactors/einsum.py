@@ -93,12 +93,13 @@ def logsumexp(a: Tensor, dims: List[int]):
 
 def log_dot(tensors_with_names: List[Tuple[torch.Tensor, List[object]]],
             *queries: List[object]) -> List[torch.Tensor]:
-    named: List[(Tensor, List[int])] = [
+    named: List[Tuple[Tensor, List[int]]] = [
         (t, list(map(id, names)))
         for t, names in tensors_with_names]
     tensor_dict: Dict[Tensor, List[int]] = dict(named)
-    mapped_queries: List[List[str]] = [
-        list(map(id, query)) for query in queries]
+    mapped_queries: List[List[int]] = [
+        [id(name) for name in query]
+        for query in queries]
     return _log_dot(tensor_dict, mapped_queries)
 
 
@@ -118,10 +119,10 @@ def align_to(t: Tensor, names: List[int], out_names: List[int]) -> Tensor:
         out_order.append(ix)
 
     # make it so that names[out_order[i]] == out_names
-    return t[(...,)+(None,)*(len(out_names)-len(names))].permute(out_order)
+    return t[(slice(None),)*len(names)+(None,)*(len(out_names)-len(names))].permute(out_order)
 
 
-# @torch.jit.script
+@torch.jit.script
 def _log_dot(tensors: Dict[torch.Tensor, List[int]],
              queries: List[List[int]]) -> List[torch.Tensor]:
     """
@@ -175,8 +176,8 @@ def _log_dot(tensors: Dict[torch.Tensor, List[int]],
     #   and remove names since names aren't yet supported for most ops
     aligned: List[Tensor] = []
     for t in tensors:
-        names: List[int] = tensors[t]
-        this_aligned: Tensor = align_to(t, names, all_names)
+        cur_in_names: List[int] = tensors[t]
+        this_aligned: Tensor = align_to(t, cur_in_names, all_names)
         aligned.append(this_aligned.expand(all_sizes))
     stacked = torch.stack(aligned)
     # "multiply" across tensors
@@ -194,13 +195,13 @@ def _log_dot(tensors: Dict[torch.Tensor, List[int]],
             reduced = product.logsumexp(dim=list(reduce_along.values()))
         else:
             reduced = product
-        cur_names: List[int] = []
+        cur_out_names: List[int] = []
         for name in all_names:
             if name in keep_dims:
-                cur_names.append(name)
+                cur_out_names.append(name)
         # cur_names are left and in that order,
         # but they should be in the order given by the query
-        answers.append(align_to(reduced, names=cur_names,
+        answers.append(align_to(reduced, names=cur_out_names,
                                 out_names=query))
     return answers
 
