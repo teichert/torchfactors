@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
                     Optional, Sequence, TypeVar, overload)
 
@@ -10,6 +11,8 @@ from torch import Tensor
 from torch.nn import Module, ModuleDict, ParameterDict
 from torch.nn.init import xavier_uniform_, zeros_
 from torch.nn.parameter import Parameter
+
+from torchfactors.variable import Var
 
 from .domain import FlexDomain
 from .factor import Factor
@@ -151,3 +154,12 @@ class Model(torch.nn.Module, Generic[T]):
 
     def __call__(self, subject: T) -> List[Factor]:
         return list(self.factors(subject))
+
+
+class VarGroupFactorizer(ABC):
+
+    def __call__(self, params: ParamNamespace, *variables: Var) -> Iterable[Factor]:
+        return self.factors(params, *variables)
+
+    @abstractmethod
+    def factors(self, params: ParamNamespace, *variables: Var) -> Iterable[Factor]: ...

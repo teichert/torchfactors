@@ -3,7 +3,7 @@ from typing import cast
 import torch
 import torch_semiring_einsum as tse  # type: ignore
 from torchfactors.einsum import (MultiEquation, compile_equation,
-                                 compile_obj_equation, log_einsum)
+                                 compile_obj_equation, log_dot, log_einsum)
 
 
 def test_compile_obj_equation():
@@ -63,3 +63,28 @@ def test_log_einsum_multi():
     a, b, c = [torch.zeros(3, 3)] * 3
     jl, = log_einsum(from_str, a, b, c)
     assert (jl == torch.tensor(9.0).log()).all()
+
+
+def test_log_dot():
+    ab = torch.tensor([
+        [1, 2, 3],
+        [2, 4, 5]
+    ])
+    bc = torch.tensor([
+        [1, 2, 3, 8],
+        [2, 4, 5, 3],
+        [1, 4, 5, 3],
+    ])
+    ac_expected = torch.tensor([  # 2 x 4
+        [1+4+3, 2+8+12, 3+10+15, 8+6+9],
+        [2+8+5, 4+16+20, 6+20+25, 16+12+15]
+    ]).float()
+    log_out, = log_dot(
+        [(ab.log(), list('ab')),
+         (bc.log(), list('bc'))],
+        list('ac'))
+    out = log_out.exp()
+    assert out.allclose(ac_expected)
+
+
+test_log_dot()

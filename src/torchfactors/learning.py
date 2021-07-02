@@ -23,8 +23,11 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
         data: SubjectType
         for data in data_loader:
             optimizer.zero_grad()
+            print('starting...')
             logz_clamped = system.product_marginal(data.clamp_annotated_())
+            print('\t', logz_clamped)
             logz_free = system.product_marginal(data.unclamp_annotated_())
+            print('\t', logz_free)
             loss = (logz_free - logz_clamped).sum()
             print(loss)
             loss.backward()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from abc import abstractmethod
 from functools import cached_property
-from typing import Callable, Iterator, List, Optional, Sequence, Union
+from typing import (Callable, Iterator, List, Optional, Sequence, Union)
 
 import torch
 from torch import Tensor
