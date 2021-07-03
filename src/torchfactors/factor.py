@@ -3,12 +3,13 @@ from __future__ import annotations
 import math
 from abc import abstractmethod
 from functools import cached_property
-from typing import (Callable, Iterator, List, Optional, Sequence, Union)
+from typing import (Callable, Dict, Iterator, List, Optional, Sequence, Tuple,
+                    Union, cast)
 
 import torch
 from torch import Tensor
 
-from .einsum import compile_obj_equation, log_einsum
+from .einsum import log_dot
 from .types import ShapeType
 from .utils import outer
 from .variable import Var
@@ -47,13 +48,16 @@ class Factor:
         if len(set(variables)) < len(variables):
             raise ValueError("It looks like you've used the same variable more than once in "
                              "this factor (sorry, this is not supported yet).")
-        self.variables = variables
+        self.variables: List[Var] = list(variables)
         for v in self.variables[1:]:
             if v.shape != self.variables[0].shape:
                 raise ValueError("all variables must have the same shape (domains can vary)")
-        self._usage_equation = self.__vars_equation(
-            [(v,) for v in self.variables],
-            [self.variables])
+        # self._usage_equation = self.__vars_equation(
+        #     [(v,) for v in self.variables],
+        #     [self.variables])
+        # self._usage_equation = self.__vars_equation(
+        #     [(v,) for v in self.variables],
+        #     [self.variables])
         # if self._usage_equation.input_variables == [[0], [0]]:
         #     self._usage_equation = self.__vars_equation(
         #         [(v,) for v in self.variables],
@@ -77,16 +81,16 @@ class Factor:
     def __len__(self) -> int:
         return len(self.variables)
 
-    def __vars_equation(self, input_var_groups: Sequence[Sequence[Var]],
-                        output_var_groups: Sequence[Sequence[Var]],
-                        force_multi=False):
-        batch_dims = [object() for _ in range(self.num_batch_dims)]
+    # def __vars_equation(self, input_var_groups: Sequence[Sequence[Var]],
+    #                     output_var_groups: Sequence[Sequence[Var]],
+    #                     force_multi=False):
+    #     batch_dims = [object() for _ in range(self.num_batch_dims)]
 
-        def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
-            return tuple([*batch_dims, *objs])
-        groups = [with_batch_dims(group) for group in input_var_groups]
-        queries = [with_batch_dims(group) for group in output_var_groups]
-        return compile_obj_equation(groups, queries, force_multi=force_multi)
+    #     def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
+    #         return tuple([*batch_dims, *objs])
+    #     groups = [with_batch_dims(group) for group in input_var_groups]
+    #     queries = [with_batch_dims(group) for group in output_var_groups]
+    #     return compile_obj_equation(groups, queries, force_multi=force_multi)
 
     def product_marginal(self, query: Union[Sequence[Var], Var, None] = None,
                          other_factors: Sequence[Factor] = ()
@@ -360,19 +364,38 @@ class Factor:
         """
         check_queries(queries)
         # return dense_factors_log_einsum([self, *other_factors], queries, force_multi=True)
-        equation = self.__vars_equation(
-            [self.variables, *[other.variables for other in other_factors]],
-            queries, force_multi=True)
+        # equation = self.__vars_equation(
+        #     [self.variables, *[other.variables for other in other_factors]],
+        #     queries, force_multi=True)
+        # self.num_batch_dims
+        canonical_variables: Dict[Var, Var] = {}
 
-        def f() -> Sequence[Tensor]:
+        def vars_ids(variables: Sequence[Var]) -> List[object]:
+            # num_batch_dims = len(variables[0].shape) - len(variables)
+            return cast(List[object], [
+                *range(self.num_batch_dims),
+                # make sure to recognize when two variables are the same
+                *[canonical_variables.setdefault(v, v) for v in variables]])
+
+        def factor_with_ids(factor: Factor) -> Tuple[Tensor, List[object]]:
+            ids = vars_ids(factor.variables)
+            return factor.dense, ids
+
+        query_lists: List[List[object]] = [vars_ids(query) for query in queries]
+
+        def compute_marginals() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make
             # sure that changes in e.g. usage are reflected
             # any nans in any factor should be treated as a log(1)
             # meaning that it doesn't impact the product
-            input_tensors = [self.dense] + [f.dense
-                                            for f in other_factors]
-            return log_einsum(equation, *input_tensors)
-        return f
+            # input_tensors = [self.dense] + [f.dense
+            #                                 for f in other_factors]
+            # return log_einsum(equation, *input_tensors)
+            tensors = [factor_with_ids(factor) for factor in [self, *other_factors]]
+            out = log_dot(tensors, *query_lists, force_multi=True)
+            return cast(List[Tensor], out)
+            # return log_einsum(input_tensors, *input_tensors)
+        return compute_marginals
 
     @ staticmethod
     def normalize(tensor: Tensor, num_batch_dims=0) -> Tensor:

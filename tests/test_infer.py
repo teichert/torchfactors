@@ -107,6 +107,3 @@ def test_predict_multi():
     ]).log())
     bp.predict(factors)
     assert (bits.tensor == torch.tensor([True, False, False])).all()
-
-
-test_predict_multi()

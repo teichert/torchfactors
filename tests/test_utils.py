@@ -23,6 +23,12 @@ def test_compose():
     assert compose(shape, other_first, other_second) == expected_combined
 
 
+# def test_compose_to_single():
+#     shape = (3,)
+#     first = (ellipsis,)
+#     second = 1
+#     expected_out = ()
+
 def test_ndrange():
     t = ndarange(2, 3, 4)
     assert (t == arange(2*3*4).reshape(2, 3, 4)).all()

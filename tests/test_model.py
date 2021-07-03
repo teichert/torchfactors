@@ -127,12 +127,13 @@ def test_model_inferencer():
                 yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
 
     system = System(model=MyModel(), inferencer=BP())
-    out = system.predict(MySubject())
+    subject = MySubject()
+    out = system.predict(subject)
     assert (out.items.tensor == 3).all()
 
     # there is only one valid assignment which has a score of 0.0
-    assert system.product_marginal(MySubject()) == 0.0
-    x = MySubject()
+    assert system.product_marginal(subject) == 0.0
+    x = subject
     marg, = system.product_marginals(x, [x.items[..., 2]])
     assert (marg.exp() == torch.tensor([0, 0, 0, 1, 0])).all()
 

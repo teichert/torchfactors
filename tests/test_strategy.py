@@ -67,3 +67,6 @@ def test_strategy_schedule():
     assert set(bg.penetrating_edges(0)) == set()
     assert set(bg.penetrating_edges(1)) == {(0, 1)}
     assert set(bg.penetrating_edges(2)) == {(0, 2)}
+
+
+# test_strategy()

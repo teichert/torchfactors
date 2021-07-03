@@ -123,7 +123,7 @@ class BPInference:
             in zip(targets, divide_out_messages, out_messages)]
 
         # I want to cache the setup here, but I want it to be flexible??
-        def f():
+        def update_messages():
             # compute numerators
             numerators = compute_numerators()
             for numerator, out, compute_denominator in zip(
@@ -131,10 +131,11 @@ class BPInference:
                 # keep the nans, but the negative infs can be ignored
                 denominator = compute_denominator()[0].nan_to_num(
                     nan=float('nan'), posinf=float('inf'), neginf=0)
+                new_message = Factor.normalize(numerator - denominator,
+                                               num_batch_dims=out.num_batch_dims)
                 # - and + rather than / and * since this is in log space
-                out.tensor = Factor.normalize(numerator - denominator,
-                                              num_batch_dims=out.num_batch_dims)
-        return f
+                out.tensor = new_message
+        return update_messages
 
     def run(self):
         for s, ts in self.strategy:
