@@ -46,15 +46,18 @@ class Inferencer(ABC):
         b = m / z => m = b * z
         """
         check_queries(queries)
+        factors = list(factors)
         wrapped_queries = tuple([(q,) if isinstance(q, Var) else q for q in queries])
-        return self.product_marginals_(list(factors), *wrapped_queries, normalize=normalize)
+        return self.product_marginals_(factors, *wrapped_queries, normalize=normalize)
 
     def predict(self, factors: Iterable[Factor]) -> None:
         wrapped_factors = list(factors)
         all_variables = list(set(list(v.origin for f in wrapped_factors for v in f)))
-        self.predict_(list(factors), all_variables)
+        factors = list(factors)
+        self.predict_(factors, all_variables)
 
     def predict_(self, factors: Sequence[Factor], variables: Sequence[Var]) -> None:
-        marginals = self.product_marginals_(factors, *[(v,) for v in variables])
+        queries = [(v,) for v in variables]
+        marginals = self.product_marginals_(factors, *queries)
         for marginal, variable in zip(marginals, variables):
             variable.tensor = marginal.argmax(-1)

@@ -1,3 +1,4 @@
+import logging
 from typing import Callable, Optional, Sequence
 
 import torch
@@ -14,23 +15,30 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
                       each_step: Optional[Callable[[
                           DataLoader[SubjectType], SubjectType], None]] = None,
                       each_epoch: Optional[Callable[[DataLoader[SubjectType]], None]] = None,
-                      lr=1.0) -> System[SubjectType]:
-    data_loader = examples[0].data_loader(list(examples))
+                      lr=1.0, batch_size: Optional[int] = 1) -> System[SubjectType]:
+    logging.info('loading...')
+    data_loader = examples[0].data_loader(list(examples), batch_size=batch_size)
+    logging.info('done loading.')
     system = System(model, BP())
     system.prime(data_loader)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    logging.info('staring training...')
     for _ in range(iterations):
         data: SubjectType
         for data in data_loader:
+            logging.info('zeroing grad...')
             optimizer.zero_grad()
-            print('starting...')
+            logging.info('clamped inference...')
             logz_clamped = system.product_marginal(data.clamp_annotated_())
-            print('\t', logz_clamped)
+            logging.info(('\t', logz_clamped))
+            logging.info('unclamped inference...')
             logz_free = system.product_marginal(data.unclamp_annotated_())
-            print('\t', logz_free)
+            logging.info(('\t', logz_free))
             loss = (logz_free - logz_clamped).sum()
-            print(loss)
+            logging.info(loss)
+            logging.info('computing gradient...')
             loss.backward()
+            logging.info('updating...')
             optimizer.step()
             if each_step is not None:
                 each_step(data_loader, data)

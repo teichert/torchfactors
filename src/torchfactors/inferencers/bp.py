@@ -4,6 +4,7 @@ from functools import lru_cache
 from typing import Callable, Dict, List, Sequence, Tuple, Union
 
 import torch
+from tqdm import tqdm  # type: ignore
 
 from ..components.tensor_factor import TensorFactor
 from ..factor import Factor
@@ -138,7 +139,7 @@ class BPInference:
         return update_messages
 
     def run(self):
-        for s, ts in self.strategy:
+        for s, ts in tqdm(self.strategy):
             self.update_messages_from_regionf(s, tuple(ts))()
 
 

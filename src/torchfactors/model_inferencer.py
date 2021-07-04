@@ -47,7 +47,9 @@ class System(Generic[SubjectType]):
         r"""
         convenience method for a single product_marginal query
         """
-        return self.inferencer.product_marginal(self.model(x), query, normalize=normalize)
+        factors = self.model(x)
+        out = self.inferencer.product_marginal(factors, query, normalize=normalize)
+        return out
 
     def product_marginals(self, x: SubjectType,
                           *queries: Union[Var, Sequence[Var]],
@@ -64,5 +66,6 @@ class System(Generic[SubjectType]):
         so I get the unnormalized back by multiplying by Z:
         b = m / z => m = b * z
         """
-        return self.inferencer.product_marginals(self.model(x), *queries,
-                                                 normalize=normalize)
+        factors = self.model(x)
+        out = self.inferencer.product_marginals(factors, *queries, normalize=normalize)
+        return out

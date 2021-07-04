@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from .components.linear_factor import LinearFactor
@@ -16,6 +17,8 @@ from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
 from .utils import ndarange
 from .variable import TensorVar, Var, VarBranch, VarField, VarUsage, vtensor
+
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 
 PADDING = VarUsage.PADDING
 LATENT = VarUsage.LATENT

@@ -116,9 +116,10 @@ class Strategy(object):
     regions: List[Region]
     edges: List[Tuple[int, int]]
 
-    def __iter__(self) -> Iterator[Tuple[int, Tuple[int, ...]]]:
+    def __iter__(self) -> Iterator[Tuple[int, List[int]]]:
         # naive default for now is to pass everything twice
-        schedule = [(s, (t,)) for s, t in self.edges]
+        # schedule = [(s, (t,)) for s, t in self.edges]
+        schedule = [(s, self.outfrom[s]) for s in range(len(self.regions)) if self.outfrom[s]]
         return iter(chain(schedule, schedule))
 
     def __post_init__(self):

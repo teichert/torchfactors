@@ -4,12 +4,12 @@ import math
 from abc import abstractmethod
 from functools import cached_property
 from typing import (Callable, Dict, Iterator, List, Optional, Sequence, Tuple,
-                    Union, cast)
+                    Union)
 
 import torch
 from torch import Tensor
 
-from .einsum import log_dot
+from .einsum import _log_dot
 from .types import ShapeType
 from .utils import outer
 from .variable import Var
@@ -370,18 +370,18 @@ class Factor:
         # self.num_batch_dims
         canonical_variables: Dict[Var, Var] = {}
 
-        def vars_ids(variables: Sequence[Var]) -> List[object]:
+        def vars_ids(variables: Sequence[Var]) -> List[int]:
             # num_batch_dims = len(variables[0].shape) - len(variables)
-            return cast(List[object], [
+            return [
                 *range(self.num_batch_dims),
                 # make sure to recognize when two variables are the same
-                *[canonical_variables.setdefault(v, v) for v in variables]])
+                *[id(canonical_variables.setdefault(v, v)) for v in variables]]
 
-        def factor_with_ids(factor: Factor) -> Tuple[Tensor, List[object]]:
+        def factor_with_ids(factor: Factor) -> Tuple[Tensor, List[int]]:
             ids = vars_ids(factor.variables)
             return factor.dense, ids
 
-        query_lists: List[List[object]] = [vars_ids(query) for query in queries]
+        query_lists: List[List[int]] = [vars_ids(query) for query in queries]
 
         def compute_marginals() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make
@@ -391,9 +391,9 @@ class Factor:
             # input_tensors = [self.dense] + [f.dense
             #                                 for f in other_factors]
             # return log_einsum(equation, *input_tensors)
-            tensors = [factor_with_ids(factor) for factor in [self, *other_factors]]
-            out = log_dot(tensors, *query_lists, force_multi=True)
-            return cast(List[Tensor], out)
+            tensors, names = zip(*[factor_with_ids(factor) for factor in [self, *other_factors]])
+            out = _log_dot(list(tensors), list(names), query_lists)
+            return out
             # return log_einsum(input_tensors, *input_tensors)
         return compute_marginals
 
