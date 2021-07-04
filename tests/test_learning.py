@@ -39,3 +39,6 @@ def test_learning():
     assert num_counted == iters
     out = system.predict(MySubject.stack(examples))
     assert out.v.flatten().tolist() == [1, 1]
+
+
+test_learning()

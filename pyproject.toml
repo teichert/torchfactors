@@ -17,6 +17,7 @@ torch-semiring-einsum = "^1.0.0"
 opt-einsum = "^3.3.0"
 pandas = "1.2.5"
 torchmetrics = "^0.4.0"
+tqdm = "^4.61.1"
 
 
 [tool.poetry.dev-dependencies]

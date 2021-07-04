@@ -48,3 +48,13 @@ profile: pyproject.lock
 .PHONY: doc
 doc: pyproject.lock
 	poetry run python -m pdoc -o ./docs src
+
+
+examples/spr/protoroles_eng_ud1.2_11082016.tsv:
+	mkdir -p examples/spr
+	cd examples/spr; wget http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
+	cd examples/spr; tar xvf protoroles_eng_udewt.tar.gz
+
+.PHONY: spr-example
+spr-example: examples/spr/protoroles_eng_ud1.2_11082016.tsv pyproject.lock
+	poetry run python examples/spr/spr.py examples/spr/protoroles_eng_ud1.2_11082016.tsv
