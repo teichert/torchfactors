@@ -5,6 +5,20 @@ check:
 .PHONY: install
 install: pyproject.lock
 
+.PHONY: install-python
+install-python:
+	wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+	~/bin/micromamba shell init -s bash -p ~/micromamba
+	echo "micromamba activate"
+	source ~/.bashrc
+	micromamba install python=3.9
+
+.PHONY: install-poetry
+install-poetry:
+	python -m pip install --user -U pipx
+	python -m pipx ensurepath
+	python -m pipx install poetry
+
 pyproject.lock: pyproject.toml
 	poetry update
 	poetry install --remove-untracked
