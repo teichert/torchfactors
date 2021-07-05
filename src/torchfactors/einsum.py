@@ -1,7 +1,7 @@
 
 import warnings
 from functools import singledispatch
-from typing import Dict, Hashable, List, Sequence, Tuple, Union
+from typing import Dict, Hashable, Iterable, List, Sequence, Tuple, Union
 
 import torch
 import torch_semiring_einsum as tse  # type: ignore
@@ -104,6 +104,10 @@ def log_einsum2(
             tse.utils.add_in_place)
 
     return tse.semiring_einsum_forward(equation, args, block_size, callback)
+
+
+def ids(values: Iterable[object]) -> List[int]:
+    return list(map(id, values))
 
 
 def log_dot(tensors: List[Tuple[Tensor, List[int]]],

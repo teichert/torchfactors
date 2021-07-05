@@ -81,8 +81,8 @@ def test_log_dot():
         [2+8+5, 4+16+20, 6+20+25, 16+12+15]
     ]).float()
     log_out, = tx.log_dot(
-        [(ab.log(), list(map(id, 'ab'))),
-         (bc.log(), list(map(id, 'bc')))],
-        [list(map(id, 'ac'))])
+        [(ab.log(), tx.ids('ab')),
+         (bc.log(), tx.ids('bc'))],
+        [tx.ids('ac')])
     out = log_out.exp()
     assert out.allclose(ac_expected)

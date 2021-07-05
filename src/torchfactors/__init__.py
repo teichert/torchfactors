@@ -7,7 +7,7 @@ from . import learning
 from .components.linear_factor import LinearFactor
 from .components.tensor_factor import TensorFactor
 from .domain import Domain, FlexDomain, Range, SeqDomain
-from .einsum import log_dot
+from .einsum import ids, log_dot
 from .factor import Factor
 from .factor_graph import FactorGraph
 from .inferencer import Inferencer
@@ -46,5 +46,5 @@ __all__ = [
     'Inferencer',
     'System',
     'BP',
-    'learning', 'log_dot'
+    'learning', 'log_dot', 'ids'
 ]
