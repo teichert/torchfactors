@@ -15,7 +15,7 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
                       each_step: Optional[Callable[[
                           DataLoader[SubjectType], SubjectType], None]] = None,
                       each_epoch: Optional[Callable[[DataLoader[SubjectType]], None]] = None,
-                      lr=1.0, batch_size: Optional[int] = 1) -> System[SubjectType]:
+                      lr=1.0, batch_size: int = -1) -> System[SubjectType]:
     logging.info('loading...')
     data_loader = examples[0].data_loader(list(examples), batch_size=batch_size)
     logging.info('done loading.')

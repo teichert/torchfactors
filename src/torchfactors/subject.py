@@ -157,10 +157,12 @@ class Subject:
 
     @staticmethod
     def data_loader(data: Union[List[ExampleType], Dataset[ExampleType]],
-                    batch_size: int | None = 1,
+                    batch_size: int = -1,
                     **kwargs) -> DataLoader[ExampleType]:
         if not isinstance(data, Dataset):
             data = ListDataset(data)
+        if batch_size == -1:
+            batch_size = len(data)
         return DataLoader(cast(Dataset, data), collate_fn=Subject.stack, batch_size=batch_size,
                           **kwargs)
         # def shapes(self):
