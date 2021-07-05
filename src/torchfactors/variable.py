@@ -106,15 +106,16 @@ class Var(ABC):
         return Size([*self.tensor.shape, len(self.domain)])
 
     def set_tensor(self, value: Tensorable) -> None:
+        self.clear_cache()
         self._set_tensor(value)
 
     @property
     def tensor(self) -> Tensor:
+        self.clear_cache()
         return self._get_tensor()
 
     @tensor.setter
     def tensor(self, value: Any) -> None:
-        self.clear_cache()
         self.set_tensor(cast(Tensorable, value))
 
     # # @property
@@ -170,6 +171,7 @@ class Var(ABC):
 
     @property
     def usage(self) -> Tensor:
+        self.clear_cache()
         out = self._get_usage()
         if isinstance(out, VarUsage):
             out = torch.full_like(self.tensor, out, dtype=torch.int8)
@@ -236,11 +238,9 @@ class Var(ABC):
     #     # return self._get_original_tensor()
 
     def clamp_annotated(self) -> None:
-        self.__cached_possible = None
         self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
 
     def unclamp_annotated(self) -> None:
-        self.__cached_possible = None
         self.usage[self.usage == VarUsage.CLAMPED] = VarUsage.ANNOTATED
 
     @abstractmethod
