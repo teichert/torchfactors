@@ -23,74 +23,62 @@ from dataclasses import dataclass
 ### Describe the "Subject" of the Model
 <!--pytest-codeblocks:cont-->
 ```python
-# @dataclass
-# class TrueCaseSubject:
-#     lower_cased: torch.Tensor  # TensorType["example": ..., "character", int]
-#     hidden: torch.Tensor  # TensorType["example": ..., "character", int]
-#     is_upper: torch.Tensor  # TensorType["example": ..., "character", bool]
+@dataclass
+class Bits(tx.Subject):
+    bits: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED)
+    hidden: tx.Var = tx.VarField(tx.Range(10), tx.LATENT, shape=bits)
 
-#     @staticmethod
-#     def make(input: str):
-#         padded = [-1, *[ord(ch) for ch in sentence.lower()], -1]
-#         return TrueCaseSubject(
-#             lower_cased=torch.tensor(padded),
-#             hidden=torch.zeros(len(padded)),
-#             is_upper=torch.tensor([False, *[ch.isupper() for ch in sentence], False]))
-    
-#     def apply(self, upper):
-#         chars = [chr(ch) for ch in self.lower_cased[1:-2]]
-#         return ''.join(ch.uppder() if ui else ch for ch, ui in zip(chars, upper))
 ```
 
 ### Specify the Variables and Factors
-Here is one way (there is also a decorator verison that saves a little typing):
+
 <!--pytest-codeblocks:cont-->
 ```python
 
-# class TrueCaseModel(tx.Model)
-#     def factors(data):
-#         hidden = tfs.Variable(data.hidden, tfs.Integer(5), tfs.LATENT)
-#         is_upper = tfs.Variable(data.is_upper, tfs.Boolean)
-#         for i in range(0, len(data.is_upper)):
-#             # current character is used to predict current state
-#             yield tfs.LinearFactor(
-#                 [hidden[...,]],
-#                 torch.nn.functional.one_hot(data.lower_cased[...,i]),
-#                 model.params('hidden'))
-#             # ... along with the next hidden state
-#             yield tfs.LinearFactor(
-#                 [hidden[...,i-1], hidden[...,i]],
-#                 torch.tensor(1),
-#                 model.params('transition'))
-#             if i > 0:
-#                 # ... current state predicts label
-#                 yield tfs.LinearFactor(
-#                     [hidden[...,i], is_upper[...,i]],
-#                     model.params('emmission'))
+class BitsModel(tx.Model[TrueCaseSubject]):
+    def factors(x: Bits):
+        length = x.hidden.shape[-1]
+        yield tx.LinearFactor(self.namespace('start'), x.hidden[..., 0])
+        yield tx.LinearFactor(self.namespace('end'), x.hidden[..., -1])
+        for i in range(length):
+            yield tx.LinearFactor(self.namespace('emission'), x.hidden[..., i], x.bits[..., i])
+            if i > 0:
+                yield tx.LinearFactor(self.namespace('transition'), x.hidden[..., i - 1], x.hidden[..., i])
 ```
 
-### Load Data, Train, and Use the Model
+### Load Data
 <!--pytest-codeblocks:cont-->
 ```python
 
-# with open(__file__) as f:
-#     code = list(TrueCaseSubject.make(line) for line in f.readlines())
+bit_sequences = [
+    [True, False, False, True],
+    [False, False, True, True],
+    [True, True, False, False],
+    [True, True, False, False, True],
+    [True, False, False, True, True],
+    [False, False, True, True, False, False],
+]
 
-# train = code[:len(code)//2]
-# val = code[len(code)//2:]
+data = [Bits(tx.vtensor(bits)) for bits in bit_sequences]
+```
 
-# optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+### Train a Model
+<!--pytest-codeblocks:cont-->
+```python
 
-# # train
-# for _ in range(100):
-#     for x in train:
-#         optimizer.zero_grad()
-#         factor_graph = model(x)
-#         partition_free, = log_einsum(factor_graph, [()])
-#         partition_gold, = log_einsum(factor_graph, [()], clamp=tfs.OBSERVED)
-#         loss = partition_gold - partition_free
-#         loss.backward()
-#         optimizer.step()
+system = tx.System(BitsModel(), tx.BP())
+system.prime(data)
+
+# train
+for _ in range(10):
+    for x in data:
+        optimizer.zero_grad()
+        system.marginal
+        partition_free, = log_einsum(factor_graph, [()])
+        partition_gold, = log_einsum(factor_graph, [()], clamp=tfs.OBSERVED)
+        loss = partition_gold - partition_free
+        loss.backward()
+        optimizer.step()
 
 # # test
 # for x in val:
