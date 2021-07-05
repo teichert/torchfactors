@@ -47,7 +47,9 @@ class System(Generic[SubjectType]):
         r"""
         convenience method for a single product_marginal query
         """
-        return self.inferencer.product_marginal(self.model(x), query, normalize=normalize)
+        factors = self.model(x)
+        marginal = self.inferencer.product_marginal(factors, query, normalize=normalize)
+        return marginal
 
     def product_marginals(self, x: SubjectType,
                           *queries: Union[Var, Sequence[Var]],

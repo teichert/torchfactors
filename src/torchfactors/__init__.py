@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from . import learning
 from .components.linear_factor import LinearFactor
 from .components.tensor_factor import TensorFactor
 from .domain import Domain, FlexDomain, Range, SeqDomain
@@ -15,7 +16,7 @@ from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
 from .utils import ndarange
-from .variable import TensorVar, Var, VarBranch, VarField, VarUsage, vtensor
+from .variable import TensorVar, Var, VarField, VarUsage, vtensor
 
 logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 
@@ -44,4 +45,5 @@ __all__ = [
     'Inferencer',
     'System',
     'BP',
+    'learning'
 ]

@@ -30,8 +30,6 @@ bit_sequences = [
     [True, False, True],
     [True, False, True, False],
     [False, True],
-    [False],
-    [True],
 ]
 
 data = [Bits(tx.vtensor(bits)) for bits in bit_sequences]
@@ -62,3 +60,9 @@ held_out = Bits(tx.vtensor([False] * 10))
 held_out.bits.usage[1] = tx.OBSERVED
 predicted = system.predict(held_out)
 logging.info(predicted.bits.tensor.tolist())
+
+
+# alternative training
+system2 = tx.learning.example_fit_model(BitsModel(), data, iterations=5, lr=1.0)
+predicted2 = system2.predict(held_out)
+logging.info(predicted2.bits.tensor.tolist())
