@@ -4,6 +4,7 @@ from functools import lru_cache
 from typing import Callable, Dict, List, Sequence, Tuple, Union
 
 import torch
+from torch.functional import Tensor
 
 from ..components.tensor_factor import TensorFactor
 from ..factor import Factor
@@ -24,12 +25,20 @@ class BPInference:
         # variables of the target after excluding those of the source
         #
         self.messages: Dict[Tuple[int, int], TensorFactor] = {}
+        self.messages_changes: Dict[TensorFactor, Tensor] = {}
         # these will be the queryf functions
         # self.message_functions: List[Callable[[Sequence[Factor]], Sequence[Factor]]] = []
         # self.update_message_functions: List[Callable[[], None]] = []
         # self.message_outputs: List[List[TensorFactor]] = []
         # self.message_inputs: List[List[Factor]] = []
         # )]
+
+    def amount_changed(self, old: Tensor, new: Tensor) -> Tensor:
+        return torch.nn.functional.kl_div(old.nan_to_num(), new.nan_to_num(),
+                                          log_target=True, reduction='batchmean')
+
+    def total_amount_changed(self):
+        return torch.stack(tuple(self.messages_changes.values()), 0).sum(dim=0)
 
     def logz(self) -> torch.Tensor:
         region_free_energies = []
@@ -132,8 +141,11 @@ class BPInference:
                 denominator = compute_denominator()[0].nan_to_num(
                     nan=float('nan'), posinf=float('inf'), neginf=0)
                 # - and + rather than / and * since this is in log space
-                out.tensor = Factor.normalize(numerator - denominator,
-                                              num_batch_dims=out.num_batch_dims)
+                updated = Factor.normalize(numerator - denominator,
+                                           num_batch_dims=out.num_batch_dims)
+                change = -self.amount_changed(out.tensor, updated)
+                self.messages_changes[out] = change
+                out.tensor = updated
         return f
 
     def run(self):
@@ -143,14 +155,17 @@ class BPInference:
 
 class BP(Inferencer):
 
-    def __init__(self, strategy: Callable[[FactorGraph], Strategy] = BetheGraph):
+    def __init__(self, strategy: Callable[[FactorGraph, int], Strategy] = BetheGraph,
+                 passes: int = 3):
         self.strategy_factory = strategy
+        self.passes = passes
 
     # TODO: handle queries that are not in the graph
     def product_marginals_(self, factors: Sequence[Factor], *queries: Sequence[Var],
-                           normalize=True) -> Sequence[torch.Tensor]:
+                           normalize: bool = True, append_total_change: bool = False
+                           ) -> Sequence[torch.Tensor]:
         fg = FactorGraph(factors)
-        strategy = self.strategy_factory(fg)
+        strategy = self.strategy_factory(fg, self.passes)
         bp = BPInference(fg, strategy)
         bp.run()
         if () in queries or not normalize:
@@ -164,4 +179,6 @@ class BP(Inferencer):
                 if not normalize:
                     belief = belief + logz
                 responses.append(belief)
+        if append_total_change:
+            responses.append(bp.total_amount_changed())
         return responses

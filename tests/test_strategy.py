@@ -52,13 +52,14 @@ def test_strategy_schedule():
     fg = FactorGraph(factors)
     bg = BetheGraph(fg)
     schedule = list(bg)
+
     va, vb = fg.neighbors[0]
     expected_schedule = [
-        (0, (va,)),
-        (0, (vb,)),
-        (0, (va,)),
-        (0, (vb,)),
+        (0, [va, vb]),
+        (0, [va, vb]),
+        (0, [va, vb]),
     ]
+
     assert schedule == expected_schedule
     assert set(bg.reachable_from(0)) == {0, 1, 2}
     assert set(bg.reachable_from(1)) == {1}

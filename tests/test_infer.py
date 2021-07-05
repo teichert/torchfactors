@@ -109,4 +109,21 @@ def test_predict_multi():
     assert (bits.tensor == torch.tensor([True, False, False])).all()
 
 
-test_predict_multi()
+def test_bp_change():
+    bits = TensorVar(Range(2), torch.tensor([False]), ANNOTATED)
+    factors = [
+        TensorFactor(bits[..., 0], tensor=torch.tensor([0, 0.5]).log()),
+    ]
+    bp = BP()
+    _, change = bp.partition_with_change(factors)
+    assert change.sum() == 0.0
+
+
+def test_bp_change2():
+    bits = TensorVar(Range(2), torch.tensor([False]), ANNOTATED)
+    factors = [
+        TensorFactor(bits[..., 0], tensor=torch.tensor([0.25, 0.75]).log()),
+    ]
+    bp = BP(passes=1)
+    _, change = bp.partition_with_change(factors)
+    assert change.sum() > 0.0

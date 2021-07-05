@@ -1,5 +1,5 @@
 from abc import ABC, abstractclassmethod
-from typing import Iterable, Sequence, TypeVar, Union
+from typing import Iterable, Sequence, Tuple, TypeVar, Union
 
 from torch.functional import Tensor
 
@@ -12,7 +12,18 @@ T = TypeVar('T')
 class Inferencer(ABC):
     @abstractclassmethod
     def product_marginals_(self, factors: Sequence[Factor], *queries: Sequence[Var],
-                           normalize=True) -> Sequence[Tensor]: ...
+                           normalize: bool = True, append_total_change: bool = False
+                           ) -> Sequence[Tensor]: ...
+
+    def partition_with_change(self, factors: Iterable[Factor]) -> Tuple[Tensor, Tensor]:
+        r"""
+        convenience method for the log partition and the
+        total kl between the prior messages and the current messages
+        """
+        logz, total_change = self.product_marginals(factors, (),
+                                                    normalize=False,
+                                                    append_total_change=True)
+        return logz, total_change
 
     def product_marginal(self, factors: Iterable[Factor],
                          query: Union[Sequence[Var], Var, None] = None,
@@ -31,7 +42,8 @@ class Inferencer(ABC):
     def product_marginals(self,
                           factors: Iterable[Factor],
                           *queries: Union[Var, Sequence[Var]],
-                          normalize=True
+                          normalize=True,
+                          append_total_change=False,
                           ) -> Sequence[Tensor]:
         r"""
         Returns marginals corresponding to the specified queries.
@@ -47,7 +59,9 @@ class Inferencer(ABC):
         """
         check_queries(queries)
         wrapped_queries = tuple([(q,) if isinstance(q, Var) else q for q in queries])
-        return self.product_marginals_(list(factors), *wrapped_queries, normalize=normalize)
+        out = self.product_marginals_(list(factors), *wrapped_queries, normalize=normalize,
+                                      append_total_change=append_total_change)
+        return out
 
     def predict(self, factors: Iterable[Factor]) -> None:
         wrapped_factors = list(factors)
@@ -57,6 +71,7 @@ class Inferencer(ABC):
     # TODO: would be nice to have this do max-product inference rather than just independently
     # pick the max of each variable
     def predict_(self, factors: Sequence[Factor], variables: Sequence[Var]) -> None:
-        marginals = self.product_marginals_(factors, *[(v,) for v in variables])
+        queries = [(v,) for v in variables]
+        marginals = self.product_marginals_(factors, *queries)
         for marginal, variable in zip(marginals, variables):
             variable.tensor = marginal.argmax(-1)

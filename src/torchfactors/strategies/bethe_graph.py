@@ -4,7 +4,7 @@ from ..factor_graph import FactorGraph
 from ..strategy import Region, Strategy
 
 
-def BetheGraph(graph: FactorGraph) -> Strategy:
+def BetheGraph(graph: FactorGraph, passes: int = 3) -> Strategy:
     r"""
     Returns the bethe graph region graph: A region for every factor and a
         separate region for each variable. Factor regions (including variables
@@ -19,4 +19,5 @@ def BetheGraph(graph: FactorGraph) -> Strategy:
             for factor_node in graph.factor_nodes] + [
             Region(graph, (variable_node,), 1 - len(graph.neighbors[variable_node]))
             for variable_node in graph.variable_nodes],
-        edges=[(i, j) for i in range(len(graph.factor_nodes)) for j in graph.neighbors[i]])
+        edges=[(i, j) for i in range(len(graph.factor_nodes)) for j in graph.neighbors[i]],
+        passes=passes)

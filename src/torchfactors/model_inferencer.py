@@ -1,5 +1,5 @@
 import copy
-from typing import Generic, Iterable, Sequence, Union, cast
+from typing import Generic, Iterable, Sequence, Tuple, Union, cast
 
 from torch.functional import Tensor
 
@@ -38,9 +38,18 @@ class System(Generic[SubjectType]):
         the prediction of this inferencer
         """
         x = copy.deepcopy(x)
-        factors = list(self.model(x))
+        factors = self.model(x)
         self.inferencer.predict(factors)
         return x
+
+    def partition_with_change(self, x: SubjectType) -> Tuple[Tensor, Tensor]:
+        r"""
+        convenience method for the log partition and the
+        total kl between the prior messages and the current messages
+        """
+        factors = self.model(x)
+        out = self.inferencer.partition_with_change(factors)
+        return out
 
     def product_marginal(self, x: SubjectType, query: Union[Sequence[Var], Var, None] = None,
                          normalize=True) -> Tensor:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
 from itertools import chain
@@ -115,11 +116,12 @@ class Strategy(object):
     """
     regions: List[Region]
     edges: List[Tuple[int, int]]
+    passes: int = 2
 
-    def __iter__(self) -> Iterator[Tuple[int, Tuple[int, ...]]]:
+    def __iter__(self) -> Iterator[Tuple[int, List[int]]]:
         # naive default for now is to pass everything twice
-        schedule = [(s, (t,)) for s, t in self.edges]
-        return iter(chain(schedule, schedule))
+        schedule = list((s, ts) for s, ts in enumerate(self.outfrom) if ts)
+        return itertools.chain.from_iterable(itertools.repeat(schedule, self.passes))
 
     def __post_init__(self):
         self.into: List[List[int]] = [list() for _ in self.regions]

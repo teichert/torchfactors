@@ -23,22 +23,32 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
     system.prime(data_loader)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     logging.info('staring training...')
-    for _ in range(iterations):
+    for i in range(iterations):
         data: SubjectType
         for data in data_loader:
-            logging.info('zeroing grad...')
+            logging.info(f'iteration: {i}')
+            logging.info('\tzeroing grad...')
             optimizer.zero_grad()
-            logging.info('clamped inference...')
+            logging.info('\tclamped inference...')
             logz_clamped = system.product_marginal(data.clamp_annotated_())
-            logging.info(f'\tlogz_free: {logz_clamped}')
-            logging.info('unclamped inference...')
-            logz_free = system.product_marginal(data.unclamp_annotated_())
-            logging.info(f'\tlogz_free: {logz_free}')
-            loss = (logz_free - logz_clamped).sum()
-            logging.info(f'\tloss: {loss}')
-            logging.info('computing gradient...')
+            # for t in system.model(data):
+            #     logging.info('\t\t\t---')
+            #     for row in t.dense.tolist()[0]:
+            #         logging.info(f'\t\t\t{row}')
+            logging.info(f'\t\tlogz_clamped: {logz_clamped}')
+            logging.info('\tunclamped inference...')
+            logz_free, penalty = system.partition_with_change(data.unclamp_annotated_())
+            # for t in system.model(data):
+            #     logging.info('\t\t\t---')
+            #     for row in t.dense.tolist()[0]:
+            #         logging.info(f'\t\t\t{row}')
+            logging.info(f'\t\tlogz_free: {logz_free}')
+            logging.info(f'\t\tpenalty: {penalty}')
+            loss = (logz_free - logz_clamped + penalty).sum()
+            logging.info(f'\t\tloss: {loss}')
+            logging.info('\tcomputing gradient...')
             loss.backward()
-            logging.info('updating...')
+            logging.info('\tupdating...')
             optimizer.step()
             if each_step is not None:
                 each_step(data_loader, data)

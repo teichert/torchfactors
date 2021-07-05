@@ -11,6 +11,7 @@ def test_learning():
     examples = [MySubject(tx.vtensor(0)), MySubject(tx.vtensor(1))]
     examples0 = [MySubject(tx.vtensor(0)), MySubject(tx.vtensor(0))]
     examples1 = [MySubject(tx.vtensor(1)), MySubject(tx.vtensor(1))]
+    stacked_examples = MySubject.stack(examples)
 
     class MyModel(tx.Model[MySubject]):
         def factors(self, x: MySubject):
@@ -26,7 +27,7 @@ def test_learning():
     system = example_fit_model(model, examples=examples0, each_step=each_step, iterations=iters,
                                batch_size=1)
     assert num_steps == iters * len(examples0)
-    out = system.predict(MySubject.stack(examples))
+    out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [0, 0]
 
     num_counted = 0
@@ -39,10 +40,10 @@ def test_learning():
     system = example_fit_model(model, examples=examples1, each_epoch=each_epoch, iterations=iters,
                                batch_size=1)
     assert num_counted == iters
-    out = system.predict(MySubject.stack(examples))
+    out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
 
     system = example_fit_model(model, examples=examples1, each_epoch=each_epoch, iterations=iters,
                                batch_size=-1)
-    out = system.predict(MySubject.stack(examples))
+    out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
