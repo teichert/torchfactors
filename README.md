@@ -11,80 +11,72 @@ python -m pip install git+ssh://git@github.com/teichert/torchfactors
 
 ## Basic Usage
 
-### Imports
 
 ```python
+import logging
+from dataclasses import dataclass
+
 import torch
 import torchfactors as tx
 
-from dataclasses import dataclass
-```
 
-### Describe the "Subject" of the Model
-<!--pytest-codeblocks:cont-->
-```python
+# Describe the "Subject" of the Model
 @dataclass
 class Bits(tx.Subject):
     bits: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED)
-    hidden: tx.Var = tx.VarField(tx.Range(10), tx.LATENT, shape=bits)
 
-```
 
-### Specify the Variables and Factors
-
-<!--pytest-codeblocks:cont-->
-```python
-
-class BitsModel(tx.Model[TrueCaseSubject]):
-    def factors(x: Bits):
-        length = x.hidden.shape[-1]
-        yield tx.LinearFactor(self.namespace('start'), x.hidden[..., 0])
-        yield tx.LinearFactor(self.namespace('end'), x.hidden[..., -1])
+# Specify the Variables and Factors
+class BitsModel(tx.Model[Bits]):
+    def factors(self, x: Bits):
+        length = x.bits.shape[-1]
         for i in range(length):
-            yield tx.LinearFactor(self.namespace('emission'), x.hidden[..., i], x.bits[..., i])
             if i > 0:
-                yield tx.LinearFactor(self.namespace('transition'), x.hidden[..., i - 1], x.hidden[..., i])
-```
+                yield tx.LinearFactor(self.namespace('transition'),
+                                      x.bits[..., i - 1], x.bits[..., i])
 
-### Load Data
-<!--pytest-codeblocks:cont-->
-```python
 
+# Load Data
 bit_sequences = [
-    [True, False, False, True],
-    [False, False, True, True],
-    [True, True, False, False],
-    [True, True, False, False, True],
-    [True, False, False, True, True],
-    [False, False, True, True, False, False],
+    [True, False, True, False],
+    [True, False, True, False, True],
+    [True, False],
+    [False, True, False],
+    [True, False, True],
+    [True, False, True, False],
+    [False, True],
+    [False],
+    [True],
 ]
 
 data = [Bits(tx.vtensor(bits)) for bits in bit_sequences]
-```
 
-### Train a Model
-<!--pytest-codeblocks:cont-->
-```python
+train_data = Bits.stack(data)
 
+# Build a System and Train the Model
 system = tx.System(BitsModel(), tx.BP())
 system.prime(data)
 
-# train
-for _ in range(10):
-    for x in data:
-        optimizer.zero_grad()
-        system.marginal
-        partition_free, = log_einsum(factor_graph, [()])
-        partition_gold, = log_einsum(factor_graph, [()], clamp=tfs.OBSERVED)
-        loss = partition_gold - partition_free
-        loss.backward()
-        optimizer.step()
+optimizer = torch.optim.Adam(system.model.parameters(), lr=1.0)
 
-# # test
-# for x in val:
-#     factor_graph = model(s)
-#     out = tx.log_einsum(factor_graph, [x.is_upper])
-#     print(x.case(torch.argmax(out, -1)))
+
+# train
+for i in range(5):
+    optimizer.zero_grad()
+    system.product_marginal(train_data)
+    partition_gold = system.product_marginal(train_data.clamp_annotated_()).sum()
+    partition_free = system.product_marginal(train_data.unclamp_annotated_()).sum()
+    loss = partition_free - partition_gold
+    loss.backward()
+    optimizer.step()
+
+    logging.info(f'iteration: {i}, loss: {loss} = {partition_free} - {partition_gold}')
+
+# use the model on held out data
+held_out = Bits(tx.vtensor([False] * 10))
+held_out.bits.usage[1] = tx.OBSERVED
+predicted = system.predict(held_out)
+logging.info(predicted.bits.tensor.tolist())
 
 ```
 
