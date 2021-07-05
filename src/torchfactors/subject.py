@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field, fields
-from typing import (Dict, FrozenSet, Generic, List, Sequence, TypeVar, Union,
-                    cast)
+from typing import (Dict, FrozenSet, Generic, List, Sequence, Sized, TypeVar,
+                    Union, cast)
 
 from torch.utils.data import DataLoader, Dataset
 
@@ -162,7 +162,7 @@ class Subject:
         if not isinstance(data, Dataset):
             data = ListDataset(data)
         if batch_size == -1:
-            batch_size = len(data)
+            batch_size = len(cast(Sized, data))
         return DataLoader(cast(Dataset, data), collate_fn=Subject.stack, batch_size=batch_size,
                           **kwargs)
         # def shapes(self):

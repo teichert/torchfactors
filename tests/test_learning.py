@@ -23,7 +23,8 @@ def test_learning():
         nonlocal num_steps
         num_steps += 1
     iters = 5
-    system = example_fit_model(model, examples=examples0, each_step=each_step, iterations=iters)
+    system = example_fit_model(model, examples=examples0, each_step=each_step, iterations=iters,
+                               batch_size=1)
     assert num_steps == iters * len(examples0)
     out = system.predict(MySubject.stack(examples))
     assert out.v.flatten().tolist() == [0, 0]
@@ -35,10 +36,13 @@ def test_learning():
         num_counted += 1
     iters = 5
 
-    system = example_fit_model(model, examples=examples1, each_epoch=each_epoch, iterations=iters)
+    system = example_fit_model(model, examples=examples1, each_epoch=each_epoch, iterations=iters,
+                               batch_size=1)
     assert num_counted == iters
     out = system.predict(MySubject.stack(examples))
     assert out.v.flatten().tolist() == [1, 1]
 
-
-test_learning()
+    system = example_fit_model(model, examples=examples1, each_epoch=each_epoch, iterations=iters,
+                               batch_size=-1)
+    out = system.predict(MySubject.stack(examples))
+    assert out.v.flatten().tolist() == [1, 1]
