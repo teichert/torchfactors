@@ -1,4 +1,5 @@
 
+import warnings
 from functools import singledispatch
 from typing import Dict, Hashable, List, Sequence, Tuple, Union
 
@@ -104,6 +105,41 @@ def log_einsum2(
 
     return tse.semiring_einsum_forward(equation, args, block_size, callback)
 
+
+def log_dot(tensors: List[Tuple[Tensor, List[int]]],
+            queries: List[List[int]]) -> List[Tensor]:
+    """
+    Carries out a generalized tensor dot product across multiple named
+    tensors.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        return _log_dot(tensors, queries)
+
+
+def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
+             queries: List[List[int]]) -> List[Tensor]:
+    """
+    see log_dot which squelches warning about named tensors
+    """
+    def make_names(ids: List[int]) -> List[str]:
+        return [f'v{i}' for i in ids]
+    named = [t.rename(*make_names(names)) for t, names in tensors]
+    all_names, all_shapes = list(zip(*set((name, shape) for t in named
+                                          for name, shape in zip(t.names, t.shape))))
+
+    aligned = [t.align_to(*all_names).expand(*all_shapes).rename(None) for t in named]
+    stacked = torch.stack(aligned, dim=0)
+    # "multiply" across tensors
+    product = torch.sum(stacked, dim=0).nan_to_num().rename(*all_names)
+
+    names_set = set(all_names)
+    named_queries = list(map(make_names, queries))
+    # "sum" over dimensions not in the query
+    answers = [
+        product.logsumexp(dim=list(names_set.difference(q))).align_to(*q).rename(None)
+        for q in named_queries]
+    return answers
 
 # # def log_expectation_exp_einsum2(
 # #         equation: tse.equation.Equation,
