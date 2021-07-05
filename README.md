@@ -3,6 +3,9 @@ differentiable generalized belief propagation with pytorch
 
 # Getting Started
 
+## Prereqs
+- Python `>= 3.8` (if you have `make` and checkout the repo, you can use `make install-python`)
+
 ## Install
 <!--pytest-codeblocks:skip-->
 ```bash
@@ -83,6 +86,12 @@ logging.info(predicted.bits.tensor.tolist())
 # Contributing
 ## Development with `poetry`
 Prereq: install [poetry](https://python-poetry.org/docs/#installation):
+
+### Option 1
+`make install-poetry` will install `poetry` via `pipx`
+
+
+### Option 2
 
 <!--pytest-codeblocks:skip-->
 ```bash
