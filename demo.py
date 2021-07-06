@@ -36,9 +36,9 @@ def unigram():
         optimizer = torch.optim.Adam(model.parameters(), lr=1.0)
         for i in range(100):
             optimizer.zero_grad()
-            x.unclamp_annotated_()
+            x.unclamp_annotated()
             logz_free = system.product_marginal(x)
-            x.clamp_annotated_()
+            x.clamp_annotated()
             logz_clamped = system.product_marginal(x)
             loss = (logz_free - logz_clamped).sum()
             print(loss)

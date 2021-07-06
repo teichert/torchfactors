@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from abc import abstractmethod
 from functools import cached_property
-from typing import Callable, Iterator, List, Optional, Sequence, Union
+from typing import Callable, Iterator, Optional, Sequence, Union
 
 import torch
 from torch import Tensor
@@ -22,6 +22,12 @@ def check_queries(queries: Sequence[Union[Var, Sequence[Var]]]):
                          "or if you want to just get the partition function.")
 
 # @dataclass
+
+
+def uncache(factors: Sequence[Factor]):
+    for f in factors:
+        f.clear_cache()
+    return factors
 
 
 class Factor:
@@ -58,18 +64,23 @@ class Factor:
         #     self._usage_equation = self.__vars_equation(
         #         [(v,) for v in self.variables],
         #         [self.variables])
-        self.versions: List[int] = []
-        self.update_versions()
+        # self.versions: List[int] = []
+        # self.update_versions()
 
-    def update_versions(self):
-        self.versions = self.variable_versions()
+    # def update_versions(self):
+    #     self.versions = self.variable_versions()
 
-    def variable_versions(self):
-        return [v.version for v in self.variables]
+    # def variable_versions(self):
+    #     return [v.version for v in self.variables]
 
-    @property
-    def _is_stale(self):
-        return self.variable_versions() != self.versions
+    # @property
+    # def _is_stale(self):
+    #     return self.variable_versions() != self.versions
+
+    def clear_cache(self):
+        self.cached = None
+        for v in self.variables:
+            v.clear_cache()
 
     def __iter__(self) -> Iterator[Var]:
         return iter(self.variables)
@@ -212,7 +223,7 @@ class Factor:
         the factor and dimensions should correspond to the variables in the same
         order as given by the factor).
         """
-        if not self._is_stale and self.cached is not None:
+        if self.cached is not None:
             return self.cached
         d = self.dense_()
 
@@ -230,7 +241,7 @@ class Factor:
             self._is_possible,
             torch.full_like(d, float('-inf'))
         )
-        self.update_versions()
+        # self.update_versions()
         return self.cached
         # masks = [v.usage_mask for v in self.variables]
         # maksed: Tensor = log_einsum(self._usage_equation, d, *masks)[0]

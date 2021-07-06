@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import IntEnum
+from functools import cached_property
 from typing import (Any, Callable, List, Optional, Sequence, Union, cast,
                     overload)
 
@@ -92,10 +93,8 @@ class Var(ABC):
        those could, in principle, be accessible via the resulting factor graph.
     """
 
-    def __init__(self):
-        self.version = 0
-        self.__cached_possible: Optional[Tensor] = None
-        self.__cached_padding: Optional[Tensor] = None
+    # def __init__(self):
+    # self.version = 0
 
     @property
     def shape(self) -> Size:
@@ -105,16 +104,32 @@ class Var(ABC):
     def marginal_shape(self) -> Size:
         return Size([*self.tensor.shape, len(self.domain)])
 
+    @property
+    def read_only(self) -> bool:
+        return self.origin._read_only()
+
+    def maybe_read_only(self, t: Tensor) -> Tensor:
+        if self.read_only:
+            read_only = t.as_subclass(ReadOnlyView)  # type: ignore
+            return read_only
+        else:
+            return t
+
+    def assert_writeable(self):
+        if self.read_only:
+            raise TypeError("tensor and usage are read-only after caching possible or padding")
+
     def set_tensor(self, value: Tensorable) -> None:
-        self.clear_cache()
+        self.assert_writeable()
         self._set_tensor(value)
+
+    def clear_cache(self):
+        self.origin._clear_cache()
 
     @property
     def tensor(self) -> Tensor:
-        # self.clear_cache()
         t = self._get_tensor()
-        read_only = t.as_subclass(ReadOnlyView)  # type: ignore
-        return read_only
+        return self.maybe_read_only(t)
 
     @tensor.setter
     def tensor(self, value: Any) -> None:
@@ -168,53 +183,48 @@ class Var(ABC):
         return self._get_origin()
 
     def set_usage(self, value: Union[Tensor, VarUsage]) -> None:
-        self.clear_cache()
+        self.assert_writeable()
         self._set_usage(value)
 
     @property
     def usage(self) -> Tensor:
-        self.clear_cache()
-        out = self._get_usage()
-        if isinstance(out, VarUsage):
-            out = torch.full_like(self.tensor, out, dtype=torch.int8)
-            self.usage = out
-            # raise TypeError(
-            #     "your variable needs tensor before you can access the tensor-based usage!")
+        usage = self._get_usage()
+        if isinstance(usage, VarUsage):
+            usage = torch.full_like(self.tensor, usage, dtype=torch.int8)
+            self.usage = usage
+        out = self.maybe_read_only(usage)
         return out
 
     @usage.setter
     def usage(self, value: Any) -> None:
         self.set_usage(cast(Union[Tensor, VarUsage], value))
 
-    @abstractmethod
-    def _get_original_tensor(self) -> Tensor: ...
+    # @abstractmethod
+    # def _get_original_tensor(self) -> Tensor: ...
 
-    @property
-    def original_tensor(self) -> Tensor:
-        return self._get_original_tensor()
+    # @property
+    # def original_tensor(self) -> Tensor:
+    #     return self._get_original_tensor()
 
-    def clear_cache(self):
-        self.version += 1
-        self.__cached_padding = None
-        self.__cached_possible = None
+    # def clear_cache(self):
+    #     self.version += 1
+    #     self.__cached_padding = None
+    #     self.__cached_possible = None
+
+    @cached_property
+    def _out_slice(self) -> NDSlice:
+        out = ndslices_cat(self.ndslice, slice(None))
+        return out
 
     @property
     def is_padding(self) -> Tensor:
-        if self.__cached_padding is None:
-            self.__cached_padding = (
-                self.usage == VarUsage.PADDING)[..., None].expand(self.marginal_shape)
-        return self.__cached_padding
+        padding = self.origin._is_padding()
+        return padding[self._out_slice]
 
     @property
     def is_possible(self) -> Tensor:
-        if self.__cached_possible is None:
-            one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
-            is_fixed = (
-                (self.usage == VarUsage.PADDING).logical_or
-                (self.usage == VarUsage.OBSERVED).logical_or
-                (self.usage == VarUsage.CLAMPED))[..., None].expand_as(one_hot)
-            self.__cached_possible = one_hot.where(is_fixed, torch.ones_like(one_hot)) != 0
-        return self.__cached_possible
+        possible = self.origin._is_possible()
+        return possible[self._out_slice]
 
     # @property
     # def usage_mask(self) -> Tensor:
@@ -239,6 +249,13 @@ class Var(ABC):
     #         torch.ones_like(one_hot)).log()
     #     # return self._get_original_tensor()
 
+    def clone(self) -> Var:
+        return TensorVar(
+            domain=self.domain,
+            usage=self.usage.clone(),
+            tensor=self.tensor.clone().as_subclass(torch.Tensor),  # type: ignore
+        )
+
     def clamp_annotated(self) -> None:
         self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
 
@@ -257,8 +274,8 @@ class Var(ABC):
 
     # TODO: make an ndrange which can be hashed and use that instead
     def hash_key(self):
-        return (id(self.origin),
-                as_ndrange(self.ndslice, self.original_tensor.shape))
+        return (id(self.origin._tensor),
+                as_ndrange(self.ndslice, self.origin.tensor.shape))
 
     def __hash__(self) -> int:
         return hash(self.hash_key())
@@ -285,7 +302,6 @@ class VarBranch(Var):
     """
 
     def __init__(self, root: TensorVar, ndslice: NDSlice):
-        super().__init__()
         self.root = root
         self.__ndslice = ndslice
 
@@ -312,8 +328,8 @@ class VarBranch(Var):
     def _get_domain(self) -> Domain:
         return self.root.domain
 
-    def _get_original_tensor(self) -> Tensor:
-        return self.root.tensor
+    # def _get_original_tensor(self) -> Tensor:
+    #     return self.root.tensor
 
     def _get_ndslice(self) -> NDSlice:
         return self.__ndslice
@@ -332,7 +348,6 @@ class VarField(Var):
                   shape: Union[Var, ShapeType, None] = None,
                   init: Callable[[ShapeType], Tensor] = torch.zeros,
                   info: typing_extensions._AnnotatedAlias = None):
-        super().__init__()
         self._domain = domain
         self._usage = usage
         self._shape = shape
@@ -453,8 +468,8 @@ class VarField(Var):
     def _get_domain(self) -> Domain:
         raise NotImplementedError("need to access _domain directly")
 
-    def _get_original_tensor(self) -> Tensor:
-        raise NotImplementedError("var fields don't actually have a tensor")
+    # def _get_original_tensor(self) -> Tensor:
+    #     raise NotImplementedError("var fields don't actually have a tensor")
 
     def _get_ndslice(self) -> NDSlice:
         raise NotImplementedError("var fields don't actually have a tensor")
@@ -489,7 +504,8 @@ class TensorVar(Var):
         when the shape is another variable object, that indicates that this variable object
         is being
         """
-        super().__init__()
+        self.__cached_possible: Optional[Tensor] = None
+        self.__cached_padding: Optional[Tensor] = None
         self._domain = domain
         self._tensor = tensor
         # can only build usage if there is a tensor
@@ -560,10 +576,30 @@ class TensorVar(Var):
     def _get_origin(self) -> TensorVar:
         return self
 
+    def _clear_cache(self):
+        self.__cached_padding = None
+        self.__cached_possible = None
+
     def __getitem__(self, ndslice: NDSlice) -> Var:
         if self._tensor is None:
             raise ValueError("need to have a tensor before subscripting")
         return VarBranch(root=self, ndslice=ndslice)
+
+    def _is_padding(self):
+        if self.__cached_padding is None:
+            self.__cached_padding = (
+                self.usage == VarUsage.PADDING)[..., None].expand(self.marginal_shape)
+        return self.__cached_padding
+
+    def _is_possible(self):
+        if self.__cached_possible is None:
+            one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
+            is_fixed = (
+                (self.usage == VarUsage.PADDING).logical_or
+                (self.usage == VarUsage.OBSERVED).logical_or
+                (self.usage == VarUsage.CLAMPED))[..., None].expand_as(one_hot)
+            self.__cached_possible = one_hot.where(is_fixed, torch.ones_like(one_hot)) != 0
+        return self.__cached_possible
 
     def _get_tensor(self) -> Tensor:
         return cast(Tensor, self._tensor)
@@ -642,11 +678,14 @@ class TensorVar(Var):
             in zip(usages, tensors, self._stack_shapes)
         ]
 
-    def _get_original_tensor(self) -> Tensor:
-        return self.tensor
+    # def _get_original_tensor(self) -> Tensor:
+    #     return self.tensor
 
     def _get_ndslice(self) -> NDSlice:
         return (...,)
+
+    def _read_only(self) -> bool:
+        return self.__cached_padding is not None or self.__cached_possible is not None
 
 
 def vtensor(data: Any, **kwargs):

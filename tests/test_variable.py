@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict, Tuple, cast
 
 import pytest
 import torch
@@ -31,7 +31,7 @@ def test_variable():
     print(v.usage == VarUsage.OBSERVED)
     assert (v.usage == VarUsage.OBSERVED).all()
     assert v.ndslice == (...,)
-    assert v.original_tensor is t
+    assert v.origin.tensor is t
     assert v.origin is v
 
 
@@ -45,7 +45,7 @@ def test_vtensor():
     print(v.usage == VarUsage.OBSERVED)
     assert (v.usage == VarUsage.OBSERVED).all()
     assert v.ndslice == (...,)
-    assert v.original_tensor is v.tensor
+    assert v.origin.tensor is v.tensor
     assert v.origin is v
 
 
@@ -54,7 +54,7 @@ def test_shape():
     v = TensorVar(t, Range(4))
     v2 = v[1:3, 2:4]
     assert v2.origin is v
-    assert v2.original_tensor is t
+    assert v2.origin.tensor is t
     assert v2.ndslice == (slice(1, 3), slice(2, 4))
     assert t.sum() == 3*4
     assert v2.shape == (2, 2)
@@ -257,8 +257,6 @@ def test_var_field():
     with pytest.raises(NotImplementedError):
         v.domain
     with pytest.raises(NotImplementedError):
-        v.original_tensor
-    with pytest.raises(NotImplementedError):
         v.ndslice
     with pytest.raises(NotImplementedError):
         v.origin
@@ -382,9 +380,9 @@ def test_broken_usage():
                         for ch in x]))
     data = BitLanguageSubject.from_string('t')
     assert (data.bits.usage == tx.ANNOTATED).all()
-    data.clamp_annotated_()
+    data = data.clamp_annotated()
     assert (data.bits.usage == tx.CLAMPED).all()
-    data.unclamp_annotated_()
+    data = data.unclamp_annotated()
     assert (data.bits.usage == tx.ANNOTATED).all()
 
 
@@ -426,3 +424,43 @@ def test_flatten():
         [tx.LATENT, tx.LATENT, tx.ANNOTATED]])
     assert v.flatten(usage=tx.ANNOTATED).tolist() == [4, 3]
     assert v.flatten(usage=tx.LATENT).tolist() == [5, 1, 4, 2]
+
+
+def test_no_late_change():
+    v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
+    v2 = v[1]
+    v.is_padding
+    with pytest.raises(TypeError):
+        v.usage[1] = VarUsage.CLAMPED
+    with pytest.raises(TypeError):
+        v2.tensor[1] = 2
+
+
+def test_no_late_change2():
+    v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
+    v2 = v[1]
+    v2.is_possible
+    with pytest.raises(TypeError):
+        # can't change tensor after getting is_possible
+        v.tensor[1] = 2
+    with pytest.raises(TypeError):
+        # can't change usage after getting is_possible
+        v2.usage[1] = VarUsage.CLAMPED
+
+
+def test_clone():
+    v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
+    v2 = v.clone()
+    v.usage[(...,)] = tx.LATENT
+    assert cast(torch.Tensor, (v.usage == tx.LATENT)).all()
+    assert cast(torch.Tensor, (v2.usage == tx.ANNOTATED)).all()
+    v2.tensor[(...,)] = 0
+    assert v2.tensor.sum() == 0
+    assert v.tensor.sum() > 0
+    # make sure I can still clamp
+    v.is_possible
+    with pytest.raises(TypeError):
+        # can't change usage after getting is_possible
+        v.clamp_annotated()
+    v2.clamp_annotated()
+    assert cast(torch.Tensor, (v2.usage == tx.CLAMPED)).all()

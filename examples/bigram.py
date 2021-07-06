@@ -54,10 +54,10 @@ if __name__ == '__main__':
         for i in range(3):
             optimizer.zero_grad()
 
-            data.unclamp_annotated_()
+            data.unclamp_annotated()
             logz_free = system.product_marginal(data)
 
-            data.clamp_annotated_()
+            data.clamp_annotated()
             logz_clamped = system.product_marginal(data)
 
             loss = (logz_free - logz_clamped).sum()

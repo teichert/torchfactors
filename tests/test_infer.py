@@ -65,6 +65,8 @@ def test_predict_simple2():
     factors = [factor]
     bp = BP()
     assert coin.tensor == 0
+    # TODO: waht do I do about this? predict wants to change the variable,
+    # but there are factors that are depending on them???
     bp.predict(factors)
     assert coin.tensor == 1
     factor.tensor = torch.tensor([1, 0]).log()

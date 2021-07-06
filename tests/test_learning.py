@@ -47,3 +47,6 @@ def test_learning():
                                batch_size=-1)
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
+
+
+test_learning()

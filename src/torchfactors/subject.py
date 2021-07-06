@@ -184,18 +184,27 @@ class Subject:
 
         #     return
 
-    def clamp_annotated_(self: SubjectType) -> SubjectType:
-        for attr_name in self.__varset:
-            cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
-        return self
+    def clamp_annotated(self: SubjectType) -> SubjectType:
+        out = self.clone()
+        for attr_name in out.__varset:
+            cast(TensorVar, getattr(out, attr_name)).clamp_annotated()
+        return out
 
-    def unclamp_annotated_(self: SubjectType) -> SubjectType:
-        for attr_name in self.__varset:
-            cast(TensorVar, getattr(self, attr_name)).unclamp_annotated()
-        return self
+    def unclamp_annotated(self: SubjectType) -> SubjectType:
+        out = self.clone()
+        for attr_name in out.__varset:
+            cast(TensorVar, getattr(out, attr_name)).unclamp_annotated()
+        return out
 
     def __post_init__(self):
         self.init_variables()
+
+    def clone(self: SubjectType) -> SubjectType:
+        out = copy.copy(self)
+        for attr_name in out.__varset:
+            old = cast(TensorVar, getattr(out, attr_name))
+            setattr(out, attr_name, old.clone())
+        return out
 
     def __init__(self, *args, **kwargs):
         raise ValueError(

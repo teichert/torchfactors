@@ -123,16 +123,19 @@ def test_clamp_annotated():
     assert (u.items2.usage == ANNOTATED).sum() == 5
     assert (u.items1.usage == CLAMPED).sum() == 0
     assert (u.items2.usage == CLAMPED).sum() == 0
-    u.clamp_annotated_()
-    assert (u.items1.usage == ANNOTATED).sum() == 0
-    assert (u.items2.usage == ANNOTATED).sum() == 0
-    assert (u.items1.usage == CLAMPED).sum() == 10
-    assert (u.items2.usage == CLAMPED).sum() == 5
-    u.unclamp_annotated_()
-    assert (u.items1.usage == ANNOTATED).sum() == 10
-    assert (u.items2.usage == ANNOTATED).sum() == 5
-    assert (u.items1.usage == CLAMPED).sum() == 0
-    assert (u.items2.usage == CLAMPED).sum() == 0
+    u2 = u.clamp_annotated()
+    assert (u2.items1.usage == ANNOTATED).sum() == 0
+    assert (u2.items2.usage == ANNOTATED).sum() == 0
+    assert (u2.items1.usage == CLAMPED).sum() == 10
+    assert (u2.items2.usage == CLAMPED).sum() == 5
+    u3 = u2.unclamp_annotated()
+    assert (u3.items1.usage == ANNOTATED).sum() == 10
+    assert (u3.items2.usage == ANNOTATED).sum() == 5
+    assert (u3.items1.usage == CLAMPED).sum() == 0
+    assert (u3.items2.usage == CLAMPED).sum() == 0
+
+
+test_clamp_annotated()
 
 
 def test_stacked():

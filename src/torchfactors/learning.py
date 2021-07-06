@@ -30,14 +30,14 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
             logging.info('\tzeroing grad...')
             optimizer.zero_grad()
             logging.info('\tclamped inference...')
-            logz_clamped = system.product_marginal(data.clamp_annotated_())
+            logz_clamped = system.product_marginal(data.clamp_annotated())
             # for t in system.model(data):
             #     logging.info('\t\t\t---')
             #     for row in t.dense.tolist()[0]:
             #         logging.info(f'\t\t\t{row}')
             logging.info(f'\t\tlogz_clamped: {logz_clamped}')
             logging.info('\tunclamped inference...')
-            logz_free, penalty = system.partition_with_change(data.unclamp_annotated_())
+            logz_free, penalty = system.partition_with_change(data.unclamp_annotated())
             # for t in system.model(data):
             #     logging.info('\t\t\t---')
             #     for row in t.dense.tolist()[0]:

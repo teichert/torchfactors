@@ -66,8 +66,8 @@ optimizer = torch.optim.Adam(system.model.parameters(), lr=1.0)
 # train
 for i in range(5):
     optimizer.zero_grad()
-    partition_gold = system.product_marginal(train_data.clamp_annotated_()).sum()
-    partition_free = system.product_marginal(train_data.unclamp_annotated_()).sum()
+    partition_gold = system.product_marginal(train_data.clamp_annotated()).sum()
+    partition_free = system.product_marginal(train_data.unclamp_annotated()).sum()
     loss = partition_free - partition_gold
     loss.backward()
     optimizer.step()

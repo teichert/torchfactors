@@ -1,4 +1,4 @@
-from typing import cast
+from typing import List, cast
 
 import torch
 import torch_semiring_einsum as tse  # type: ignore
@@ -130,7 +130,8 @@ def test_hmm():
     x, y = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.ANNOTATED)
             for _ in range(2)]
     z = tx.TensorVar(tx.Range(2), tensor=torch.tensor(1), usage=tx.ANNOTATED)
-    variables = [a, b, c, x, y, z]
+
+    variables: List[tx.Var] = [a, b, c, x, y, z]
     f_ax = tx.TensorFactor(a, x, tensor=t)
     f_by = tx.TensorFactor(b, y, tensor=t)
     f_cz = tx.TensorFactor(c, z, tensor=t)
@@ -146,14 +147,20 @@ def test_hmm():
     bp = tx.BP()
     for v in variables:
         v.clamp_annotated()
-    print([f.dense for f in factors])
-    logz_clamped = bp.product_marginal(factors)
 
+    logz_clamped = bp.product_marginal(factors)
+    print([f.dense for f in factors])
+
+    tx.factor.uncache(factors)
     for v in variables:
         v.unclamp_annotated()
-    print([f.dense for f in factors])
+
     logz_free = bp.product_marginal(factors)
+    print([f.dense for f in factors])
     print(out_free, out_clamped)
     print(logz_free, logz_clamped)
     assert logz_free.allclose(out_free)
     assert logz_clamped.allclose(out_clamped)
+
+
+test_hmm()

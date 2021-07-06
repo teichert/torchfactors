@@ -67,7 +67,7 @@ if __name__ == '__main__':
         logz_free = system.product_marginal(data)
         print(logz_free)
 
-        data.clamp_annotated_()
+        data.clamp_annotated()
         logz_clamped = system.product_marginal(data)
         print(logz_clamped)
 
@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
         loss.backward()
         optimizer.step()
-        data.unclamp_annotated_()
+        data.unclamp_annotated()
 
         marginals = system.product_marginals(data, *[(data.bits[..., i, j],)
                                                      for i in range(n)

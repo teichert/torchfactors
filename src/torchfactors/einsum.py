@@ -103,7 +103,9 @@ def log_einsum2(
             logsumexp,
             tse.utils.add_in_place)
 
-    return tse.semiring_einsum_forward(equation, args, block_size, callback)
+    writeable_args = [arg.as_subclass(torch.Tensor) for arg in args]  # type: ignore
+    out = tse.semiring_einsum_forward(equation, writeable_args, block_size, callback)
+    return out
 
 
 def ids(values: Iterable[object]) -> List[int]:
