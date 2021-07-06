@@ -125,10 +125,11 @@ def test_hmm():
             (t, tx.ids('bc'))],
         [[]])
 
-    a, b, c = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.LATENT) for _ in range(3)]
-    x, y, z = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.ANNOTATED)
+    a, b, c = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.LATENT)
                for _ in range(3)]
-    z.tensor[(...,)] = 1
+    x, y = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.ANNOTATED)
+            for _ in range(2)]
+    z = tx.TensorVar(tx.Range(2), tensor=torch.tensor(1), usage=tx.ANNOTATED)
     variables = [a, b, c, x, y, z]
     f_ax = tx.TensorFactor(a, x, tensor=t)
     f_by = tx.TensorFactor(b, y, tensor=t)

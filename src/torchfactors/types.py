@@ -1,6 +1,5 @@
 from typing import Any, List, Sequence, Tuple, Union
 
-import torch
 from torch import Size, Tensor
 
 FULL_SLICE = slice(None, None, None)
@@ -11,7 +10,8 @@ SliceType = Union[slice, int]
 ShapeType = Union[Size, Tuple[int, ...]]
 
 
-class ReadOnlyView(torch.Tensor):
+class ReadOnlyView(Tensor):
+
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):
         if (func.__name__ == '__setitem__' or

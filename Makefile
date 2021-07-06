@@ -29,6 +29,11 @@ test: pyproject.lock
 	@echo "running tests..."
 	poetry run python -m pytest --cov=src --cov-report term-missing:skip-covered --cov-report html --codeblocks
 
+.PHONY: test
+test-one: pyproject.lock
+	@echo "running tests..."
+	poetry run python -m pytest -x -s -vvv
+
 .PHONY: lint
 lint: pyproject.lock
 	@echo "running linter..."

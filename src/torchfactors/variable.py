@@ -12,7 +12,7 @@ from torch import Size, Tensor
 from torch.nn import functional as F
 
 from .domain import Domain
-from .types import NDSlice, ShapeType
+from .types import NDSlice, ReadOnlyView, ShapeType
 from .utils import as_ndrange, compose, ndslices_cat, ndslices_overlap
 
 Tensorable = Union[Tensor, int, float, bool]
@@ -111,8 +111,10 @@ class Var(ABC):
 
     @property
     def tensor(self) -> Tensor:
-        self.clear_cache()
-        return self._get_tensor()
+        # self.clear_cache()
+        t = self._get_tensor()
+        read_only = t.as_subclass(ReadOnlyView)  # type: ignore
+        return read_only
 
     @tensor.setter
     def tensor(self, value: Any) -> None:
@@ -255,7 +257,7 @@ class Var(ABC):
 
     # TODO: make an ndrange which can be hashed and use that instead
     def hash_key(self):
-        return (id(self.original_tensor),
+        return (id(self.origin),
                 as_ndrange(self.ndslice, self.original_tensor.shape))
 
     def __hash__(self) -> int:
