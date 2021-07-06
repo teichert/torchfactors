@@ -46,9 +46,6 @@ def test_infer():
     assert (marg_a == math.log(9*8)).all()
 
 
-test_infer()
-
-
 def test_predict_simple():
     coin = TensorVar(Range(2), torch.tensor(0), ANNOTATED)
     factor = TensorFactor(coin, tensor=torch.tensor([1, 3]).log())
@@ -112,6 +109,28 @@ def test_predict_multi():
     ]).log())
     bp.predict(factors)
     assert (bits.tensor == torch.tensor([True, False, False])).all()
+
+
+# TODO: make this work
+# def test_predict_multi2():
+#     bits = TensorVar(Range(2), torch.tensor([False, True, True]), ANNOTATED)
+#     factors = [
+#         TensorFactor(bits, tensor=torch.tensor([0, 0.5]).log()),
+#         TensorFactor(bits[..., :-1], bits[..., 1:],
+#                      tensor=torch.tensor([[0, 1], [1, 0.]]).log()),
+#     ]
+#     bp = BP()
+#     marginals = bp.product_marginal(factors, bits)
+#     assert marginals.allclose(torch.tensor([
+#         [0, 1],
+#         [1, 0],
+#         [0, 1]
+#     ]).log())
+#     bp.predict(factors)
+#     assert (bits.tensor == torch.tensor([True, False, True])).all()
+
+
+test_predict_multi()
 
 
 def test_bp_change():

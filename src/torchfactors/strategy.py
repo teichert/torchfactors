@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import itertools
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
 from itertools import chain
-from typing import (Callable, Dict, FrozenSet, Iterable, Iterator, List,
-                    Sequence, Tuple)
+from typing import (Callable, DefaultDict, Dict, FrozenSet, Iterable, Iterator,
+                    List, Sequence, Set, Tuple)
 
 import torch
 from torch import Tensor
@@ -129,8 +130,11 @@ class Strategy(object):
         # maps from a variable to the smallest region holding it
         # (not reasoning about super/sub variables;
         var_to_size_and_region: Dict[Var, Tuple[int, int]] = {}
+        self.root_to_subs: DefaultDict[Var, Set[Var]] = defaultdict(set)
         for rid, r in enumerate(self.regions):
             for v in r.variables:
+                if v.origin is not v:
+                    self.root_to_subs[v.origin].add(v)
                 this_one = (len(r.variables), rid)
                 if v not in var_to_size_and_region:
                     var_to_size_and_region[v] = this_one
@@ -138,8 +142,8 @@ class Strategy(object):
                     old_one = var_to_size_and_region[v]
                     if this_one < old_one:
                         var_to_size_and_region[v] = this_one
-        self.var_to_region: Dict[Var, int] = {v: size for v,
-                                              (size, _) in var_to_size_and_region.items()}
+        self.var_to_region: Dict[Var, int] = {v: region_id for v,
+                                              (_, region_id) in var_to_size_and_region.items()}
         for s, t in self.edges:
             # TODO: ensure that t is a strict subset of s
             self.into[t].append(s)

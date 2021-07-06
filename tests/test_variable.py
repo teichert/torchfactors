@@ -247,13 +247,13 @@ def test_pad_and_stack():
 def test_var_field():
     v = VarField()
     with pytest.raises(NotImplementedError):
-        v.tensor
+        v._set_tensor(1.0)
     with pytest.raises(NotImplementedError):
-        v.set_tensor(1.0)
+        v.tensor
     with pytest.raises(NotImplementedError):
         v.usage
     with pytest.raises(NotImplementedError):
-        v.set_usage(DEFAULT)
+        v._set_usage(DEFAULT)
     with pytest.raises(NotImplementedError):
         v.domain
     with pytest.raises(NotImplementedError):
@@ -262,6 +262,9 @@ def test_var_field():
         v.origin
     with pytest.raises(NotImplementedError):
         v[3]
+
+
+test_var_field()
 
 
 def test_grad_through_stack():
@@ -462,5 +465,8 @@ def test_clone():
     with pytest.raises(TypeError):
         # can't change usage after getting is_possible
         v.clamp_annotated()
+    with pytest.raises(TypeError):
+        # can't change tensor after getting is_possible
+        v.set_tensor(3.0)
     v2.clamp_annotated()
     assert cast(torch.Tensor, (v2.usage == tx.CLAMPED)).all()

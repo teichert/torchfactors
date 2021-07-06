@@ -14,7 +14,7 @@ from torch.nn import functional as F
 
 from .domain import Domain
 from .types import NDSlice, ReadOnlyView, ShapeType
-from .utils import as_ndrange, compose, ndslices_cat, ndslices_overlap
+from .utils import as_ndrange, compose, ndslices_cat
 
 Tensorable = Union[Tensor, int, float, bool]
 
@@ -173,10 +173,10 @@ class Var(ABC):
     @abstractmethod
     def _get_origin(self) -> TensorVar: ...
 
-    def overlaps(self, other: Var) -> bool:
-        return (
-            self.origin is other.origin and
-            ndslices_overlap(self.ndslice, other.ndslice, self.origin.shape))
+    # def overlaps(self, other: Var) -> bool:
+    #     return (
+    #         self.origin is other.origin and
+    #         ndslices_overlap(self.ndslice, other.ndslice, self.origin.shape))
 
     @property
     def origin(self) -> TensorVar:
