@@ -88,6 +88,14 @@ def test_log_dot():
     assert out.allclose(ac_expected)
 
 
+def test_log_dot2():
+    t = torch.tensor([[1, 2], [0.5, 3]]).float().log()
+    out, = tx.log_dot([
+        (t, tx.ids('ab'))
+    ], [[]])
+    assert out == t.logsumexp(dim=[0, 1])
+
+
 def test_hmm():
     t = torch.tensor([
         [-7.021953582763672, 3.808997869491577],
@@ -107,23 +115,22 @@ def test_hmm():
     by = t.masked_fill(out_is_True, float('-inf'))
     cz = t.masked_fill(out_is_True.logical_not(), float('-inf'))
 
-    out_free, = tx.log_dot(
-        [
-            (t, tx.ids('ax')),
-            (t, tx.ids('bx')),
-            (t, tx.ids('cz')),
-            (t, tx.ids('ab')),
-            (t, tx.ids('bc'))],
-        [[]])
+    free_factors = [
+        (t, tx.ids('ax')),
+        (t, tx.ids('by')),
+        (t, tx.ids('cz')),
+        # (t, tx.ids('ab')),
+        (t, tx.ids('bc'))]
+    out_free, = tx.log_dot(free_factors, [[]])
 
-    out_clamped, = tx.log_dot(
-        [
-            (ax, tx.ids('ax')),
-            (by, tx.ids('bx')),
-            (cz, tx.ids('cz')),
-            (t, tx.ids('ab')),
-            (t, tx.ids('bc'))],
-        [[]])
+    clamped_factors = [
+        (ax, tx.ids('ax')),
+        (by, tx.ids('by')),
+        (cz, tx.ids('cz')),
+        # (t, tx.ids('ab')),
+        (t, tx.ids('bc')),
+    ]
+    out_clamped, = tx.log_dot(clamped_factors, [[]])
 
     a, b, c = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.LATENT)
                for _ in range(3)]
@@ -135,13 +142,13 @@ def test_hmm():
     f_ax = tx.TensorFactor(a, x, tensor=t)
     f_by = tx.TensorFactor(b, y, tensor=t)
     f_cz = tx.TensorFactor(c, z, tensor=t)
-    f_ab = tx.TensorFactor(a, b, tensor=t)
+    # f_ab = tx.TensorFactor(a, b, tensor=t)
     f_bc = tx.TensorFactor(b, c, tensor=t)
     factors = [
         f_ax,
         f_by,
         f_cz,
-        f_ab,
+        # f_ab,
         f_bc,
     ]
     bp = tx.BP()
@@ -155,6 +162,8 @@ def test_hmm():
     for v in variables:
         v.unclamp_annotated()
 
+    # logz_free, penalty = bp.partition_with_change(factors)
+    # print(logz_free, penalty)
     logz_free = bp.product_marginal(factors)
     print([f.dense for f in factors])
     print(out_free, out_clamped)
@@ -163,4 +172,4 @@ def test_hmm():
     assert logz_clamped.allclose(out_clamped)
 
 
-test_hmm()
+# test_hmm()
