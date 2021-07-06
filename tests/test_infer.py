@@ -151,3 +151,6 @@ def test_bp_change2():
     bp = BP(passes=1)
     _, change = bp.partition_with_change(factors)
     assert change.sum() > 0.0
+
+
+test_bp_change2()

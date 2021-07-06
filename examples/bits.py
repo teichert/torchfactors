@@ -1,7 +1,6 @@
 import logging
 from dataclasses import dataclass
 
-import torch
 import torchfactors as tx
 
 
@@ -9,30 +8,29 @@ import torchfactors as tx
 @dataclass
 class Bits(tx.Subject):
     bits: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED)
-    hidden: tx.Var = tx.VarField(tx.Range(2), tx.LATENT, shape=bits)
+    hidden: tx.Var = tx.VarField(tx.Range(6), tx.LATENT, shape=bits)
 
 
 # Specify the Variables and Factors
 class BitsModel(tx.Model[Bits]):
     def factors(self, x: Bits):
-        length = x.hidden.shape[-1]
-        # yield tx.LinearFactor(self.namespace('start'), x.hidden[..., 0])
-        # yield tx.LinearFactor(self.namespace('end'), x.hidden[..., -1])
+        length = x.bits.shape[-1]
+        yield tx.LinearFactor(self.namespace('start'), x.hidden[..., 0])
         # yield tx.LinearFactor(self.namespace(('start-end', length > 1)),
-        #   x.hidden[..., 0], x.hidden[..., -1])
+        #                       x.hidden[..., 0], x.hidden[..., -1])
         # yield tx.LinearFactor(self.namespace('emission'), x.hidden[..., 0], x.bits[..., 0])
         # yield tx.LinearFactor(self.namespace('emission'), x.hidden[..., 2], x.bits[..., 2])
         for i in range(length):
-            # yield tx.LinearFactor(self.namespace('emission'), x.hidden[..., i], x.bits[..., i])
-            # yield tx.LinearFactor(self.namespace('emission'), x.bits[..., i])
-            yield tx.LinearFactor(self.namespace('transition'),
-                                  x.hidden[..., i], x.bits[..., i])
+            yield tx.LinearFactor(self.namespace('emission'), x.hidden[..., i], x.bits[..., i])
+        #     # yield tx.LinearFactor(self.namespace('emission'), x.bits[..., i])
+        #     # yield tx.LinearFactor(self.namespace('transition'),
+        #     #                       x.hidden[..., i], x.bits[..., i])
             if i > 0:
                 yield tx.LinearFactor(self.namespace('transition'),
                                       x.hidden[..., i - 1], x.hidden[..., i])
-            # if i > 1:
-            #     yield tx.LinearFactor(self.namespace('transition_skip'),
-            # x.hidden[..., i - 2], x.hidden[..., i])
+        #     if i > 1:
+        #         yield tx.LinearFactor(self.namespace('transition_skip'),
+        #                               x.hidden[..., i - 2], x.hidden[..., i])
 
 # this gives larger clamped than unclamped with the following single data and transition/emmission
 # factors (why?!):
@@ -42,14 +40,14 @@ class BitsModel(tx.Model[Bits]):
 
 # Load Data
 bit_sequences = [
-    # [True, False, False, True, True, False],
-    # [True, False],
+    [True, False, False, True, True, False],
+    [True, False],
     # [False, False, True, True],
-    # [True, True, False, False],
-    # [True, True, False, False, True, True, False],
-    # [True, False, False, True, True, False],
+    [True, True, False, False],
+    [True, True, False, False, True, True, False],
+    [True, False, False, True, True, False],
     # [False, False, True, True, False, False, True],
-    [False, False, True],
+    # [False, False, True],
     # [False, True],
 ]
 
@@ -58,14 +56,15 @@ data = [Bits(tx.vtensor(bits)) for bits in bit_sequences]
 train_data = Bits.stack(data)
 
 # Build a System and Train the Model
-system = tx.System(BitsModel(), tx.BP())
-system.prime(data)
+# system = tx.System(BitsModel(), tx.BP())
+# system.prime(data)
 
-optimizer = torch.optim.Adam(system.model.parameters(), lr=1.0)
+# optimizer = torch.optim.Adam(system.model.parameters(), lr=1.0)
 
 
 # train the model
-system = tx.learning.example_fit_model(BitsModel(), data, iterations=500, lr=1.0)
+model = BitsModel()
+system = tx.learning.example_fit_model(model, data, iterations=500, lr=0.01, penalty_coeff=10000)
 
 # use the model on held out data
 held_out = Bits(tx.vtensor([False] * 10))

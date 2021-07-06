@@ -15,10 +15,10 @@ class MultiEquation(object):
 
 @singledispatch
 def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 100):
-    # return log_einsum2(compiled_equation, *[t.nan_to_num() for t in tensors],
-    #                    block_size=block_size)
     return log_einsum2(compiled_equation, *[t for t in tensors],
                        block_size=block_size)
+    # return log_einsum2(compiled_equation, *[t for t in tensors],
+    #                    block_size=block_size)
     # return tse.log_einsum(compiled_equation, *[t.nan_to_num() for t in tensors],
     #                       block_size=block_size)
 
@@ -85,8 +85,8 @@ def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
 
 def logsumexp(a: Tensor, dims):
     if dims:
-        # return torch.logsumexp(a.nan_to_num(), dim=dims)
-        return torch.logsumexp(a, dim=dims)
+        return torch.logsumexp(a.nan_to_num(), dim=dims)
+        # return torch.logsumexp(a, dim=dims)
     else:
         return a
 

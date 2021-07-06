@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import math
 from functools import lru_cache
 from typing import Callable, Dict, List, Sequence, Tuple, Union
 
 import torch
 from torch.functional import Tensor
+from torchmetrics.functional import kldivergence
 
 from ..components.tensor_factor import Message, TensorFactor
 from ..factor import Factor
@@ -24,14 +26,26 @@ class BPInference:
         # the message from one region to another will be a factor dealing with the
         # variables of the target
         self.messages: Dict[Tuple[int, int], TensorFactor] = {}
-        self.messages_changes: Dict[TensorFactor, Tensor] = {}
+        self.message_changes: Dict[TensorFactor, Tensor] = {}
 
-    def amount_changed(self, old: Tensor, new: Tensor) -> Tensor:
-        return torch.nn.functional.kl_div(old.nan_to_num(), new.nan_to_num(),
-                                          log_target=True, reduction='batchmean')
+    def amount_changed(self, old: Tensor, new: Tensor, num_batch_dims: int) -> Tensor:
+        num_dims = len(old.shape)
+        old = old.nan_to_num()
+        new = new.nan_to_num()
+        if num_dims < 2:
+            old = old[(None,)*(2 - num_dims)]
+            new = new[(None,)*(2 - num_dims)]
+            num_batch_dims = 1
+        num_dims = len(old.shape)
+        old = old.flatten(0, num_batch_dims - 1).flatten(1)
+        new = new.flatten(0, num_batch_dims - 1).flatten(1)
+        out = kldivergence(new, Factor.normalize(
+            old, num_batch_dims=num_batch_dims), log_prob=True)
+        return out
 
     def total_amount_changed(self):
-        return torch.stack(tuple(self.messages_changes.values()), 0).sum(dim=0)
+        changes = torch.tensor(list(self.message_changes.values())).sum()
+        return changes
 
     def logz(self) -> torch.Tensor:
         region_free_energies = []
@@ -104,10 +118,23 @@ class BPInference:
             return self.messages[key]
         except KeyError:
             _, t = key
-            return self.messages.setdefault(
-                key, Message(
-                    *self.strategy.regions[t].variables,
-                    init=torch.zeros))
+            # uniform_denom = -math.log()
+            # tensor = (-torch.tensor(self.strategy.regions[t].num_configurations).float().log()
+            # ).expand_as
+            v: Var = self.strategy.regions[t].variables[0]
+            variable_shape = v.shape
+
+            # make a uniform message backed by a single scalar
+            def init(shape):
+                num_configs = math.prod(shape[len(variable_shape):])
+                out = (-torch.tensor(num_configs).float().log()).expand(shape)
+                return out
+
+            message = Message(
+                *self.strategy.regions[t].variables,
+                init=init)
+            # message.tensor = Factor.normalize(message)
+            return self.messages.setdefault(key, message)
 
     def in_messages(self, region_id: int) -> Sequence[TensorFactor]:
         """
@@ -162,8 +189,8 @@ class BPInference:
                 updated = Factor.normalize(numerator - denominator,
                                            num_batch_dims=out.num_batch_dims)
                 # keep track of how far from convergence we were before this message
-                change = -self.amount_changed(out.tensor, updated)
-                self.messages_changes[out] = change
+                change = self.amount_changed(out.tensor, updated, out.num_batch_dims)
+                self.message_changes[out] = change
                 out.tensor = updated
                 # if 'b' in set(var_name(v) for v in source.variables):
                 #     print(updated.tolist())

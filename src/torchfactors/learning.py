@@ -15,7 +15,7 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
                       each_step: Optional[Callable[[
                           DataLoader[SubjectType], SubjectType], None]] = None,
                       each_epoch: Optional[Callable[[DataLoader[SubjectType]], None]] = None,
-                      lr=1.0, batch_size: int = -1) -> System[SubjectType]:
+                      lr=1.0, batch_size: int = -1, penalty_coeff=1) -> System[SubjectType]:
     logging.info('loading...')
     data_loader = examples[0].data_loader(list(examples), batch_size=batch_size)
     logging.info('done loading.')
@@ -30,24 +30,31 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
             logging.info('\tzeroing grad...')
             optimizer.zero_grad()
             logging.info('\tclamped inference...')
-            logz_clamped = system.product_marginal(data.clamp_annotated())
+            clamped = data.clamp_annotated()
+            free = data.unclamp_annotated()
+            logz_clamped = system.product_marginal(clamped)
             # for t in system.model(data):
             #     logging.info('\t\t\t---')
             #     for row in t.dense.tolist()[0]:
             #         logging.info(f'\t\t\t{row}')
             logging.info(f'\t\tlogz_clamped: {logz_clamped}')
             logging.info('\tunclamped inference...')
-            logz_free, penalty = system.partition_with_change(data.unclamp_annotated())
+            logz_free, penalty = system.partition_with_change(free)
             # for t in system.model(data):
             #     logging.info('\t\t\t---')
             #     for row in t.dense.tolist()[0]:
             #         logging.info(f'\t\t\t{row}')
             logging.info(f'\t\tlogz_free: {logz_free}')
             logging.info(f'\t\tpenalty: {penalty}')
-            loss = (logz_free - logz_clamped + penalty).sum()
+            loss = (logz_free - logz_clamped).sum()
             logging.info(f'\t\tloss: {loss}')
+            if penalty_coeff != 0:
+                loss = loss + penalty_coeff * penalty.sum()
+            logging.info(f'\t\tpenalty coeff: {penalty_coeff}')
+            logging.info(f'\t\tpenalized loss: {loss}')
             logging.info('\tcomputing gradient...')
             loss.backward()
+            # print([p.grad for p in system.model.parameters()])
             logging.info('\tupdating...')
             optimizer.step()
             if each_step is not None:

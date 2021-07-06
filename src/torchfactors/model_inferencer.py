@@ -28,6 +28,7 @@ class System(Generic[SubjectType]):
         if isinstance(x, Subject):
             for f in self.model(cast(SubjectType, x)):
                 f.dense
+                f.clear_cache()
         else:
             for subject in cast(Iterable[SubjectType], x):
                 self.prime(subject)
