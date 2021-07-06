@@ -115,11 +115,17 @@ def test_hmm():
     by = t.masked_fill(out_is_True, float('-inf'))
     cz = t.masked_fill(out_is_True.logical_not(), float('-inf'))
 
+    gold_clamped = torch.einsum('ax,by,cz,ab,bc->', ax.exp(), by.exp(),
+                                cz.exp(), t.exp(), t.exp()).log()
+    print(f'gold clamped: {gold_clamped}')
+    gold_free = torch.einsum('ax,by,cz,ab,bc->', [t.exp()] * 5).log()
+    print(f'gold free: {gold_free}')
+
     free_factors = [
         (t, tx.ids('ax')),
         (t, tx.ids('by')),
         (t, tx.ids('cz')),
-        # (t, tx.ids('ab')),
+        (t, tx.ids('ab')),
         (t, tx.ids('bc'))]
     out_free, = tx.log_dot(free_factors, [[]])
 
@@ -127,7 +133,7 @@ def test_hmm():
         (ax, tx.ids('ax')),
         (by, tx.ids('by')),
         (cz, tx.ids('cz')),
-        # (t, tx.ids('ab')),
+        (t, tx.ids('ab')),
         (t, tx.ids('bc')),
     ]
     out_clamped, = tx.log_dot(clamped_factors, [[]])
@@ -142,13 +148,13 @@ def test_hmm():
     f_ax = tx.TensorFactor(a, x, tensor=t)
     f_by = tx.TensorFactor(b, y, tensor=t)
     f_cz = tx.TensorFactor(c, z, tensor=t)
-    # f_ab = tx.TensorFactor(a, b, tensor=t)
+    f_ab = tx.TensorFactor(a, b, tensor=t)
     f_bc = tx.TensorFactor(b, c, tensor=t)
     factors = [
         f_ax,
         f_by,
         f_cz,
-        # f_ab,
+        f_ab,
         f_bc,
     ]
     bp = tx.BP()
