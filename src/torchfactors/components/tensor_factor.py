@@ -33,3 +33,15 @@ class TensorFactor(Factor):
 
     def dense_(self):
         return self.tensor
+
+
+class Message(TensorFactor):
+    def __init__(self, *variables: Var,
+                 tensor: Optional[torch.Tensor] = None,
+                 init: Callable[[ShapeType], torch.Tensor] = float_zeros):
+        super().__init__(*variables, tensor=tensor, init=init)
+
+    # no interaction with the variables nor caching
+    @property
+    def dense(self):
+        return self.tensor

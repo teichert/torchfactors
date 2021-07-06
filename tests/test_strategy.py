@@ -34,15 +34,15 @@ def test_strategy():
     logz = -bg.regions[0].free_energy(())
     assert logz.shape == (3, 4)
     assert logz.exp().isclose(torch.full((3, 4), 25.)).all()
-    varid = fg.varids[vs[1]]
-    expected_regions_with_var1 = [
-        (0, bg.regions[0], [vs[1]]),
-        (1, bg.regions[1], [vs[1]]),
-        (varid, bg.regions[varid], [vs[1]])]
+    # varid = fg.varids[vs[1]]
+    # expected_regions_with_var1 = [
+    #     (0, bg.regions[0], [vs[1]]),
+    #     (1, bg.regions[1], [vs[1]]),
+    #     (varid, bg.regions[varid], [vs[1]])]
 
-    out_regions_with_var1 = list(bg.get_regions_with_vars(vs[1]))
+    # out_regions_with_var1 = list(bg.get_regions_with_vars(vs[1]))
 
-    assert out_regions_with_var1 == expected_regions_with_var1
+    # assert out_regions_with_var1 == expected_regions_with_var1
 
 
 def test_strategy_schedule():

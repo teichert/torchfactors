@@ -49,4 +49,4 @@ def test_learning():
     assert out.v.flatten().tolist() == [1, 1]
 
 
-test_learning()
+# test_learning()

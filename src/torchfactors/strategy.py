@@ -4,8 +4,8 @@ import itertools
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
 from itertools import chain
-from typing import (Callable, FrozenSet, Iterable, Iterator, List, Sequence,
-                    Tuple)
+from typing import (Callable, Dict, FrozenSet, Iterable, Iterator, List,
+                    Sequence, Tuple)
 
 import torch
 from torch import Tensor
@@ -126,21 +126,35 @@ class Strategy(object):
     def __post_init__(self):
         self.into: List[List[int]] = [list() for _ in self.regions]
         self.outfrom: List[List[int]] = [list() for _ in self.regions]
+        # maps from a variable to the smallest region holding it
+        # (not reasoning about super/sub variables;
+        var_to_size_and_region: Dict[Var, Tuple[int, int]] = {}
+        for rid, r in enumerate(self.regions):
+            for v in r.variables:
+                this_one = (len(r.variables), rid)
+                if v not in var_to_size_and_region:
+                    var_to_size_and_region[v] = this_one
+                else:
+                    old_one = var_to_size_and_region[v]
+                    if this_one < old_one:
+                        var_to_size_and_region[v] = this_one
+        self.var_to_region: Dict[Var, int] = {v: size for v,
+                                              (size, _) in var_to_size_and_region.items()}
         for s, t in self.edges:
             # TODO: ensure that t is a strict subset of s
             self.into[t].append(s)
             self.outfrom[s].append(t)
 
-    def get_regions_with_vars(self, variable: Var) -> Iterable[Tuple[int, Region, Sequence[Var]]]:
-        r"""
-        Generates a list of all of the regions that overlap with the given variable.
-        Each entry specifies the region_id, the region itself, and the list of variables
-        in the region that overlap with `variable`
-        """
-        for rid, r in enumerate(self.regions):
-            vs = [v for v in r.variables if variable.overlaps(v)]
-            if vs:
-                yield rid, r, vs
+    # def get_regions_with_vars(self, variable: Var) -> Iterable[Tuple[int, Region, Sequence[Var]]]:
+    #     r"""
+    #     Generates a list of all of the regions that overlap with the given variable.
+    #     Each entry specifies the region_id, the region itself, and the list of variables
+    #     in the region that overlap with `variable`
+    #     """
+    #     for rid, r in enumerate(self.regions):
+    #         vs = [v for v in r.variables if variable.overlaps(v)]
+    #         if vs:
+    #             yield rid, r, vs
 
     def reachable_from(self, i: int) -> Iterable[int]:
         r"""

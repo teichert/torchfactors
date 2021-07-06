@@ -97,9 +97,13 @@ def test_log_dot2():
 
 
 def test_hmm():
+    # t = torch.tensor([
+    #     [-7.021953582763672, 3.808997869491577],
+    #     [4.331912040710449, -17.0089054107666]
+    # ])
     t = torch.tensor([
-        [-7.021953582763672, 3.808997869491577],
-        [4.331912040710449, -17.0089054107666]
+        [1., 2.],
+        [3., 4.]
     ])
     # t = torch.tensor([
     #     [0.5, 1],
@@ -115,9 +119,10 @@ def test_hmm():
     by = t.masked_fill(out_is_True, float('-inf'))
     cz = t.masked_fill(out_is_True.logical_not(), float('-inf'))
 
-    gold_clamped = torch.einsum('ax,by,cz,ab,bc->', ax.exp(), by.exp(),
-                                cz.exp(), t.exp(), t.exp()).log()
-    print(f'gold clamped: {gold_clamped}')
+    for q in ['', 'ax', 'by', 'cz', 'ab', 'bc', 'a', 'b', 'c', 'x', 'y', 'z']:
+        gold_clamped = torch.einsum(f'ax,by,cz,ab,bc->{q}', ax.exp(), by.exp(),
+                                    cz.exp(), t.exp(), t.exp()).log()
+        print(f'gold clamped "{q}": {tx.Factor.normalize(gold_clamped).tolist()}')
     gold_free = torch.einsum('ax,by,cz,ab,bc->', [t.exp()] * 5).log()
     print(f'gold free: {gold_free}')
 
@@ -138,11 +143,11 @@ def test_hmm():
     ]
     out_clamped, = tx.log_dot(clamped_factors, [[]])
 
-    a, b, c = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.LATENT)
-               for _ in range(3)]
-    x, y = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.ANNOTATED)
-            for _ in range(2)]
-    z = tx.TensorVar(tx.Range(2), tensor=torch.tensor(1), usage=tx.ANNOTATED)
+    a, b, c = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.LATENT, info=name)
+               for name in 'abc']
+    x, y = [tx.TensorVar(tx.Range(2), tensor=torch.tensor(0), usage=tx.ANNOTATED, info=name)
+            for name in 'xy']
+    z = tx.TensorVar(tx.Range(2), tensor=torch.tensor(1), usage=tx.ANNOTATED, info='z')
 
     variables: List[tx.Var] = [a, b, c, x, y, z]
     f_ax = tx.TensorFactor(a, x, tensor=t)
@@ -178,4 +183,4 @@ def test_hmm():
     assert logz_clamped.allclose(out_clamped)
 
 
-# test_hmm()
+test_hmm()

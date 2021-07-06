@@ -382,7 +382,8 @@ class Factor:
             # meaning that it doesn't impact the product
             input_tensors = [self.dense] + [f.dense
                                             for f in other_factors]
-            return log_einsum(equation, *input_tensors)
+            out = log_einsum(equation, *input_tensors)
+            return out
         return f
 
     @ staticmethod
@@ -467,9 +468,9 @@ class Factor:
         # variable_dims = list(range(num_batch_dims, num_dims))
         variable_dims = list(range(self.num_batch_dims, len(self.shape)))
         masked_belief = belief.masked_fill(belief <= 0, 1.0)
-        masked_log_beleif = log_belief.masked_fill(belief <= 0, 0.0)
+        masked_log_belief = log_belief.masked_fill(belief <= 0, 0.0)
         masked_log_potentials = log_potentials.masked_fill(belief <= 0, 0.0)
-        return (masked_belief * (masked_log_beleif - masked_log_potentials)).sum(
+        return (masked_belief * (masked_log_belief - masked_log_potentials)).sum(
             dim=variable_dims)
         # terms = belief * (log_belief - log_potentials)
         # filtered = terms.where((belief > 1).logical_and(log_potentials.exp() > 1),

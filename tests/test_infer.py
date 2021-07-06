@@ -46,6 +46,9 @@ def test_infer():
     assert (marg_a == math.log(9*8)).all()
 
 
+test_infer()
+
+
 def test_predict_simple():
     coin = TensorVar(Range(2), torch.tensor(0), ANNOTATED)
     factor = TensorFactor(coin, tensor=torch.tensor([1, 3]).log())
