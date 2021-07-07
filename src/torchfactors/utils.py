@@ -1,7 +1,9 @@
+import itertools
 import math
 from itertools import chain
 from typing import Tuple, cast, overload
 
+import torch
 from multimethod import multidispatch
 from opt_einsum import contract  # type: ignore
 from torch import Tensor, arange
@@ -149,3 +151,29 @@ def compose(shape: ShapeType, first: NDSlice, second: NDSlice):
     for i, rhs in zip(remaining_dims, second):
         out[i] = compose_single(out[i], rhs, length=shape[i])
     return tuple(out)
+
+
+def stereotype(scales: Tensor, binary: Tensor) -> Tensor:
+    r"""
+    given a scales tensor with D dimensions, and another tensor with B + D
+    dimensions and the last D dimensions each of size exactly 2, returns a
+    B+D dimensional tensor where the last D dimensions match the dimension
+    sizes of `scales`.  The first B dimensions correnspond to separate
+    elements of the batch.  Within the same element of the batch,
+    the output cell is a linear interpolation of the cells of
+    the corresponding slice of `binary`.
+
+    In other words, the output is an interpolation over the cells
+    in the binary tensor, each value being multiplied by the
+    scales tensor after summing out dimensions of the latter corresponding
+    to zeros in the binary configuration and then expanding it appropriately.
+    """
+    num_config_dims = len(scales.shape)
+    all = []
+    for config in itertools.product(*itertools.repeat([0, 1], num_config_dims)):
+        dims_to_sum = [i for i, ci in enumerate(config) if ci == 0]
+        coeffs = scales.sum(dims_to_sum, keepdim=True).expand_as(scales)
+        out = binary[..., config] * coeffs
+        all.append(out)
+    full = torch.stack(all, -1).sum(-1)
+    return full

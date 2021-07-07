@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Iterable
 
 import pytest
 import torch
@@ -75,8 +75,13 @@ def test_parameters():
         model.namespace('transition').parameter((2, 10))
 
 
+@tx.dataclass
+class MySubject(tx.Subject):
+    i: int = 1
+
+
 def test_parameters2():
-    m = Model[Any]()
+    m = Model[MySubject]()
     ns_a = m.namespace('a')
     with pytest.raises(KeyError):
         # no parameter with this key
@@ -85,11 +90,11 @@ def test_parameters2():
     assert ns_a.parameter((3, 3)).shape == (3, 3)
     assert ns_a_b.parameter((4, 6)).shape == (4, 6)
     ns_a.parameter()
-    assert list(m(object())) == []
+    assert list(m(MySubject())) == []
 
 
 def test_modules():
-    m = Model[Any]()
+    m = Model[MySubject]()
     with pytest.raises(KeyError):
         # need to specify a factory if not already built for that key
         m.namespace('root').module()

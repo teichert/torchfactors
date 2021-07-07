@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field, fields
-from typing import (Dict, FrozenSet, Generic, List, Sequence, Sized, TypeVar,
-                    Union, cast)
+from typing import (Callable, Dict, FrozenSet, Generic, Hashable, List,
+                    Sequence, Sized, TypeVar, Union, cast)
 
 from torch.utils.data import DataLoader, Dataset
 
 from .domain import Domain
+from .factor import Factor
 from .types import ShapeType
 from .variable import TensorVar, Var, VarField, VarUsage
 
@@ -28,11 +29,39 @@ class ListDataset(Dataset, Generic[ExampleType]):
         return self.examples[index]
 
 
+class Grounding(object):
+    """
+    allows additional variables and factors to be
+    added without duplicates
+    """
+
+    def __init__(self):
+        self.variables: Dict[Hashable, Var] = {}
+        self.factors: Dict[Hashable, Factor] = {}
+
+    def variable(self, key: Hashable, factory: Callable[[], Var]) -> Var:
+        try:
+            out = self.variables[key]
+            return out
+        except KeyError:
+            out = factory()
+            return self.variables.setdefault(key, out)
+
+    def factor(self, key: Hashable, factory: Callable[[], Factor]) -> Factor:
+        try:
+            out = self.factors[key]
+            return out
+        except KeyError:
+            out = factory()
+            return self.factors.setdefault(key, out)
+
+
 @ dataclass
 class Subject:
     is_stacked: bool = field(init=False, default=False)
     __lists: Dict[str, List[object]] = field(init=False, default_factory=dict)
     __varset: FrozenSet = field(init=False, default=frozenset())
+    grounding: Grounding = field(init=False, default_factory=Grounding)
 
     def list(self, key: str) -> List[object]:
         return self.__lists[key]

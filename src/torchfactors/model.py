@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
-                    Optional, Sequence, TypeVar, overload)
+                    Optional, Sequence, overload)
 
 import torch
 # from multimethod import multidispatch as overload
@@ -13,9 +13,9 @@ from torch.nn.parameter import Parameter
 
 from .domain import FlexDomain
 from .factor import Factor
+from .subject import Grounding, SubjectType
 from .types import ShapeType
-
-T = TypeVar('T')
+from .variable import Var
 
 
 class ParamNamespace:
@@ -24,7 +24,7 @@ class ParamNamespace:
     with a unique key and the Model that actually stores everything
     """
 
-    def __init__(self, model: Model, key: Hashable):
+    def __init__(self, model: 'Model', key: Hashable):
         self.model = model
         self.key = key
 
@@ -73,7 +73,31 @@ class ParamNamespace:
         return self.model._get_module(self.key, default_factory=constructor)
 
 
-class Model(torch.nn.Module, Generic[T]):
+# class GroundedNamespace(ParamNamespace):
+
+#     def __init__(self, model: 'Model', key: Hashable,
+#                  grounding: Optional[Grounding] = None):
+#         super().__init__(model, key)
+#         if grounding is None:
+#             grounding = Grounding()
+#         self.grounding = Grounding()
+
+#     def namespace(self, key: Hashable) -> GroundedNamespace:
+#         r"""
+#         Returns a new namespace branch labeled with the given key
+#         """
+#         return GroundedNamespace(
+#             model=self.model, key=(self.key, key),
+#             grounding=self.grounding)
+
+#     def variable(self, factory: Callable[[], Var]) -> Var:
+#         return self.grounding.variable(self.key, factory)
+
+#     def factor(self, factory: Callable[[], Factor]) -> Factor:
+#         return self.grounding.factor(self.key, factory)
+
+
+class Model(torch.nn.Module, Generic[SubjectType]):
 
     def __init__(self):
         super(Model, self).__init__()
@@ -94,10 +118,13 @@ class Model(torch.nn.Module, Generic[T]):
     def namespace(self, key: Hashable) -> ParamNamespace:
         return ParamNamespace(self, key)
 
+    # def grounded_namespace(self, key: Hashable = 'root') -> GroundedNamespace:
+    #     return GroundedNamespace(self, key)
+
     # def factors_from(self, factor_generator: Callable[[T], Iterable[Factor]]) -> None:
     #     self._model_factor_generators.append(factor_generator)
 
-    def factors(self, subject: T) -> Iterable[Factor]:
+    def factors(self, subject: SubjectType) -> Iterable[Factor]:
         return []
         # for gen in self._model_factor_generators:
         #     yield from gen(subject)
@@ -149,5 +176,18 @@ class Model(torch.nn.Module, Generic[T]):
         else:
             return self._model_modules[repr]
 
-    def __call__(self, subject: T) -> List[Factor]:
+    def __call__(self, subject: SubjectType) -> List[Factor]:
+        subject.grounding = Grounding()
         return list(self.factors(subject))
+
+
+# class Clique(torch.nn.Module, Generic[T]):
+
+#     def __init__(self, variables: Sequence[Var]):
+#         self.variables = variables
+
+
+#     def i
+
+#     def factors(self, subject: T) -> Iterable[Factor]:
+#         return []
