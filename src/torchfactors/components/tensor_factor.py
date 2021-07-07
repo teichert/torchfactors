@@ -27,7 +27,9 @@ class TensorFactor(Factor):
         super().__init__(variables)
         if tensor is None:
             tensor = init(self.shape)
+
         if tensor.shape != self.shape:
+            # tensor = tensor.expand(self.shape)
             raise ValueError("you didn't provide a tensor with the correct shape")
         self.tensor = tensor
 

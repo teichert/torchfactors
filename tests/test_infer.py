@@ -111,15 +111,17 @@ def test_predict_multi():
     assert (bits.tensor == torch.tensor([True, False, False])).all()
 
 
-# TODO: make this work
+# # TODO: make this work;
+# # it would be nice to be able to specify models this way; it would be great to
+# # be able to execute inference more efficiently by passing messages in parallel
 # def test_predict_multi2():
 #     bits = TensorVar(Range(2), torch.tensor([False, True, True]), ANNOTATED)
 #     factors = [
-#         TensorFactor(bits, tensor=torch.tensor([0, 0.5]).log()),
+#         TensorFactor(bits, tensor=torch.tensor([0, 1]).log()),
 #         TensorFactor(bits[..., :-1], bits[..., 1:],
 #                      tensor=torch.tensor([[0, 1], [1, 0.]]).log()),
 #     ]
-#     bp = BP()
+#     bp = BP(passes=6)
 #     marginals = bp.product_marginal(factors, bits)
 #     assert marginals.allclose(torch.tensor([
 #         [0, 1],
@@ -130,7 +132,7 @@ def test_predict_multi():
 #     assert (bits.tensor == torch.tensor([True, False, True])).all()
 
 
-test_predict_multi()
+# test_predict_multi2()
 
 
 def test_bp_change():
