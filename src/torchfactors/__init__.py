@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from torch.nn.functional import one_hot
+
 from . import learning
 from .components.linear_factor import LinearFactor
 from .components.tensor_factor import TensorFactor
@@ -32,6 +34,7 @@ OPEN = Domain.OPEN
 
 __all__ = [
     'dataclass',
+    'one_hot',
     'Domain', 'SeqDomain', 'Range', 'FlexDomain',
     'OPEN',
     'VarUsage', 'Var', 'VarBranch', 'VarField', 'TensorVar', 'vtensor',
