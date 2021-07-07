@@ -8,7 +8,7 @@ import torchfactors as tx
 @dataclass
 class Bits(tx.Subject):
     bits: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED)
-    hidden: tx.Var = tx.VarField(tx.Range(6), tx.LATENT, shape=bits)
+    hidden: tx.Var = tx.VarField(tx.Range(10), tx.LATENT, shape=bits)
 
 
 # Specify the Variables and Factors
@@ -64,7 +64,8 @@ train_data = Bits.stack(data)
 
 # train the model
 model = BitsModel()
-system = tx.learning.example_fit_model(model, data, iterations=500, lr=0.01, penalty_coeff=10000)
+system = tx.learning.example_fit_model(
+    model, data, iterations=200, lr=0.01, passes=4, penalty_coeff=2)
 
 # use the model on held out data
 held_out = Bits(tx.vtensor([False] * 10))

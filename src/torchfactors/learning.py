@@ -15,11 +15,12 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
                       each_step: Optional[Callable[[
                           DataLoader[SubjectType], SubjectType], None]] = None,
                       each_epoch: Optional[Callable[[DataLoader[SubjectType]], None]] = None,
-                      lr=1.0, batch_size: int = -1, penalty_coeff=1) -> System[SubjectType]:
+                      lr=1.0, batch_size: int = -1, penalty_coeff=1, passes=3
+                      ) -> System[SubjectType]:
     logging.info('loading...')
     data_loader = examples[0].data_loader(list(examples), batch_size=batch_size)
     logging.info('done loading.')
-    system = System(model, BP())
+    system = System(model, BP(passes=passes))
     system.prime(data_loader)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     logging.info('staring training...')
@@ -49,7 +50,7 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
             loss = (logz_free - logz_clamped).sum()
             logging.info(f'\t\tloss: {loss}')
             if penalty_coeff != 0:
-                loss = loss + penalty_coeff * penalty.sum()
+                loss = loss + (penalty_coeff * penalty.sum()).exp()
             logging.info(f'\t\tpenalty coeff: {penalty_coeff}')
             logging.info(f'\t\tpenalized loss: {loss}')
             logging.info('\tcomputing gradient...')
