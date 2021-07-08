@@ -21,6 +21,7 @@ class OptionalBiasLinear(torch.nn.Module):
 
     def __init__(self, input_features: int, output_features: int,
                  bias: bool = True):
+        super().__init__()
         self.input_features = input_features
         self.bias_only: Union[torch.nn.parameter.Parameter, torch.Tensor, None] = None
         self.with_features: Optional[torch.nn.Module] = None
@@ -37,7 +38,8 @@ class OptionalBiasLinear(torch.nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         if self.bias_only is not None:
-            out = self.bias_only.expand(*x.shape[:-1], len(self.bias_only))
+            # out = self.bias_only.expand(*x.shape[:-1], len(self.bias_only))
+            out = self.bias_only
         else:
             out = cast(torch.nn.Module, self.with_features)(x)
         return out
@@ -47,6 +49,7 @@ class ShapedLinear(torch.nn.Module):
 
     def __init__(self, output_shape: ShapeType,
                  bias: bool = True, input_shape: ShapeType = None):
+        super().__init__()
         self.input_shape = input_shape
         if input_shape is None:
             input_features = 0
@@ -117,7 +120,7 @@ class LinearFactor(Factor):
         #         input = input.reshape((*self.batch_shape, -1))
         #     input = input.float()
         # return m(input).reshape(self.shape)
-        return m(input)
+        return m(self.input)
 
 
 def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],

@@ -11,5 +11,5 @@ class LatentBinary(CliqueModel):
 
     def factors(self, env: Environment, params: ParamNamespace,
                 *variables: Var, input: Tensor):
-
         # make a binary variable for each binary configuration
+        pass

@@ -15,7 +15,7 @@ def test_linear_factor():
     print(f.dense)
     p = list(m.parameters())
     print(p)
-    assert len(p) == 2
+    assert len(p) == 1
 
 
 def test_linear_factor2():
