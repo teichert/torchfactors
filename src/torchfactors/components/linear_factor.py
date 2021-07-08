@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import math
 from functools import cached_property
-from typing import Optional, Sequence, Union, cast
+from typing import Optional, Union, cast
 
 import torch
 from torch.functional import Tensor
-from torchfactors.types import ShapeType
 
 from ..factor import Factor
 from ..model import ParamNamespace
+from ..types import ShapeType
 from ..variable import Var
 
 
@@ -121,17 +121,3 @@ class LinearFactor(Factor):
         #     input = input.float()
         # return m(input).reshape(self.shape)
         return m(self.input)
-
-
-def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
-                       input: Tensor,
-                       bias: bool = False):
-    num_batch_dims = len(variables[0].shape) - 1
-
-    def factory():
-        out = ShapedLinear(input_shape=input.shape[num_batch_dims:],
-                           output_shape=tuple(2 for v in variables),
-                           bias=bias)
-        return out
-    out = params.module(factory)
-    return out
