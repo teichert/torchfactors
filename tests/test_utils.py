@@ -2,7 +2,8 @@ import pytest
 import torch
 from torch import arange
 from torchfactors.utils import (as_ndrange, compose, compose_single, ndarange,
-                                ndslices_cat, ndslices_overlap, outer)
+                                ndslices_cat, ndslices_overlap, outer,
+                                stereotype)
 
 
 def test_compose_single():
@@ -100,4 +101,58 @@ def test_outer_batch():
         [[28, 36], [42, 54]],
         [[84, 108], [126, 162]]
     ]])
+    assert out.allclose(expected)
+
+
+def test_stereotype():
+    scales = torch.tensor([2, 3, 4])
+    binary = torch.tensor([5, 6])
+    out = stereotype(scales, binary)
+    # total = scales.sum() * binary[0]
+    # full = scales * binary[1] + total
+    # for each coordinate, iterate over the 4
+    expected = torch.tensor([2*6+9*5, 3*6+9*5, 4*6+9*5])
+    assert out.allclose(expected)
+
+
+def test_stereotype2():
+    scales = torch.tensor([
+        [1, 2, 3],
+        [3, 4, 5],
+        [6, 7, 8],
+        [9, 10, 11]
+    ]).float()
+    binary = torch.tensor([
+        [12, 13],
+        [14, 15]
+    ])
+    out = stereotype(scales, binary)
+    total = scales.sum() * binary[0, 0]
+    full = scales * binary[1, 1] + total
+    cols = scales.sum(0) * binary[0, 1]
+    rows = scales.sum(1) * binary[1, 0]
+    # for each coordinate, iterate over the 4
+    expected = torch.tensor(
+        [
+            [
+                full[0, 0] + rows[0] + cols[0],
+                full[0, 1] + rows[0] + cols[1],
+                full[0, 2] + rows[0] + cols[2],
+            ],
+            [
+                full[1, 0] + rows[1] + cols[0],
+                full[1, 1] + rows[1] + cols[1],
+                full[1, 2] + rows[1] + cols[2],
+            ],
+            [
+                full[2, 0] + rows[2] + cols[0],
+                full[2, 1] + rows[2] + cols[1],
+                full[2, 2] + rows[2] + cols[2],
+            ],
+            [
+                full[3, 0] + rows[3] + cols[0],
+                full[3, 1] + rows[3] + cols[1],
+                full[3, 2] + rows[3] + cols[2],
+            ],
+        ])
     assert out.allclose(expected)

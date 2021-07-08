@@ -170,10 +170,15 @@ def stereotype(scales: Tensor, binary: Tensor) -> Tensor:
     """
     num_config_dims = len(scales.shape)
     all = []
+    # batch_dims = binary.shape[:-num_config_dims]
     for config in itertools.product(*itertools.repeat([0, 1], num_config_dims)):
         dims_to_sum = [i for i, ci in enumerate(config) if ci == 0]
-        coeffs = scales.sum(dims_to_sum, keepdim=True).expand_as(scales)
-        out = binary[..., config] * coeffs
+        if dims_to_sum:
+            coeffs = scales.sum(dims_to_sum, keepdim=True).expand_as(scales)
+        else:
+            coeffs = scales
+        # .expand(batch_dims + coeffs.shape)
+        out = binary[(...,) + config] * coeffs
         all.append(out)
     full = torch.stack(all, -1).sum(-1)
     return full
