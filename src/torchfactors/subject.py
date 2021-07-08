@@ -29,7 +29,7 @@ class ListDataset(Dataset, Generic[ExampleType]):
         return self.examples[index]
 
 
-class Grounding(object):
+class Environment(object):
     """
     allows additional variables and factors to be
     added without duplicates
@@ -61,7 +61,7 @@ class Subject:
     is_stacked: bool = field(init=False, default=False)
     __lists: Dict[str, List[object]] = field(init=False, default_factory=dict)
     __varset: FrozenSet = field(init=False, default=frozenset())
-    grounding: Grounding = field(init=False, default_factory=Grounding)
+    environment: Environment = field(init=False, default_factory=Environment)
 
     def list(self, key: str) -> List[object]:
         return self.__lists[key]

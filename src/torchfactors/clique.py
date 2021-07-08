@@ -1,6 +1,8 @@
 
 from abc import ABC, abstractmethod
 
+from torch.functional import Tensor
+
 from torchfactors.subject import Environment
 
 from .model import ParamNamespace
@@ -11,4 +13,4 @@ from .variable import Var
 class CliqueModel(ABC):
 
     @abstractmethod
-    def factors(self, env: Environment, params: ParamNamespace, *variables: Var, **kwargs): ...
+    def factors(self, env: Environment, params: ParamNamespace, *variables: Var, input: Tensor): ...

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from functools import cached_property
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Union, cast
 
 import torch
 from torch.functional import Tensor
@@ -16,14 +16,14 @@ from ..variable import Var
 class OptionalBiasLinear(torch.nn.Module):
     r"""
     Allows the output to ignore the input (bias-only),
-    but otherwise, works like a regular linear layer
+    but otherwise, works like a regular linear
     """
 
     def __init__(self, input_features: int, output_features: int,
                  bias: bool = True):
         self.input_features = input_features
-        self.bias_only = None
-        self.with_features = None
+        self.bias_only: Union[torch.nn.parameter.Parameter, torch.Tensor, None] = None
+        self.with_features: Optional[torch.nn.Module] = None
         if input_features == 0:
             if bias:
                 self.bias_only = torch.nn.parameter.Parameter(
@@ -36,10 +36,10 @@ class OptionalBiasLinear(torch.nn.Module):
                 input_features, output_features, bias=bias)
 
     def forward(self, x: Tensor) -> Tensor:
-        if self.input_features == 0:
+        if self.bias_only is not None:
             out = self.bias_only.expand(*x.shape[:-1], len(self.bias_only))
         else:
-            out = self.with_features(x)
+            out = cast(torch.nn.Module, self.with_features)(x)
         return out
 
 
@@ -58,10 +58,11 @@ class ShapedLinear(torch.nn.Module):
                                                  bias=bias)
 
     def forward(self, x: Tensor) -> Tensor:
+        flattened_in: Tensor
         if self.input_shape is None:
             flattened_in = x
         else:
-            flattened_in: Tensor = x.flatten(len(x.shape) - len(self.input_shape))
+            flattened_in = x.flatten(len(x.shape) - len(self.input_shape))
         out: Tensor = self.wrapped_linear(flattened_in)
         reshaped = out.unflatten(-1, self.output_shape)
         return reshaped
@@ -115,11 +116,12 @@ class LinearFactor(Factor):
         #     else:
         #         input = input.reshape((*self.batch_shape, -1))
         #     input = input.float()
-
         # return m(input).reshape(self.shape)
+        return m(input)
 
 
-def BinaryScoresModule(params: ParamNamespace, variables: Sequence,
+def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
+                       input: Tensor,
                        bias: bool = False):
     num_batch_dims = len(variables[0].shape) - 1
 

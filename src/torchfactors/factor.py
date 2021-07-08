@@ -148,10 +148,6 @@ class Factor:
         return Factor.out_shape_from_variables(self.variables)
 
     @cached_property
-    def in_shape(self):
-        return self.batch_shape
-
-    @cached_property
     def shape(self):
         r"""
         Returns the shape of the (possibly implicit) tensor that would represent this tensor

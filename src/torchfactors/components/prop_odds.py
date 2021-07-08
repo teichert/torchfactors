@@ -2,11 +2,11 @@ import itertools
 from typing import Dict, Tuple
 
 import torch
-import torchfactors as tx
 from torch.functional import Tensor
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.factor import Factor
 
+from ..clique import CliqueModel
 from ..domain import Range
 from ..model import ParamNamespace
 from ..subject import Environment
@@ -22,7 +22,7 @@ from .linear_factor import BinaryScoresModule, ShapedLinear
 #         pass
 
 
-class ProportionalOdds(tx.CliqueModel):
+class ProportionalOdds(CliqueModel):
 
     def factors(self, env: Environment, params: ParamNamespace,
                 *variables: Var, input: Tensor):
@@ -32,17 +32,20 @@ class ProportionalOdds(tx.CliqueModel):
             out = TensorVar(
                 domain=Range(2),
                 usage=v.usage.clone(),
-                tensor=v.tensor == label).int()
+                tensor=(v.tensor == label).int())
             return out
-        binary_variables: Dict[Tuple[Var, int]] = {
+        binary_variables: Dict[Tuple[Var, int], Var] = {
             (v, label): env.variable((v, label), lambda: binary_variable(v, label))
             for v in variables
             for label in range(len(v.domain))
         }
-        binary_scores_module = BinaryScoresModule(params.namespace('binary-scores'), variables)
+        binary_scores_module = BinaryScoresModule(
+            params.namespace('binary-scores'), variables, input=input)
         binary_scores = binary_scores_module(input)
-        bias_module = params.namespace('full-bias').module(lambda:
-                                                           ShapedLinear(output_shape=Factor.out_shape_from_variables(variables), bias=True))
+
+        def bias_module_factory():
+            return ShapedLinear(output_shape=Factor.out_shape_from_variables(variables), bias=True)
+        bias_module = params.namespace('full-bias').module(bias_module_factory)
         bias = bias_module(None)
         for config in itertools.product(*[range(1, len(v.domain)) for v in variables]):
             config_variables = [
@@ -51,5 +54,6 @@ class ProportionalOdds(tx.CliqueModel):
             # the config-specific bias is applied to whether or not all of the
             # corresponding binary variables is true
             config_bias = torch.sparse_coo_tensor(
-                [[1]] * len(variables), [bias[config]], binary_scores.shape)
+                torch.ones((len(variables), 1)),
+                [bias[config]], binary_scores.shape)
             yield TensorFactor(*config_variables, tensor=binary_scores + config_bias)

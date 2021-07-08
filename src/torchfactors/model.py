@@ -13,9 +13,8 @@ from torch.nn.parameter import Parameter
 
 from .domain import FlexDomain
 from .factor import Factor
-from .subject import Grounding, SubjectType
+from .subject import Environment, SubjectType
 from .types import ShapeType
-from .variable import Var
 
 
 class ParamNamespace:
@@ -177,7 +176,7 @@ class Model(torch.nn.Module, Generic[SubjectType]):
             return self._model_modules[repr]
 
     def __call__(self, subject: SubjectType) -> List[Factor]:
-        subject.grounding = Grounding()
+        subject.environment = Environment()
         return list(self.factors(subject))
 
 
