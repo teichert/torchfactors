@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, cast
+from typing import Any, Dict, Tuple, cast
 
 import pytest
 import torch
@@ -7,6 +7,8 @@ import torchfactors as tx
 from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED,
                           PADDING, Var, VarUsage)
 from torchfactors.domain import Range
+from torchfactors.factor import Factor
+from torchfactors.subject import Environment
 from torchfactors.variable import TensorVar, VarField
 
 
@@ -470,3 +472,23 @@ def test_clone():
         v.set_tensor(3.0)
     v2.clamp_annotated()
     assert cast(torch.Tensor, (v2.usage == tx.CLAMPED)).all()
+
+
+def test_environment_vars():
+    env = Environment()
+    v: Var = VarField()
+    v2: Var = VarField()
+    assert env.variable('a', lambda: v) is v
+    assert env.variable('a', lambda: v2) is v
+    assert env.variable('a', lambda: v2) is not v2
+
+
+def test_environment_factors():
+    env = Environment()
+    model = tx.Model[Any]()
+    v: Var = tx.vtensor([3, 4, 5])
+    f: Factor = tx.LinearFactor(model.namespace('a'), v)
+    f2: Factor = tx.LinearFactor(model.namespace('b'), v)
+    assert env.factor('b', lambda: f) is f
+    assert env.factor('b', lambda: f2) is f
+    assert env.factor('b', lambda: f2) is not f2
