@@ -3,11 +3,11 @@ import torch
 import torchfactors as tx
 from torch.functional import Tensor
 
-from ..clique import CliqueModel
+from ..clique import BinaryScoresModule, CliqueModel
 from ..model import ParamNamespace
 from ..subject import Environment
 from ..variable import Var
-from .linear_factor import BinaryScoresModule, LinearFactor
+from .linear_factor import LinearFactor
 
 
 class Stereotype(CliqueModel):

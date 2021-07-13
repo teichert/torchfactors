@@ -16,20 +16,29 @@ class CliqueModel(ABC):
 
     @abstractmethod
     def factors(self, env: Environment, params: ParamNamespace, *variables: Var, input: Tensor): ...
+    # TODO: when needed later, will accept an additional (optional) input map from
+    # variable subset (frozenset?) to tensor and the ability to specify cat or add
+    # for the variables subsets that match a subset of interest.  This
+    # will allow sufficient generalization as to simulate separate keys per variable
+    # and per element of the same batch.
 
 
 def make_binary_label_variables(env: Environment, *variables: Var, key: Hashable = None,
-                                latent: bool = False
+                                latent: bool = False, only_equals: bool = False
                                 ) -> Dict[Tuple[Var, int], Var]:
     def binary_variable(v: Var, label: int):
         if latent:
-            usage = v.usage.clone().where(v.usage == VarUsage.PADDING, VarUsage.LATENT)
+            usage = v.usage.clone().masked_fill(v.usage != VarUsage.PADDING, VarUsage.LATENT)
         else:
             usage = v.usage.clone()
+        if only_equals:
+            labels = v.tensor == label
+        else:
+            labels = v.tensor >= label
         out = TensorVar(
             domain=Range(2),
             usage=usage,
-            tensor=(v.tensor == label).int())
+            tensor=labels.int())
         return out
     binary_variables: Dict[Tuple[Var, int], Var] = {
         (v, label): env.variable((v, label, key), lambda: binary_variable(v, label))
@@ -41,19 +50,19 @@ def make_binary_label_variables(env: Environment, *variables: Var, key: Hashable
 
 def make_binary_threshold_variables(env: Environment, *variables: Var, key: Hashable = None,
                                     latent: bool = False
-                                    ) -> Dict[Tuple[Var], Var]:
+                                    ) -> Dict[Var, Var]:
     # TODO: allow different ways of thresholding
     def binary_variable(v: Var):
         if latent:
-            usage = v.usage.clone().where(v.usage == VarUsage.PADDING, VarUsage.LATENT)
+            usage = v.usage.clone().masked_fill(v.usage != VarUsage.PADDING, VarUsage.LATENT)
         else:
             usage = v.usage.clone()
         out = TensorVar(
             domain=Range(2),
             usage=usage,
-            tensor=(v.tensor > len(v.domain) // 2).int())
+            tensor=(v.tensor >= len(v.domain) / 2).int())
         return out
-    binary_variables: Dict[Tuple[Var], Var] = {
+    binary_variables: Dict[Var, Var] = {
         v: env.variable((v, key), lambda: binary_variable(v))
         for v in variables
     }
