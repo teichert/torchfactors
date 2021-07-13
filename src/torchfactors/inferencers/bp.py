@@ -201,6 +201,7 @@ class BPInference:
         return update_messages
 
     def run(self):
+        # for s, ts in list(self.strategy):
         for s, ts in tqdm(list(self.strategy)):
             self.update_messages_from_regionf(s, tuple(ts))()
 

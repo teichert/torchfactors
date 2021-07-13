@@ -122,11 +122,37 @@ class SPRLModel(tx.Model[SPRL]):
                     tx.one_hot(x.predicate[..., i].tensor.long(), num_predicates).float(),
                     tx.one_hot(x.predicate[..., j].tensor.long(), num_predicates).float()
                 )
+
                 yield from Stereotype().factors(
                     x.environment,
                     self.namespace('property-groups'),
                     x.rating[..., i], x.rating[..., j],
                     input=torch.cat([embeded_property, embeded_predicate], -1))
+
+
+# class SPRLModel2(tx.Model[SPRL]):
+
+#     # def __init__(self, clique_model: CliqueModel):
+#     #     super().__init__()
+#     #     self.clique_model = Lin
+
+#     def factors(self, x: SPRL):
+#         n = x.property.shape[-1]
+#         # for i in range(n):
+#         property_domain.freeze()
+#         annotator_domain.freeze()
+#         predicate_domain.freeze()
+#         # num_properties = len(x.property.domain)
+#         # num_predicates = len(x.predicate.domain)
+#         # embed_size = 5
+#         # for group, group_info in LinearChain().groups(x.rating.unbind(-1),
+#         for i in range(1, n):
+#             group = [x.rating[..., i - 1], x.rating[..., i]]
+#             yield from Stereotype().factors(
+#                 x.environment,
+#                 self.namespace('property-groups'),
+#                 *group,
+#                 input=torch.cat([embeded_property, embeded_predicate], -1))
 
 
 if __name__ == '__main__':

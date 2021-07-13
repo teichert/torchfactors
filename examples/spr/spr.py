@@ -129,7 +129,7 @@ if __name__ == '__main__':
                         # default='./protoroles_eng_ud1.2_11082016.tsv')
                         default='./examples/spr/protoroles_eng_ud1.2_11082016.tsv')
     args = parser.parse_args()
-    torch.set_anomaly_enabled(True)
+    # torch.set_anomaly_enabled(True)
     # print(os.cpu_count())
     torch.set_num_threads(1)
     model = SPRLModel()
