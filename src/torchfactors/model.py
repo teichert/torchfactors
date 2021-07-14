@@ -104,6 +104,7 @@ class Model(torch.nn.Module, Generic[SubjectType]):
         # self._model_domains: Dict[Hashable, Domain] = {}
         self._model_parameters = ParameterDict()
         self._model_modules = ModuleDict()
+        # TODO: these domains are not actually saved anywhere to file
         self._domains: Dict[str, FlexDomain] = {}
 
     def domain_ids(self, domain: FlexDomain, values: Sequence[Hashable]) -> torch.Tensor:

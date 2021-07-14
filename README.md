@@ -80,6 +80,17 @@ held_out.bits.usage[1] = tx.OBSERVED
 predicted = system.predict(held_out)
 logging.info(predicted.bits.tensor.tolist())
 
+# # save the model to disk
+# import torch
+# torch.save(model.state_dict(), "model.pt")
+# model2 = BitsModel()
+# model2.load_state_dict(torch.load("model.pt"), strict=False)
+
+# held_out2 = Bits(tx.vtensor([False] * 10))
+# held_out2.bits.usage[1] = tx.OBSERVED
+# predicted2 = system.predict(held_out2)
+# logging.info(predicted2.bits.tensor.tolist())
+
 ```
 
 # Contributing
