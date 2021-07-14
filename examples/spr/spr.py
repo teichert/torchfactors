@@ -136,7 +136,7 @@ if __name__ == '__main__':
     # file available: http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
     examples = list(SPRL.from_tsv(
         args.tsv,
-        model=model))[:1]
+        model=model))[:1000]
     system = System(model, BP())
     train = SPRL.stack(examples)
 

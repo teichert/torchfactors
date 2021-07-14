@@ -63,3 +63,8 @@ examples/spr/protoroles_eng_ud1.2_11082016.tsv:
 .PHONY: spr-example
 spr-example: examples/spr/protoroles_eng_ud1.2_11082016.tsv pyproject.lock
 	poetry run python examples/spr/spr.py examples/spr/protoroles_eng_ud1.2_11082016.tsv
+
+# .PHONY: profile-spr
+# profile-spr: examples/spr/protoroles_eng_ud1.2_11082016.tsv pyproject.lock
+# 	poetry run python examples/spr/spr.py examples/spr/protoroles_eng_ud1.2_11082016.tsv &; pid=`top | head -n 10 | grep python | head -n 1 | cut -d" " -f2`; poetry run py-spy
+# 	poetry run python examples/spr/spr.py examples/spr/protoroles_eng_ud1.2_11082016.tsv

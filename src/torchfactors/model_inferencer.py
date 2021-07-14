@@ -2,6 +2,7 @@ import copy
 from typing import Generic, Iterable, Sequence, Tuple, Union, cast
 
 from torch.functional import Tensor
+from tqdm import tqdm  # type: ignore
 
 from .inferencer import Inferencer
 from .model import Model
@@ -30,7 +31,7 @@ class System(Generic[SubjectType]):
                 f.dense
                 f.clear_cache()
         else:
-            for subject in cast(Iterable[SubjectType], x):
+            for subject in tqdm(cast(Iterable[SubjectType], x)):
                 self.prime(subject)
 
     def predict(self, x: SubjectType) -> SubjectType:
