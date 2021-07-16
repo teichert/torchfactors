@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 import torchfactors as tx
@@ -22,7 +23,7 @@ class Bits(tx.Subject):
 class BitsModel(tx.Model[Bits]):
     def factors(self, x: Bits):
         max_length = x.bits.shape[-1]
-        lasts = [length - 1 for length in x.list('length')]
+        lasts = [cast(int, length) - 1 for length in x.list('length')]
         yield tx.LinearFactor(self.namespace('start'), x.hidden[..., 0])
         yield tx.LinearFactor(self.namespace('start-end'), x.hidden[..., 0], x.hidden[..., lasts])
         for i in range(max_length):

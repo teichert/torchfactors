@@ -1,14 +1,14 @@
 import itertools
 import math
 from itertools import chain
-from typing import List, Tuple, Union, cast, overload
+from typing import Tuple, overload
 
 import torch
 from multimethod import multidispatch
 from opt_einsum import contract  # type: ignore
 from torch import Tensor, arange
 
-from .types import NDSlice, ShapeType, SliceType
+from .types import MaybeRange, NDRange, NDSlice, ShapeType, SliceType
 
 
 @multidispatch
@@ -120,26 +120,81 @@ def canonical_range(r: range) -> range:
         return range(0)
 
 
-def canonical_slice(r: range) -> range:
-    out = canonical_range(r)
-    if out.start is None:
-        out.start = 0
-    if out.step is None:
-        out.step = 1
-    return slice(out.start, out.stop, out.step)
-
-
-def as_range(one_slice: slice, length: int) -> range:
-    """returns a range representing the same subset of integers as the given
-    slice assuming the given length"""
-    out = range(length)[one_slice]
-    if isinstance(out, range):
-        return canonical_range(out)
+def canonical_maybe_range(r: MaybeRange) -> MaybeRange:
+    if isinstance(r, int):
+        return r
+    elif isinstance(r, range):
+        return canonical_range(r)
     else:
-        return out
+        # make sure if a range could suffice, that it is used
+        out = tuple(r)
+        if not out:
+            return range(0)
+        elif len(out) == 1:
+            v = out[0]
+            return range(v, v+1, 1)
+        # elif len(out) == 2:
+        #     v1, v2 = out
+        #     return range(v1, v2 + 1, v2 - v1)
+        else:
+            v1, v2 = out[:2]
+            v_last = out[-1]
+            step = v2 - v1
+            cand = range(v1, end(v_last, step), step)
+            if tuple(cand) == out:
+                return cand
+            else:
+                return out
 
 
-def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> Tuple[range, ...]:
+# def canonical_slice(r: range) -> range:
+#     out = canonical_range(r)
+#     if out.start is None:
+#         out.start = 0
+#     if out.step is None:
+#         out.step = 1
+#     return slice(out.start, out.stop, out.step)
+
+
+# def canonical_maybe_slice(r: SliceType, length: int
+#                           ) -> range:
+
+#     out = canonical_range(r)
+#     if out.start is None:
+#         out.start = 0
+#     if out.step is None:
+#         out.step = 1
+#     return slice(out.start, out.stop, out.step)
+
+
+def slice_to_range(one_slice: SliceType, length: int) -> MaybeRange:
+    if isinstance(one_slice, slice):
+        return range(length)[one_slice]
+    else:
+        return one_slice
+
+
+def range_to_slice(one_range: MaybeRange) -> SliceType:
+    if isinstance(one_range, range):
+        return slice(one_range.start, one_range.stop, one_range.step)
+    else:
+        return one_range
+
+
+def as_range(one_slice: SliceType, length: int) -> MaybeRange:
+    """returns a range (or tuple of int when not representable by a range)
+    representing the same subset of integers as the given
+    slice assuming the given length"""
+    return canonical_maybe_range(slice_to_range(one_slice, length))
+
+
+def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> NDRange:
+    r"""
+    slices are used to index into a subset of a tensor, but the are not
+    hashable; this converts something that could index into a hashable
+    version that replaces slices with equivalent range objects (and
+    lists with equivalent tuples)
+    """
     if isinstance(ndslice, (tuple, list)):
         if not ndslice:
             return ()
@@ -153,61 +208,70 @@ def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> Tuple[range, ...]:
                 dots_dims = dims_left - slices_left
                 return (
                     tuple([range(length) for length in shape[:dots_dims]]) +
-                    as_ndrange(ndslice[1:], shape[dots_dims:]))
+                    tuple(as_ndrange(ndslice[1:], shape[dots_dims:])))
             else:
                 return (
                     (as_range(first_slice, shape[0]),) +
-                    as_ndrange(ndslice[1:], shape[1:]))
+                    tuple(as_ndrange(ndslice[1:], shape[1:])))
     else:
         raise NotImplementedError("haven't implemented support for that kind of ndslice")
 
 
 def compose_single(lhs: SliceType, rhs: SliceType, length: int
-                   ) -> Union[slice, int, List[int]]:
-    # if either is an int, we get an int
-    # if both are ranges, we get a range
-    # otherwise, we get a list that might reduce to a range
-    if isinstance(lhs, int):
+                   ) -> SliceType:
+    lhs_range = as_range(lhs, length)
+    if isinstance(lhs_range, int):
         raise ValueError("cannot index into a 0-dimensional")
-    elif isinstance(rhs, int):
-        if isinstance(lhs, slice):
-            return as_range(lhs, length)[rhs]
-        else:
-            return lhs[cast(int, rhs)]
-    elif isinstance(lhs, slice) and isinstance(rhs, slice):
-        return canonical_slice(as_range(lhs, length)[rhs])
+    if isinstance(rhs, (int, slice)):
+        out = lhs_range[rhs]
     else:
-        if isinstance(lhs, slice):
-            lhs_list = list(as_range(lhs, length))
-        else:
-            lhs_list = cast(list, lhs)
-        # left_out_length = len(lhs_list)
-        if isinstance(rhs, slice):
-            # remaining length will be based on the output of the left
-            rhs_list = list(as_range(rhs, len(lhs_list)))
-        else:
-            rhs_list = cast(list, rhs)
-        # the indexes given in the right list index into the
-        # left list, but we don't keep them if they go over
-        out = [lhs_list[r] for r in rhs_list
-               if r < len(lhs_list)]
-        if len(out) == 0:
-            return slice(0, 0, 1)
-        elif len(out) == 1:
-            v = out[0]
-            return slice(v, v+1, 1)
-        elif len(out) == 2:
-            v1, v2 = out
-            return slice(v1, v2 + 1, v2 - v1)
-        else:
-            v1, v2 = out[:2]
-            v_last = out[-1]
-            step = v2 - v1
-            cand = range(v1, end(v_last, step), step)
-            if list(cand) == out:
-                return slice(cand.start, cand.stop, cand.step)
-            else:
-                return out
+        out = [lhs_range[r] for r in rhs
+               if r < len(lhs_range)]
+    # don't keep sequences if they can be replaced
+    canonical = canonical_maybe_range(out)
+    to_slice = range_to_slice(canonical)
+    return to_slice
+    # rhs_range = as_range(rhs)
+    # if
+    # elif isinstance(rhs, int):
+    #     if isinstance(lhs, slice):
+    #         return as_range(lhs, length)[rhs]
+    #     else:
+    #         return lhs[cast(int, rhs)]
+    # elif isinstance(lhs, slice) and isinstance(rhs, slice):
+    #     return canonical_slice(as_range(lhs, length)[rhs])
+    # else:
+    #     if isinstance(lhs, slice):
+    #         lhs_list = list(as_range(lhs, length))
+    #     else:
+    #         lhs_list = cast(list, lhs)
+    #     # left_out_length = len(lhs_list)
+    #     if isinstance(rhs, slice):
+    #         # remaining length will be based on the output of the left
+    #         rhs_list = list(as_range(rhs, len(lhs_list)))
+    #     else:
+    #         rhs_list = cast(list, rhs)
+    #     # the indexes given in the right list index into the
+    #     # left list, but we don't keep them if they go over
+    #     out = [lhs_list[r] for r in rhs_list
+    #            if r < len(lhs_list)]
+    #     if len(out) == 0:
+    #         return slice(0, 0, 1)
+    #     elif len(out) == 1:
+    #         v = out[0]
+    #         return slice(v, v+1, 1)
+    #     elif len(out) == 2:
+    #         v1, v2 = out
+    #         return slice(v1, v2 + 1, v2 - v1)
+    #     else:
+    #         v1, v2 = out[:2]
+    #         v_last = out[-1]
+    #         step = v2 - v1
+    #         cand = range(v1, end(v_last, step), step)
+    #         if list(cand) == out:
+    #             return slice(cand.start, cand.stop, cand.step)
+    #         else:
+    #             return out
     # out = as_range(cast(slice, lhs), length)[rhs]
     # return out if isinstance(out, int) else slice(out.start, out.stop, out.step)
 

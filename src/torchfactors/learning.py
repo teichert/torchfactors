@@ -3,7 +3,7 @@ from typing import Iterable, Optional, Protocol, Sequence, Tuple, TypeVar
 
 import torch
 from torch.utils.data.dataloader import DataLoader
-from tqdm import tqdm
+from tqdm import tqdm  # type: ignore
 
 from .inferencers.bp import BP
 from .model import Model

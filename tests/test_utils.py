@@ -7,7 +7,9 @@ from torchfactors.utils import (as_ndrange, compose, compose_single, ndarange,
 
 
 def test_compose_single():
-    assert compose_single(slice(3, 14, 2), slice(2, 6, 3), 100) == slice(7, 14, 6)
+    out = compose_single(slice(3, 14, 2), slice(2, 6, 3), 100)
+    expected = slice(7, 14, 6)
+    assert out == expected
 
 
 def test_compose():
@@ -28,18 +30,32 @@ def test_compose2():
     shape = (4, 5)
     first = (slice(1, 4), slice(None))
     second = ([2, 0, 1], 1)
-    expected_combined = ([3, 1, 2], 1)
+    expected_combined = ((3, 1, 2), 1)
 
     assert compose(shape, first, second) == expected_combined
+
+
+def test_compose3a():
+    shape = (6,)
+    first = ([2, 1, 1],)
+    second = ([0, 2],)
+    expected_combined = (slice(2, 0, -1),)
+
+    out = compose(shape, first, second)
+    assert out == expected_combined
+
+
+test_compose3a()
 
 
 def test_compose3():
     shape = (4, 5, 6)
     first = (slice(1, 4), slice(None), [2, 1, 1])
     second = ([2, 0, 1], 1, [0, 2])
-    expected_combined = ([3, 1, 2], 1, slice(2, 0, -1))
+    expected_combined = ((3, 1, 2), 1, slice(2, 0, -1))
 
-    assert compose(shape, first, second) == expected_combined
+    out = compose(shape, first, second)
+    assert out == expected_combined
 
 
 def test_ndrange():
@@ -67,6 +83,12 @@ def test_asndrange_dots():
     shape = (10, 11, 12, 13, 14)
     out = as_ndrange([slice(3, 6), ..., 5], shape=shape)
     assert out == (range(3, 6), range(11), range(12), range(13), 5)
+
+
+def test_asndrange_lists():
+    shape = (10, 11, 12, 13, 14)
+    out = as_ndrange([slice(3, 6), [3, 1, 2], slice(None), (3, 4), 5], shape=shape)
+    assert out == (range(3, 6), (3, 1, 2), range(12), range(3, 5), 5)
 
 
 def test_asndrange_bad_dots():
