@@ -7,7 +7,7 @@ from torchfactors.utils import (as_ndrange, compose, compose_single, ndarange,
 
 
 def test_compose_single():
-    assert compose_single(slice(3, 14, 2), slice(2, 6, 3), 100) == slice(7, 15, 6)
+    assert compose_single(slice(3, 14, 2), slice(2, 6, 3), 100) == slice(7, 14, 6)
 
 
 def test_compose():
@@ -15,13 +15,31 @@ def test_compose():
     first = (slice(None), 3, slice(3, 9))
     second = (2, slice(1, 3), slice(5))
     expected_combined = (2, 3, slice(4, 6, 1), slice(0, 5, 1))
-
-    assert compose(shape, first, second) == expected_combined
+    out = compose(shape, first, second)
+    assert out == expected_combined
 
     other_first = (slice(2, 4), slice(None), slice(2, 7))
     other_second = (0, 3, slice(2, -1), slice(5))
+    other_out = compose(shape, other_first, other_second)
+    assert other_out == expected_combined
 
-    assert compose(shape, other_first, other_second) == expected_combined
+
+def test_compose2():
+    shape = (4, 5)
+    first = (slice(1, 4), slice(None))
+    second = ([2, 0, 1], 1)
+    expected_combined = ([3, 1, 2], 1)
+
+    assert compose(shape, first, second) == expected_combined
+
+
+def test_compose3():
+    shape = (4, 5, 6)
+    first = (slice(1, 4), slice(None), [2, 1, 1])
+    second = ([2, 0, 1], 1, [0, 2])
+    expected_combined = ([3, 1, 2], 1, slice(2, 0, -1))
+
+    assert compose(shape, first, second) == expected_combined
 
 
 def test_ndrange():

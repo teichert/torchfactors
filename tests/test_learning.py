@@ -20,7 +20,7 @@ def test_learning():
     model = MyModel()
     num_steps = 0
 
-    def each_step(loader, example):
+    def each_step(system, loader, example):
         nonlocal num_steps
         num_steps += 1
     iters = 5
@@ -32,7 +32,7 @@ def test_learning():
 
     num_counted = 0
 
-    def each_epoch(loader):
+    def each_epoch(system, loader, example):
         nonlocal num_counted
         num_counted += 1
     iters = 5
@@ -47,6 +47,3 @@ def test_learning():
                                batch_size=-1)
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
-
-
-test_learning()

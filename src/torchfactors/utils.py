@@ -1,7 +1,7 @@
 import itertools
 import math
 from itertools import chain
-from typing import Tuple, cast, overload
+from typing import List, Tuple, Union, cast, overload
 
 import torch
 from multimethod import multidispatch
@@ -105,10 +105,38 @@ def ndslices_overlap(lhs: NDSlice, rhs: NDSlice, shape: ShapeType) -> bool:
 #     return True
 
 
+def end(last: int, step: int):
+    if step < 0:
+        return last - 1
+    else:
+        return last + 1
+
+
+def canonical_range(r: range) -> range:
+    if r:
+        # the stop should always be the smallest possible stop (so that it is cannonical)
+        return range(r.start, end(r[-1], r.step), r.step)
+    else:
+        return range(0)
+
+
+def canonical_slice(r: range) -> range:
+    out = canonical_range(r)
+    if out.start is None:
+        out.start = 0
+    if out.step is None:
+        out.step = 1
+    return slice(out.start, out.stop, out.step)
+
+
 def as_range(one_slice: slice, length: int) -> range:
     """returns a range representing the same subset of integers as the given
     slice assuming the given length"""
-    return range(length)[one_slice]
+    out = range(length)[one_slice]
+    if isinstance(out, range):
+        return canonical_range(out)
+    else:
+        return out
 
 
 def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> Tuple[range, ...]:
@@ -134,9 +162,54 @@ def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> Tuple[range, ...]:
         raise NotImplementedError("haven't implemented support for that kind of ndslice")
 
 
-def compose_single(lhs: SliceType, rhs: SliceType, length: int):
-    out = as_range(cast(slice, lhs), length)[rhs]
-    return out if isinstance(out, int) else slice(out.start, out.stop, out.step)
+def compose_single(lhs: SliceType, rhs: SliceType, length: int
+                   ) -> Union[slice, int, List[int]]:
+    # if either is an int, we get an int
+    # if both are ranges, we get a range
+    # otherwise, we get a list that might reduce to a range
+    if isinstance(lhs, int):
+        raise ValueError("cannot index into a 0-dimensional")
+    elif isinstance(rhs, int):
+        if isinstance(lhs, slice):
+            return as_range(lhs, length)[rhs]
+        else:
+            return lhs[cast(int, rhs)]
+    elif isinstance(lhs, slice) and isinstance(rhs, slice):
+        return canonical_slice(as_range(lhs, length)[rhs])
+    else:
+        if isinstance(lhs, slice):
+            lhs_list = list(as_range(lhs, length))
+        else:
+            lhs_list = cast(list, lhs)
+        # left_out_length = len(lhs_list)
+        if isinstance(rhs, slice):
+            # remaining length will be based on the output of the left
+            rhs_list = list(as_range(rhs, len(lhs_list)))
+        else:
+            rhs_list = cast(list, rhs)
+        # the indexes given in the right list index into the
+        # left list, but we don't keep them if they go over
+        out = [lhs_list[r] for r in rhs_list
+               if r < len(lhs_list)]
+        if len(out) == 0:
+            return slice(0, 0, 1)
+        elif len(out) == 1:
+            v = out[0]
+            return slice(v, v+1, 1)
+        elif len(out) == 2:
+            v1, v2 = out
+            return slice(v1, v2 + 1, v2 - v1)
+        else:
+            v1, v2 = out[:2]
+            v_last = out[-1]
+            step = v2 - v1
+            cand = range(v1, end(v_last, step), step)
+            if list(cand) == out:
+                return slice(cand.start, cand.stop, cand.step)
+            else:
+                return out
+    # out = as_range(cast(slice, lhs), length)[rhs]
+    # return out if isinstance(out, int) else slice(out.start, out.stop, out.step)
 
 
 def compose(shape: ShapeType, first: NDSlice, second: NDSlice):
@@ -147,7 +220,7 @@ def compose(shape: ShapeType, first: NDSlice, second: NDSlice):
     second = ensure_tuple(second)
 
     out = list(first) + [slice(None)] * (len(shape) - len(first))
-    remaining_dims = [i for i, s in enumerate(out) if isinstance(s, slice)]
+    remaining_dims = [i for i, s in enumerate(out) if not isinstance(s, int)]
     for i, rhs in zip(remaining_dims, second):
         out[i] = compose_single(out[i], rhs, length=shape[i])
     return tuple(out)

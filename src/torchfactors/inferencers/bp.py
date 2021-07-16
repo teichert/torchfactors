@@ -202,7 +202,7 @@ class BPInference:
 
     def run(self):
         # for s, ts in list(self.strategy):
-        for s, ts in tqdm(list(self.strategy)):
+        for s, ts in tqdm(list(self.strategy), leave=False, delay=5):
             self.update_messages_from_regionf(s, tuple(ts))()
 
     # def display(self):  # coverage: skip

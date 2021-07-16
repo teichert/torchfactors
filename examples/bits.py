@@ -10,14 +10,22 @@ import torchfactors as tx
 class Bits(tx.Subject):
     bits: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED)
     hidden: tx.Var = tx.VarField(tx.Range(10), tx.LATENT, shape=bits)
+    length: int = -1
 
+    def __post_init__(self):
+        super().__post_init__()
+        self.length = self.bits.shape[-1]
 
 # Specify the Variables and Factors
+
+
 class BitsModel(tx.Model[Bits]):
     def factors(self, x: Bits):
-        length = x.bits.shape[-1]
+        max_length = x.bits.shape[-1]
+        lasts = [length - 1 for length in x.list('length')]
         yield tx.LinearFactor(self.namespace('start'), x.hidden[..., 0])
-        for i in range(length):
+        yield tx.LinearFactor(self.namespace('start-end'), x.hidden[..., 0], x.hidden[..., lasts])
+        for i in range(max_length):
             yield tx.LinearFactor(self.namespace('emission'), x.hidden[..., i], x.bits[..., i])
             if i > 0:
                 yield tx.LinearFactor(self.namespace('transition'),
@@ -43,14 +51,30 @@ train_data = Bits.stack(data)
 
 # Build a System and Train the Model
 model = BitsModel()
-system = tx.learning.example_fit_model(
-    model, data, iterations=200, lr=0.01, passes=4, penalty_coeff=2)
 
-# Use the model on held out data
-held_out = Bits(tx.vtensor([False] * 10))
-held_out.bits.usage[1] = tx.OBSERVED
-predicted = system.predict(held_out)
-logging.info(predicted.bits.tensor.tolist())
+
+log_info = {}
+
+
+def each_epoch(system, data_loader, data):
+    # Use the model on held out data
+    held_out = Bits(tx.vtensor([False] * 10))
+    held_out.bits.usage[1] = tx.OBSERVED
+    predicted = system.predict(held_out)
+    # expecting 1001100110
+    log_info['pred'] = ''.join(map(str, predicted.bits.tensor.int().tolist()))
+
+
+system = tx.learning.example_fit_model(
+    model, data, iterations=1000, lr=0.1, passes=5, penalty_coeff=1,
+    log_info=log_info,
+    each_epoch=each_epoch)
+
+# # Use the model on held out data
+# held_out = Bits(tx.vtensor([False] * 10))
+# held_out.bits.usage[1] = tx.OBSERVED
+# predicted = system.predict(held_out)
+# logging.info(predicted.bits.tensor.tolist())
 
 # Save the model parameters
 torch.save(model.state_dict(), "model.pt")
