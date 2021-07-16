@@ -51,9 +51,8 @@ class BPInference:
     def logz(self) -> torch.Tensor:
         region_free_energies = []
         for rid, r in enumerate(self.strategy.regions):
-            region_free_energies.append(
-                r.counting_number * r.free_energy(self.in_messages(rid))
-            )
+            this_free_energy = r.free_energy(self.in_messages(rid))
+            region_free_energies.append(r.counting_number * this_free_energy)
         return -torch.stack(region_free_energies, -1).sum(dim=-1)
 
     def region_belief(self, variable: Var) -> Tensor:

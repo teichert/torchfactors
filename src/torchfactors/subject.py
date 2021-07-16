@@ -64,7 +64,10 @@ class Subject:
     environment: Environment = field(init=False, default_factory=Environment)
 
     def list(self, key: str) -> List[object]:
-        return self.__lists[key]
+        if self.is_stacked:
+            return self.__lists[key]
+        else:
+            return[getattr(self, key)]
 
     def init_variables(self):
         self.__variables: List[Var] = []

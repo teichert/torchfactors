@@ -10,7 +10,7 @@ from torch import Tensor
 
 from .einsum import compile_obj_equation, log_einsum
 from .types import ShapeType
-from .utils import outer
+from .utils import logsumexp, outer
 from .variable import Var
 
 
@@ -396,7 +396,7 @@ class Factor:
 
         # normalize by subtracting out the sum of the last |V| dimensions
         variable_dims = list(range(num_batch_dims, num_dims))
-        normalizer = torch.logsumexp(tensor, dim=variable_dims)
+        normalizer = logsumexp(tensor, dim=variable_dims)
         return tensor - normalizer[(...,) + (None,) * (num_dims - num_batch_dims)]
 
     def free_energy(self,

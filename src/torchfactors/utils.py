@@ -1,7 +1,7 @@
 import itertools
 import math
 from itertools import chain
-from typing import Tuple, overload
+from typing import Sequence, Tuple, Union, overload
 
 import torch
 from multimethod import multidispatch
@@ -9,6 +9,19 @@ from opt_einsum import contract  # type: ignore
 from torch import Tensor, arange
 
 from .types import MaybeRange, NDRange, NDSlice, ShapeType, SliceType
+
+
+def logsumexp(t: Tensor, dim: Union[None, int, Sequence[int]] = None,
+              keepdim=False, *, out=None):
+    if dim is None:
+        dim = tuple(range(len(t.shape)))
+    if not isinstance(dim, int) and not dim:
+        if out is not None:
+            return out.copy_(t)
+        else:
+            return t
+    else:
+        return torch.logsumexp(t, dim, keepdim=keepdim, out=out)
 
 
 @multidispatch
@@ -133,13 +146,13 @@ def canonical_maybe_range(r: MaybeRange) -> MaybeRange:
         elif len(out) == 1:
             v = out[0]
             return range(v, v+1, 1)
-        # elif len(out) == 2:
-        #     v1, v2 = out
-        #     return range(v1, v2 + 1, v2 - v1)
         else:
             v1, v2 = out[:2]
             v_last = out[-1]
             step = v2 - v1
+            # is step would be zero, we can't even make a range to compare against
+            if step == 0:
+                return out
             cand = range(v1, end(v_last, step), step)
             if tuple(cand) == out:
                 return cand

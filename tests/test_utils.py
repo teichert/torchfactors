@@ -1,9 +1,10 @@
 import pytest
 import torch
+import torchfactors as tx
 from torch import arange
-from torchfactors.utils import (as_ndrange, compose, compose_single, ndarange,
-                                ndslices_cat, ndslices_overlap, outer,
-                                stereotype)
+from torchfactors.utils import (as_ndrange, canonical_maybe_range, compose,
+                                compose_single, ndarange, ndslices_cat,
+                                ndslices_overlap, outer, stereotype)
 
 
 def test_compose_single():
@@ -43,9 +44,6 @@ def test_compose3a():
 
     out = compose(shape, first, second)
     assert out == expected_combined
-
-
-test_compose3a()
 
 
 def test_compose3():
@@ -155,6 +153,11 @@ def test_stereotype():
     assert out.allclose(expected)
 
 
+def test_canonical_maybe_range():
+    out = canonical_maybe_range([4, 4])
+    assert out == (4, 4)
+
+
 def test_stereotype2():
     scales = torch.tensor([
         [1, 2, 3],
@@ -196,3 +199,33 @@ def test_stereotype2():
             ],
         ])
     assert out.allclose(expected)
+
+
+def test_logsumexp_default():
+    t = torch.tensor([[1, 2], [3, 4]]).log()
+    out = tx.logsumexp(t)
+    assert out == torch.logsumexp(t, (0, 1))
+
+
+def test_logsumexp_none():
+    t = torch.tensor([[1, 2], [3, 4]]).log()
+    out = tx.logsumexp(t, ())
+    assert out.allclose(t)
+
+
+def test_logsumexp_two():
+    t = torch.tensor([[1, 2], [3, 4]]).log()
+    out = tx.logsumexp(t, (0, 1))
+    assert out == t.logsumexp((0, 1))
+
+
+def test_logsumexp_one():
+    t = torch.tensor([[1, 2], [3, 4]]).log()
+    out = tx.logsumexp(t, 1)
+    assert out.allclose(t.logsumexp(1))
+
+
+def test_logsumexp_one_tuple():
+    t = torch.tensor([[1, 2], [3, 4]]).log()
+    out = tx.logsumexp(t, (1,))
+    assert out.allclose(t.logsumexp(1))

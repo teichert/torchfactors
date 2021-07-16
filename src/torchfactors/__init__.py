@@ -3,8 +3,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from torch.nn.functional import one_hot
-
 from . import learning
 from .clique import CliqueModel
 from .components.linear_factor import LinearFactor
@@ -19,7 +17,7 @@ from .model import Model
 from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
-from .utils import ndarange
+from .utils import logsumexp, ndarange
 from .variable import TensorVar, Var, VarField, VarUsage, vtensor
 
 logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
@@ -34,7 +32,7 @@ DEFAULT = VarUsage.DEFAULT
 OPEN = Domain.OPEN
 
 __all__ = [
-    'dataclass',
+    'dataclass', 'logsumexp',
     'one_hot',
     'CliqueModel',
     'Domain', 'SeqDomain', 'Range', 'FlexDomain',
