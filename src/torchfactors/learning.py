@@ -20,7 +20,8 @@ def nested(itr: Iterable[T], times: int) -> Iterable[Tuple[int, int, T]]:
             yield i, j, obj
 
 
-def tnested(itr: Iterable[T], times: int, log_info=None, leave=True, **kwargs) -> Iterable[Tuple[int, int, T]]:
+def tnested(itr: Iterable[T], times: int, log_info=None, leave=True, **kwargs
+            ) -> Iterable[Tuple[int, int, T]]:
     items = list(itr)
     if log_info is None:
         yield from tqdm(nested(items, times), total=len(items) * times, leave=leave, **kwargs)
@@ -51,15 +52,16 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
     logging.info('done loading.')
     system = System(model, BP(passes=passes))
     system.prime(data_loader)
-    # optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    optimizer = torch.optim.LBFGS(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    # optimizer = torch.optim.LBFGS(model.parameters(), lr=lr)
     # optimizer = torch.optim.Rprop(model.parameters(), lr=lr)
     # optimizer = torch.optim.Rprop(model.parameters(), lr=lr)
 
     # iterations=1000, lr=0.1, passes=3, penalty_coeff=100)
     # bits.py | 316/1000 [01:28<03:11,  3.58it/s, combo=251, i=315, j=0, loss=6.07, penalty=0.894]
     # optimizer = optim.RAdam(model.parameters(), lr=lr)
-    # optimizer = optim.AdaBound(model.parameters(), lr=lr)  # | 373/1000 [02:03<03:04,  3.40it/s, combo=402, i=372, j=0, loss=6.02, penalty=1.38]
+    # optimizer = optim.AdaBound(model.parameters(), lr=lr)
+    # # | 373/1000 [02:03<03:04,  3.40it/s, combo=402, i=372, j=0, loss=6.02, penalty=1.38]
     # optimizer = optim.AdaBound(model.parameters(), lr=lr)
     # scheduler = torch.optim.lr_scheduler.OneCycleLR(
     #     optimizer, max_lr=lr, epochs=iterations // 3, steps_per_epoch=3)

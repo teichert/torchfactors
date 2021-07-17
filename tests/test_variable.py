@@ -9,7 +9,162 @@ from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED,
 from torchfactors.domain import Range
 from torchfactors.factor import Factor
 from torchfactors.subject import Environment
-from torchfactors.variable import TensorVar, VarField
+from torchfactors.variable import TensorVar, VarField, at
+
+# def test_at():
+#     t = torch.tensor([
+#         [
+#             [1, 2, 3, 4],
+#             [5, 6, 7, 8],
+#         ],
+#         [
+#             [11, 12, 13, 14],
+#             [15, 16, 17, 18],
+#         ],
+#         [
+#             [21, 22, 23, 24],
+#             [25, 26, 27, 28],
+#         ],
+#     ])
+#     s = [slice(None), tx.gslice(1), tx.gslice(2, 0, 3)]
+#     expected = torch.tensor([
+#         [
+#             [7, 5, 8],
+#         ],
+#         [
+#             [17, 15, 18],
+#         ],
+#         [
+#             [27, 25, 28],
+#         ],
+#     ])
+#     out = at(t, s)
+#     assert out.tolist() == expected.tolist()
+
+
+# def test_at2():
+#     t = torch.tensor([
+#         [
+#             [1, 2, 3, 4],
+#             [5, 6, 7, 8],
+#         ],
+#         [
+#             [11, 12, 13, 14],
+#             [15, 16, 17, 18],
+#         ],
+#         [
+#             [21, 22, 23, 24],
+#             [25, 26, 27, 28],
+#         ],
+#     ])
+#     s = [tx.gslice(2, 0), 1, tx.gslice(2, 0, 3)]
+#     expected = torch.tensor([
+#         [27, 25, 28],
+#         [7, 5, 8],
+#     ])
+#     out = at(t, s)
+#     assert out.tolist() == expected.tolist()
+
+
+def test_at3():
+    t = torch.tensor([
+        [
+            [1, 2, 3, 4],
+            [5, 6, 7, 8],
+        ],
+        [
+            [11, 12, 13, 14],
+            [15, 16, 17, 18],
+        ],
+        [
+            [21, 22, 23, 24],
+            [25, 26, 27, 28],
+        ],
+    ])
+    out = at(t, slice(1, 3))
+    expected = torch.tensor([
+        [
+            [11, 12, 13, 14],
+            [15, 16, 17, 18],
+        ],
+        [
+            [21, 22, 23, 24],
+            [25, 26, 27, 28],
+        ],
+    ])
+    assert out.tolist() == expected.tolist()
+
+
+# def test_at4():
+#     t = torch.tensor([
+#         [
+#             [1, 2, 3, 4],
+#             [5, 6, 7, 8],
+#         ],
+#         [
+#             [11, 12, 13, 14],
+#             [15, 16, 17, 18],
+#         ],
+#         [
+#             [21, 22, 23, 24],
+#             [25, 26, 27, 28],
+#         ],
+#     ])
+#     s = [tx.gslice(2, 0), 1, tx.gslice(2, 0, 3)]
+#     out = at(t, -1)
+#     expected = torch.tensor(
+#         [
+#             [21, 22, 23, 24],
+#             [25, 26, 27, 28],
+#         ],
+#     )
+#     assert out.tolist() == expected.tolist()
+
+
+def test_at_jagged():
+    t = torch.tensor([
+        [
+            [1, 2, 3, 4],
+            [5, 6, 7, 8],
+        ],
+        [
+            [11, 12, 13, 14],
+            [15, 16, 17, 18],
+        ],
+        [
+            [21, 22, 23, 24],
+            [25, 26, 27, 28],
+        ],
+    ])
+    s = (slice(None), 1, tx.gdrop(1, 0, 3))
+    out = at(t, s)
+    expected = torch.tensor([6, 15, 28])
+    assert out.tolist() == expected.tolist()
+
+
+def test_at_jagged2():
+    t = torch.tensor([
+        [
+            [1, 2, 3, 4],
+            [5, 6, 7, 8],
+        ],
+        [
+            [11, 12, 13, 14],
+            [15, 16, 17, 18],
+        ],
+        [
+            [21, 22, 23, 24],
+            [25, 26, 27, 28],
+        ],
+    ])
+    expected = torch.tensor([
+        7,
+        13,
+        27,
+    ])
+    s = (slice(None), tx.gdrop(1, 0, 1), 2)
+    out = at(t, s)
+    assert out.tolist() == expected.tolist()
 
 
 def test_usage1():
@@ -57,7 +212,7 @@ def test_shape():
     v2 = v[1:3, 2:4]
     assert v2.origin is v
     assert v2.origin.tensor is t
-    assert v2.ndslice == (slice(1, 3), slice(2, 4))
+    assert v2.ndslice == (slice(1, 3, 1), slice(2, 4, 1))
     assert t.sum() == 3*4
     assert v2.shape == (2, 2)
     # could have done v2.tensor = 0.0, but waiting on:
@@ -266,7 +421,7 @@ def test_var_field():
         v[3]
 
 
-test_var_field()
+# test_var_field()
 
 
 def test_grad_through_stack():
@@ -492,3 +647,30 @@ def test_environment_factors():
     assert env.factor('b', lambda: f) is f
     assert env.factor('b', lambda: f2) is f
     assert env.factor('b', lambda: f2) is not f2
+
+
+def test_list_variable():
+    v = tx.vtensor([
+        [1, 2, 3],
+        [4, 5, 6],
+    ])
+    v1 = v[..., 0]
+    v2 = v[:, tx.gdrop(0, 0)]
+    a = v1.tensor.tolist()
+    b = v2.tensor.tolist()
+    assert a == b
+
+
+def test_list_variable2():
+    v = tx.vtensor([
+        [1, 2, 3],
+        [4, 5, 6],
+    ])
+    v1 = v[..., 0]
+    v2 = v[:, tx.gdrop(0)]
+    a = v1.tensor.tolist()
+    b = v2.tensor.tolist()
+    assert a == b
+
+
+test_no_late_change()

@@ -13,8 +13,8 @@ from torch import Size, Tensor
 from torch.nn import functional as F
 
 from .domain import Domain
-from .types import NDSlice, ReadOnlyView, ShapeType
-from .utils import as_ndrange, compose, ndslices_cat
+from .types import GeneralizedDimensionDrop, NDSlice, ReadOnlyView, ShapeType
+from .utils import as_ndrange, canonical_ndslice, compose, ndslices_cat
 
 Tensorable = Union[Tensor, int, float, bool]
 
@@ -219,12 +219,12 @@ class Var(ABC):
     @property
     def is_padding(self) -> Tensor:
         padding = self.origin._is_padding()
-        return padding[self._out_slice]
+        return at(padding, self._out_slice)
 
     @property
     def is_possible(self) -> Tensor:
         possible = self.origin._is_possible()
-        return possible[self._out_slice]
+        return at(possible, self._out_slice)
 
     # @property
     # def usage_mask(self) -> Tensor:
@@ -296,6 +296,53 @@ class Var(ABC):
             return self.tensor[self.usage == usage]
 
 
+def at(t: Tensor, s: NDSlice, starting=0) -> Tensor:
+    r"""
+    Allows indexing by slices or by non-contiguous lists or tuples;
+    `starting` is how many dimensions should be skipped before doing the indexing
+    """
+    s_tuple = s if isinstance(s, tuple) else (s,)
+    first = s_tuple[0]
+    rest = s_tuple[1:]
+    # elipsis means to skip as many dimensions as necessary
+    if first is ...:
+        if not rest:
+            return t
+        num_left = len(rest)
+        total = len(t.shape)
+        out = at(t, rest, starting=total - num_left)
+        return out
+    # keep the previous dimensions in tact and apply the next one
+    if isinstance(first, GeneralizedDimensionDrop):
+        num_to_skip = starting - 1
+        this_one = torch.nn.functional.one_hot(torch.tensor(first.indexPerIndex),
+                                               t.shape[starting]).bool()
+    else:
+        num_to_skip = starting
+        this_one = first
+    transformed = t[(slice(None),) * num_to_skip + (this_one,)]
+    if not rest:
+        return transformed
+    elif isinstance(first, (int, GeneralizedDimensionDrop)):
+        # the dimension just gets consumed by an int
+        return at(transformed, rest, starting=starting)
+    else:
+        return at(transformed, rest, starting=starting + 1)
+    #  else:
+    #     return at(t, (s_tuple,), starting=starting)
+    # # else:
+    #     raise TypeError("don't know how to handle that kind of slice")
+    # return t[s]
+    #     if s[0] is ...:
+    #         assert False
+    #         # num_left = len(s) - 1
+    #         # num_total = len(t.shape)
+    #         # return at((slice(None),) * (num_total - num_left) + tuple(s[1:]))
+    #     else:
+    #         new_s = list(s)
+    #         new_t = t
+
+
 class VarBranch(Var):
     r"""
     Represents a subset of a variable tensor
@@ -303,7 +350,7 @@ class VarBranch(Var):
 
     def __init__(self, root: TensorVar, ndslice: NDSlice):
         self.root = root
-        self.__ndslice = ndslice
+        self.__ndslice = canonical_ndslice(ndslice, root.shape)
 
     def _get_origin(self) -> TensorVar:
         return self.root
@@ -312,18 +359,19 @@ class VarBranch(Var):
         return VarBranch(self.root, compose(self.root.tensor.shape, self.ndslice, ndslice))
 
     def _get_tensor(self) -> Tensor:
-        return self.root.tensor[self.ndslice]
+        # out = self.at(self.root.tensor, self.ndslice)
+        return at(self.root.tensor, self.ndslice)
 
     def _set_tensor(self, value: Tensorable):
-        self.root.tensor[self.ndslice] = value
+        at(self.root.tensor, self.ndslice)[(...,)] = value
 
     def _get_usage(self) -> Tensor:
-        return self.root.usage[self.ndslice]
+        return at(self.root.usage, self.ndslice)
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
         if isinstance(value, VarUsage):  # or not value.shape:
             value = torch.tensor(value, dtype=torch.int8)
-        self.root.usage[self.ndslice] = cast(Tensor, value.expand_as(self.tensor))
+        at(self.root.usage, self.ndslice)[(...,)] = cast(Tensor, value.expand_as(self.tensor))
 
     def _get_domain(self) -> Domain:
         return self.root.domain
@@ -611,7 +659,7 @@ class TensorVar(Var):
             else:
                 self._tensor = torch.tensor(value)
         else:
-            cast(Tensor, self._tensor)[self.ndslice] = value
+            at(cast(Tensor, self._tensor), self.ndslice)[(...,)] = value
 
     def _get_usage(self) -> Tensor:
         return cast(Tensor, self._usage)
@@ -671,8 +719,8 @@ class TensorVar(Var):
         return [
             TensorVar(
                 domain=self.domain,
-                usage=usage[as_ndslice(shape)],
-                tensor=tensor[as_ndslice(shape)],
+                usage=at(usage, as_ndslice(shape)),
+                tensor=at(tensor, as_ndslice(shape)),
                 info=self._info)
             for usage, tensor, shape
             in zip(usages, tensors, self._stack_shapes)

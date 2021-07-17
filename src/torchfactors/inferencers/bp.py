@@ -15,7 +15,7 @@ from ..factor_graph import FactorGraph
 from ..inferencer import Inferencer
 from ..strategies.bethe_graph import BetheGraph
 from ..strategy import Strategy
-from ..variable import Var
+from ..variable import Var, at
 
 cache = lru_cache(maxsize=None)
 
@@ -78,7 +78,7 @@ class BPInference:
                 variable.origin.marginal_shape).as_subclass(torch.Tensor)  # type: ignore
             for sub_var in self.strategy.root_to_subs[variable.origin]:
                 sub_belief = self.region_belief(sub_var)
-                full[sub_var.out_slice] = sub_belief
+                at(full, sub_var.out_slice)[(...,)] = sub_belief
             return full
 
     def belief(self, variables: Union[Var, Sequence[Var]]) -> torch.Tensor:

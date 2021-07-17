@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from torch.nn.functional import one_hot
+
 from . import learning
 from .clique import CliqueModel
 from .components.linear_factor import LinearFactor
@@ -17,8 +19,9 @@ from .model import Model
 from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
+from .types import GeneralizedDimensionDrop, GeneralizedSlice, gdrop, gslice
 from .utils import logsumexp, ndarange
-from .variable import TensorVar, Var, VarField, VarUsage, vtensor
+from .variable import TensorVar, Var, VarField, VarUsage, at, vtensor
 
 logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
 
@@ -32,6 +35,7 @@ DEFAULT = VarUsage.DEFAULT
 OPEN = Domain.OPEN
 
 __all__ = [
+    'gslice', 'gdrop', 'GeneralizedDimensionDrop', 'GeneralizedSlice', 'at',
     'dataclass', 'logsumexp',
     'one_hot',
     'CliqueModel',

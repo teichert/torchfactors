@@ -59,6 +59,9 @@ def test_predict_simple():
     assert coin.tensor == 0
 
 
+test_predict_simple()
+
+
 def test_predict_simple2():
     coin = TensorVar(Range(2), torch.tensor(0), ANNOTATED)
     factor = TensorFactor(coin, tensor=torch.tensor([0, 1]).log())
@@ -153,6 +156,3 @@ def test_bp_change2():
     bp = BP(passes=1)
     _, change = bp.partition_with_change(factors)
     assert change.sum() > 0.0
-
-
-test_bp_change2()
