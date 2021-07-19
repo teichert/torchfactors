@@ -1,4 +1,5 @@
 import itertools
+from typing import Optional
 
 import torch
 from torch.functional import Tensor
@@ -21,7 +22,7 @@ class ProportionalOdds(CliqueModel):
     """
 
     def factors(self, env: Environment, params: ParamNamespace,
-                *variables: Var, input: Tensor):
+                *variables: Var, input: Optional[Tensor] = None):
 
         # make a binary variable for each label of each variable
         binary_variables = make_binary_label_variables(env, *variables)
@@ -49,7 +50,9 @@ class ProportionalOdds(CliqueModel):
             # a tensor of the right shape with the given bias
             config_bias = torch.sparse_coo_tensor(
                 torch.ones((len(variables), 1)),
-                [bias[config]], binary_scores.shape).log()
+                [bias[config]], binary_scores.shape).to_dense().log()[None].expand(
+                    Factor.shape_from_variables(config_variables)
+            )
             yield TensorFactor(*config_variables, tensor=binary_scores + config_bias)
 
         # deterministically set the ordinals given the values of the binaries

@@ -76,7 +76,7 @@ class LinearFactor(Factor):
     def __init__(self,
                  params: ParamNamespace,
                  *variables: Var,
-                 input: torch.Tensor = None,
+                 input: Optional[Tensor] = None,
                  bias: bool = True):
         super().__init__(variables)
         self.input = input

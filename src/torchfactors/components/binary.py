@@ -1,4 +1,6 @@
 
+from typing import Optional
+
 from torch.functional import Tensor
 
 from ..clique import CliqueModel, make_binary_threshold_variables
@@ -17,8 +19,9 @@ class Binary(CliqueModel):
     def __init__(self, latent: bool = True):
         self.latent = latent
 
+    # TODO: allow bias?
     def factors(self, env: Environment, params: ParamNamespace,
-                *variables: Var, input: Tensor):
+                *variables: Var, input: Optional[Tensor] = None):
         binary_variables = make_binary_threshold_variables(env, *variables, latent=self.latent)
         yield LinearFactor(params.namespace('binary-group'),
                            *binary_variables.values(), input=input)

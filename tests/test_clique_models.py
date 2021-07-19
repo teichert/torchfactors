@@ -1,4 +1,5 @@
 
+
 import pytest
 import torch
 import torchfactors as tx
@@ -7,6 +8,8 @@ from torchfactors.clique import (BinaryScoresModule,
                                  make_binary_threshold_variables)
 from torchfactors.components.at_least import KIsAtLeastJ
 from torchfactors.components.binary import Binary
+from torchfactors.components.nominal import Nominal
+from torchfactors.components.prop_odds import ProportionalOdds
 from torchfactors.subject import Environment
 from torchfactors.testing import DummyParamNamespace, DummyVar
 
@@ -95,42 +98,6 @@ def test_binary_scores_module():
     assert not out.allclose(out3)
 
 
-test_binary_scores_module()
-# from typing import Iterable
-
-# import torch
-# import torchfactors as tx
-
-
-# @tx.dataclass
-# class Seq(tx.Subject):
-#     items: tx.Var = tx.VarField(tx.Range(5))
-
-
-# class Chain(tx.Model[Seq]):
-#     def __init__(self, clique_model: tx.CliqueModel):
-#         super().__init__()
-#         self.clique_model = clique_model
-
-#     def factors(self, subject: Seq) -> Iterable[tx.Factor]:
-#         for index in range(subject.items.shape[-1]):
-#             yield from self.clique_model.factors(
-#                 subject.environment, self.namespace('unaries'),
-#                 subject.items[..., index])
-#         length = subject.items.shape[-1]
-#         for index in range(1, length):
-#             yield from self.clique_model.factors(
-#                 subject.environment, self.namespace('pairs'),
-#                 subject.items[..., index - 1], subject.items[..., index])
-
-
-# def test_prop_odds():
-#     model = Chain()
-#     x = Seq(tx.vtensor([1, 2, 3, 4, 5]),
-#             usage=torch.tensor([tx.ANNOTATED, tx.LATENT, tx.CLAMPED, tx.OBSERVED, tx.PADDING])
-#     factors=list(model(x))
-#     assert len(factors) == 5 + 4
-
 def testKIsAtLeastJ():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
     a1 = tx.TensorVar(torch.zeros(5), tx.ANNOTATED, tx.Range(2))
@@ -195,3 +162,29 @@ def test_binary():
     assert tuple(vars1) == (a, bin_a)
     vars2 = factors[2].variables
     assert tuple(vars2) == (b, bin_b)
+
+
+def test_nominal():
+    env = Environment()
+    model = Nominal()
+    params = DummyParamNamespace()
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    factors = list(model.factors(env, params, a, b))
+    assert len(factors) == 1
+    f, = factors
+    assert len(f) == 2
+    v1, v2 = f.variables
+    assert v1 is a
+    assert v2 is b
+
+
+def test_prop_odds():
+    env = Environment()
+    model = ProportionalOdds()
+    params = DummyParamNamespace()
+    input = torch.ones(5, 9)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    factors = list(model.factors(env, params, a, b, input=input))
+    assert len(factors) == 3 * 2 + 3 + 2

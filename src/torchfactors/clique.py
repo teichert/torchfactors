@@ -1,6 +1,6 @@
 
 from abc import ABC, abstractmethod
-from typing import Dict, Hashable, Sequence, Tuple, cast
+from typing import Dict, Hashable, Optional, Sequence, Tuple, cast
 
 from torch.functional import Tensor
 
@@ -83,12 +83,12 @@ def make_binary_threshold_variables(env: Environment, *variables: Var, key: Hash
 
 
 def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
-                       input: Tensor,
+                       input: Optional[Tensor],
                        bias: bool = False) -> ShapedLinear:
     num_batch_dims = len(variables[0].shape) - 1
 
     def factory():
-        out = ShapedLinear(input_shape=input.shape[num_batch_dims:],
+        out = ShapedLinear(input_shape=None if input is None else input.shape[num_batch_dims:],
                            output_shape=tuple(2 for v in variables),
                            bias=bias)
         return out
