@@ -252,12 +252,15 @@ def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> NDRangeSlice:
                     tuple(as_ndrange(ndslice[1:], shape[1:])))
     elif isinstance(ndslice, int):
         return (ndslice,)
-    elif isinstance(ndslice, slice):
+    else:  # if isinstance(ndslice, slice):
         return (as_range(ndslice, shape[0]),)
 
 
 def compose_single(lhs: SliceType, rhs: SliceType, length: int
                    ) -> SliceType:
+    r"""
+    returns the result of slicing into a given slice
+    """
     lhs_range = as_range(lhs, length)
     out: RangeSlice
     if isinstance(lhs_range, (int, GeneralizedDimensionDrop)):

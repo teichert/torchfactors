@@ -279,7 +279,7 @@ def test_canonical_range_slice():
 
 
 def test_canonical_ndslice():
-    assert canonical_ndslice(..., (8,)) == (...,)
+    assert canonical_ndslice(..., (8,)) == (...,)  # type: ignore
     assert canonical_ndslice(4, (8,)) == (4,)
     out = canonical_ndslice(slice(4, 9), (12,))
     expected = (slice(4, 9, 1),)
@@ -287,8 +287,8 @@ def test_canonical_ndslice():
 
 
 def test_canonical_ndslice2():
-    ndslice = [slice(4, 9), 3, slice(-1, 3, -10), 4]
-    shape = [12, 5, 30, 8]
+    ndslice = (slice(4, 9), 3, slice(-1, 3, -10), 4)
+    shape = (12, 5, 30, 8)
     out = canonical_ndslice(ndslice, shape)
     expected = (slice(4, 9, 1), 3, slice(29, 8, -10), 4)
     assert out == expected
@@ -312,9 +312,10 @@ def test_gdrop_multi():
     out = compose(a, b, shape)
     assert out == expected
 
-
-def test_bad_compose2():
-    with pytest.raises(ValueError):
-        compose_single(slice(5, 8), tx.gdrop(4, 2, 7, 10), 10)
-    with pytest.raises(ValueError):
-        compose_single(slice(5, 8), tx.gdrop(4, 2), 10)
+# # the actually problem this was trying
+# # to check only appears in compose (not compose_single)
+# def test_bad_compose2():
+#     with pytest.raises(ValueError):
+#         compose_single(slice(5, 8), tx.gdrop(4, 2, 7, 10), 10)
+#     with pytest.raises(ValueError):
+#         compose_single(slice(5, 8), tx.gdrop(4, 2), 10)
