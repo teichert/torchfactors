@@ -1,6 +1,7 @@
+
 import torchfactors as tx
 from torchfactors.components.linear_factor import LinearFactor
-from torchfactors.learning import example_fit_model
+from torchfactors.learning import example_fit_model, tnested
 
 
 def test_learning():
@@ -47,3 +48,22 @@ def test_learning():
                                batch_size=-1)
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
+
+
+def test_tnested():
+    out = list(tnested([3, 4, 2], 4))
+    expected = [
+        (0, 0, 3),
+        (0, 1, 4),
+        (0, 2, 2),
+        (1, 0, 3),
+        (1, 1, 4),
+        (1, 2, 2),
+        (2, 0, 3),
+        (2, 1, 4),
+        (2, 2, 2),
+        (3, 0, 3),
+        (3, 1, 4),
+        (3, 2, 2),
+    ]
+    assert out == expected
