@@ -3,9 +3,11 @@ from typing import ClassVar, List
 
 import pytest
 import torch
+import torchfactors as tx
 from torchfactors import (ANNOTATED, CLAMPED, LATENT, OBSERVED, Range, Subject,
-                          TensorVar, VarField)
-from torchfactors.variable import Var
+                          TensorFactor, TensorVar, VarField)
+from torchfactors.subject import Environment
+from torchfactors.variable import Var, vtensor
 
 
 def test_subject_nodataclass():
@@ -145,9 +147,12 @@ def test_stacked():
         id2: int
         observations: Var = VarField(Range(10), OBSERVED)
         hidden: Var = VarField(Range(4), LATENT, shape=observations)
+    u1 = Utterance(1, 6, TensorVar(torch.tensor([1, 3, 2, 4, 3, 5, 4])))
+    assert u1.list('id1') == [1]
+    assert u1.list('id2') == [6]
 
     data = [
-        Utterance(1, 6, TensorVar(torch.tensor([1, 3, 2, 4, 3, 5, 4]))),
+        u1,
         Utterance(2, 7, TensorVar(torch.tensor([2, 4, 3, 5]))),
         Utterance(3, 8, TensorVar(torch.tensor([4, 6, 5]))),
         Utterance(4, 9, TensorVar(torch.tensor([3, 2, 4, 3, 5, 4, 6, 5]))),
@@ -243,3 +248,28 @@ def test_var_check():
     with pytest.raises(TypeError):
         # passing in tensor rather than var
         MySubject(torch.tensor(3.))  # type: ignore
+
+
+def test_bad_env1():
+    env = Environment()
+    with pytest.raises(KeyError):
+        env.variable('test')
+
+
+def test_good_env1():
+    env = Environment()
+    v = env.variable('test', lambda: vtensor([2, 9, 3]))
+    assert env.variable('test') is v
+
+
+def test_bad_env2():
+    env = Environment()
+    with pytest.raises(KeyError):
+        env.factor('test')
+
+
+def test_good_env2():
+    env = Environment()
+    v = tx.TensorVar(torch.tensor([1, 2, 3]), tx.Range(5))
+    f = env.factor('test', lambda: TensorFactor(v, tensor=torch.ones(3, 5)))
+    assert env.factor('test') is f
