@@ -5,6 +5,7 @@ import torchfactors as tx
 from torchfactors.clique import (BinaryScoresModule,
                                  make_binary_label_variables,
                                  make_binary_threshold_variables)
+from torchfactors.components.at_least import KIsAtLeastJ
 from torchfactors.subject import Environment
 from torchfactors.testing import DummyParamNamespace, DummyVar
 
@@ -128,3 +129,43 @@ test_binary_scores_module()
 #             usage=torch.tensor([tx.ANNOTATED, tx.LATENT, tx.CLAMPED, tx.OBSERVED, tx.PADDING])
 #     factors=list(model(x))
 #     assert len(factors) == 5 + 4
+
+def testKIsAtLeastJ():
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
+    a1 = tx.TensorVar(torch.zeros(5), tx.ANNOTATED, tx.Range(2))
+    a3 = tx.TensorVar(torch.zeros(5), tx.ANNOTATED, tx.Range(2))
+    factor1 = KIsAtLeastJ(a, a1, 1)
+    out1 = factor1.dense
+    assert out1.shape == (5, 4, 2)
+    expected1 = torch.tensor(  # j = 1
+        [
+            [  # batch element = 0
+                [1, 0],  # k = 0, (k not at least j, is at least)
+                [0, 1],  # k = 1, (1 is not at least 1?, 1 is at least 1?)
+                [0, 1],  # k = 2,
+                [0, 1],  # k = 3
+            ],
+        ] * 5).float()
+    assert out1.exp().allclose(expected1)
+
+    expected3 = torch.tensor(  # j = 3
+        [
+            [  # batch element = 0
+                [1, 0],  # k = 0, (k not at least j, is at least)
+                [1, 0],  # k = 1, (1 is not at least 3?, 1 is at least 3?)
+                [1, 0],  # k = 2,
+                [0, 1],  # k = 3
+            ],
+        ] * 5).float()
+    factor3 = KIsAtLeastJ(a, a3, 3)
+    out3 = factor3.dense
+    assert out3.shape == (5, 4, 2)
+    assert out3.exp().allclose(expected3)
+
+    # a = tx.TensorVar(torch.tensor([0, 1, 2, 4]), tx.OBSERVED, tx.Range(5))
+    # a = tx.TensorVar(torch.tensor([0, 1, 2, 4]), tx.OBSERVED, tx.Range(5))
+    # env = Environment()
+    # vars = make_binary_label_variables(env, a, key='root')
+
+
+testKIsAtLeastJ()

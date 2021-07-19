@@ -2,6 +2,7 @@ import itertools
 
 import torch
 from torch.functional import Tensor
+from torchfactors.components.at_least import KIsAtLeastJ
 
 from ..clique import (BinaryScoresModule, CliqueModel, ShapedLinear,
                       make_binary_label_variables)
@@ -10,7 +11,6 @@ from ..factor import Factor
 from ..model import ParamNamespace
 from ..subject import Environment
 from ..variable import Var
-from .at_least import VIsKAndAtLeastB
 
 
 class ProportionalOdds(CliqueModel):
@@ -54,6 +54,10 @@ class ProportionalOdds(CliqueModel):
 
         # deterministically set the ordinals given the values of the binaries
         for v in variables:
-            yield VIsKAndAtLeastB(v, [
-                binary_variables[v, label] for label in range(1, len(v.domain))
-            ])
+            # deterministically say that if the binary 'j' is off, then
+            # the values k >= j are all impossible
+            for label in range(1, len(v.domain)):
+                yield KIsAtLeastJ(v, binary_variables[v, label], label)
+            # yield VIsKAndAtLeastB(v, [
+            #     binary_variables[v, label] for label in range(1, len(v.domain))
+            # ])
