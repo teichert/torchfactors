@@ -263,9 +263,11 @@ def compose_single(lhs: SliceType, rhs: SliceType, length: int
     if isinstance(lhs_range, (int, GeneralizedDimensionDrop)):
         raise ValueError("cannot index into a 0-dimensional")
     elif isinstance(rhs, GeneralizedDimensionDrop):
-        if len(lhs_range) != len(rhs.indexPerIndex):
-            raise ValueError(f"not an index specified for each dimension element: "
-                             f"found {len(rhs.indexPerIndex)}, required {len(lhs_range)}")
+        # if len(lhs_range) <= max(rhs.indexPerIndex):
+        #     raise ValueError(f"not an index specified for each dimension element: "
+        #                      f"found {len(rhs.indexPerIndex)}, required {len(lhs_range)}")
+        #     # raise ValueError(f"not an index specified for each dimension element: "
+        #     #                  f"found {len(rhs.indexPerIndex)}, required {len(lhs_range)}")
         out = rhs
     # elif isinstance(rhs, GeneralizedSlice):
     #     sliced = [lhs_range[r] for r in rhs.indexes
@@ -322,7 +324,7 @@ def compose_single(lhs: SliceType, rhs: SliceType, length: int
     # return out if isinstance(out, int) else slice(out.start, out.stop, out.step)
 
 
-def compose(shape: ShapeType, first: NDSlice, second: NDSlice):
+def compose(first: NDSlice, second: NDSlice, shape: ShapeType):
     def ensure_tuple(ndslice: NDSlice) -> Tuple[SliceType, ...]:
         return ndslice if isinstance(ndslice, tuple) else (ndslice,)
 

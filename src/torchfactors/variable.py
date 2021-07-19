@@ -356,7 +356,8 @@ class VarBranch(Var):
         return self.root
 
     def __getitem__(self, ndslice: NDSlice) -> Var:
-        return VarBranch(self.root, compose(self.root.tensor.shape, self.ndslice, ndslice))
+        return VarBranch(self.root, compose(self.ndslice, ndslice,
+                                            self.root.tensor.shape))
 
     def _get_tensor(self) -> Tensor:
         # out = self.at(self.root.tensor, self.ndslice)

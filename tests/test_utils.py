@@ -20,12 +20,12 @@ def test_compose():
     first = (slice(None), 3, slice(3, 9))
     second = (2, slice(1, 3), slice(5))
     expected_combined = (2, 3, slice(4, 6, 1), slice(0, 5, 1))
-    out = compose(shape, first, second)
+    out = compose(first, second, shape)
     assert out == expected_combined
 
     other_first = (slice(2, 4), slice(None), slice(2, 7))
     other_second = (0, 3, slice(2, -1), slice(5))
-    other_out = compose(shape, other_first, other_second)
+    other_out = compose(other_first, other_second, shape)
     assert other_out == expected_combined
 
 # def test_compose2():
@@ -307,9 +307,9 @@ def test_gdrop_single():
 def test_gdrop_multi():
     shape = (10, 15, 11, 12, 13)
     a = (5, slice(5, 8), slice(None, 8), slice(None), 3)  # 3 x 11 x 12
-    b = (tx.gdrop(4, 2, 7), slice(None))  # 3 x 12
-    expected = (5, slice(5, 8), tx.gdrop(4, 2, 7), slice(None), 3)
-    out = compose_single(a, b, shape)
+    b = (slice(None), tx.gdrop(4, 2, 7), slice(None))  # 3 x 12
+    expected = (5, slice(5, 8, 1), tx.gdrop(4, 2, 7), slice(0, 12, 1), 3)
+    out = compose(a, b, shape)
     assert out == expected
 
 
