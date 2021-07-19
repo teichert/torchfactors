@@ -29,8 +29,10 @@ class TensorFactor(Factor):
             tensor = init(self.shape)
 
         if tensor.shape != self.shape:
-            # tensor = tensor.expand(self.shape)
-            raise ValueError("you didn't provide a tensor with the correct shape")
+            try:
+                tensor = tensor[None].expand(self.shape)
+            except RuntimeError:
+                raise ValueError("you didn't provide a tensor with the correct shape")
         self.tensor = tensor
 
     def dense_(self):

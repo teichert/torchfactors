@@ -10,8 +10,10 @@ from torchfactors.components.at_least import KIsAtLeastJ
 from torchfactors.components.binary import Binary
 from torchfactors.components.nominal import Nominal
 from torchfactors.components.prop_odds import ProportionalOdds
+from torchfactors.components.stereotype import Stereotype
 from torchfactors.subject import Environment
 from torchfactors.testing import DummyParamNamespace, DummyVar
+from torchfactors.utils import num_params
 
 
 def test_make_binary_label_variables():
@@ -145,7 +147,7 @@ def test_binary():
     env = Environment()
     params = DummyParamNamespace()
     model = Binary(latent=False)
-    input = torch.tensor([[1, 2, 3, 9, 2, 3, 10]] * 5)
+    input = torch.ones(5, 7)
     factors = list(model.factors(env, params, a, b, input=input))
     # factor for the pair and for each ordinal to binary
     assert len(factors) == 3
@@ -163,14 +165,29 @@ def test_binary():
     vars2 = factors[2].variables
     assert tuple(vars2) == (b, bin_b)
 
+    [f.dense for f in factors]
+
+    out_params = num_params(params.model)
+    # binary configs (4) * (features plus bias) + binary to label mapping (for each)
+    expected_params = 4 * (7 + 1) + 2 * (4 + 3)
+    assert out_params == expected_params
+
 
 def test_nominal():
     env = Environment()
     model = Nominal()
     params = DummyParamNamespace()
+    input = torch.ones(5, 8)
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
-    factors = list(model.factors(env, params, a, b))
+    factors = list(model.factors(env, params, a, b, input=input))
+    [f.dense for f in factors]
+
+    out_params = num_params(params.model)
+    # configs times (labels plus bias)
+    expected_params = 4 * 3 * (8 + 1)
+    assert out_params == expected_params
+
     assert len(factors) == 1
     f, = factors
     assert len(f) == 2
@@ -187,4 +204,30 @@ def test_prop_odds():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
     factors = list(model.factors(env, params, a, b, input=input))
+    [f.dense for f in factors]
+    # pairing 3 binary to other 2 binary and adding in mapping for each
     assert len(factors) == 3 * 2 + 3 + 2
+    assert all(f.shape == (5, 2,) for f in factors[:-2])
+    assert factors[-2].shape == (5, 4, 2)
+    assert factors[-1].shape == (5, 3, 2)
+
+    out_params = num_params(params.model)
+    # features * num_bin_configs + num_full_configs for bias
+    expected_params = 9 * 4 + 4 * 3
+    assert out_params == expected_params
+
+
+def test_stereotype():
+    env = Environment()
+    model = Stereotype()
+    params = DummyParamNamespace()
+    input = torch.ones(5, 9)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    factors = [f.dense for f in model.factors(env, params, a, b, input=input)]
+    assert len(factors) == 2
+
+    out_params = num_params(params.model)
+    # features * num_bin_configs + num_full_configs for bias
+    expected_params = 9 * 4 + 4 * 3
+    assert out_params == expected_params

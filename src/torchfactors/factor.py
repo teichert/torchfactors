@@ -226,6 +226,8 @@ class Factor:
         if self.cached is not None:
             return self.cached
         d = self.dense_()
+        if d.shape != self.shape:
+            d = d[None].expand(self.shape)
 
         # really, I think I just want two masks:
         # 1) possible [clamps, observed, and padding make other things impossible]

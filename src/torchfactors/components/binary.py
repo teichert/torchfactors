@@ -19,12 +19,15 @@ class Binary(CliqueModel):
     def __init__(self, latent: bool = True):
         self.latent = latent
 
-    # TODO: allow bias?
+    # TODO: allow no bias?
     def factors(self, env: Environment, params: ParamNamespace,
                 *variables: Var, input: Optional[Tensor] = None):
         binary_variables = make_binary_threshold_variables(env, *variables, latent=self.latent)
         yield LinearFactor(params.namespace('binary-group'),
                            *binary_variables.values(), input=input)
+        # bias
         for ordinal, binary in binary_variables.items():
-            yield env.factor(ordinal, lambda: LinearFactor(params.namespace('binary-to-ordinal'),
-                                                           ordinal, binary, input=None))
+            yield env.factor((ordinal, 'binary-to-ordinal'),
+                             lambda: LinearFactor(params.namespace(
+                                 (len(ordinal.domain), 'binary-to-ordinal')),
+                ordinal, binary, input=None))
