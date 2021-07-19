@@ -45,43 +45,43 @@ def gdrop(*args, **kwargs):
     return _gdrop(*args, **kwargs)
 
 
-@dataclass(frozen=True)
-class GeneralizedSlice:
-    r"""Like a slice of a dimension in that the dimeension will be retained, but
-    allows an arbitrary sequence of dimension elements to be retained (even with
-    duplicates and in a different order)"""
-    indexes: Tuple[int, ...]
+# @dataclass(frozen=True)
+# class GeneralizedSlice:
+#     r"""Like a slice of a dimension in that the dimeension will be retained, but
+#     allows an arbitrary sequence of dimension elements to be retained (even with
+#     duplicates and in a different order)"""
+#     indexes: Tuple[int, ...]
 
 
-@multidispatch
-def _gslice(*indexes: int) -> GeneralizedSlice:
-    return GeneralizedSlice(indexes)
+# @multidispatch
+# def _gslice(*indexes: int) -> GeneralizedSlice:
+#     return GeneralizedSlice(indexes)
 
 
-@_gslice.register
-def _gslice_from_list(indexes: List[int]) -> GeneralizedSlice:
-    return _gslice(*indexes)
+# @_gslice.register
+# def _gslice_from_list(indexes: List[int]) -> GeneralizedSlice:
+#     return _gslice(*indexes)
 
 
-@_gslice.register
-def _gslice_from_tuple(indexes: Tuple[int, ...]) -> GeneralizedSlice:
-    return _gslice(*indexes)
+# @_gslice.register
+# def _gslice_from_tuple(indexes: Tuple[int, ...]) -> GeneralizedSlice:
+#     return _gslice(*indexes)
 
 
-@overload
-def gslice(*indexes: int) -> GeneralizedSlice: ...
+# @overload
+# def gslice(*indexes: int) -> GeneralizedSlice: ...
 
 
-@overload
-def gslice(indexes: List[int]) -> GeneralizedSlice: ...
+# @overload
+# def gslice(indexes: List[int]) -> GeneralizedSlice: ...
 
 
-@overload
-def gslice(indexes: Tuple[int, ...]) -> GeneralizedSlice: ...
+# @overload
+# def gslice(indexes: Tuple[int, ...]) -> GeneralizedSlice: ...
 
 
-def gslice(*args, **kwargs):
-    return _gslice(*args, **kwargs)
+# def gslice(*args, **kwargs):
+#     return _gslice(*args, **kwargs)
 
 # I guess what we really want is:
 # which rows, do we want and for each,

@@ -19,7 +19,7 @@ from .model import Model
 from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
-from .types import GeneralizedDimensionDrop, GeneralizedSlice, gdrop, gslice
+from .types import GeneralizedDimensionDrop, gdrop
 from .utils import logsumexp, ndarange
 from .variable import TensorVar, Var, VarField, VarUsage, at, vtensor
 
@@ -35,7 +35,7 @@ DEFAULT = VarUsage.DEFAULT
 OPEN = Domain.OPEN
 
 __all__ = [
-    'gslice', 'gdrop', 'GeneralizedDimensionDrop', 'GeneralizedSlice', 'at',
+    'gdrop', 'GeneralizedDimensionDrop', 'at',
     'dataclass', 'logsumexp',
     'one_hot',
     'CliqueModel',
