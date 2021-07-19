@@ -217,6 +217,13 @@ def test_logsumexp_none():
     assert out.allclose(t)
 
 
+def test_logsumexp_none_out():
+    t = torch.tensor([[1, 2], [3, 4]]).log()
+    out = torch.zeros_like(t)
+    tx.logsumexp(t, (), out=out)
+    assert out.allclose(t)
+
+
 def test_logsumexp_two():
     t = torch.tensor([[1, 2], [3, 4]]).log()
     out = tx.logsumexp(t, (0, 1))
