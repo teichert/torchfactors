@@ -1,15 +1,15 @@
 import itertools
 import math
 from itertools import chain
-from typing import Any, List, Tuple, Union, overload
+from typing import Any, List, Tuple, Union, cast, overload
 
 import torch
 from multimethod import multidispatch
 from opt_einsum import contract  # type: ignore
 from torch import Tensor, arange
 
-from .types import (GeneralizedDimensionDrop, MaybeRange, NDRange, NDSlice,
-                    ShapeType, SliceType)
+from .types import (GeneralizedDimensionDrop, NDRangeSlice, NDSlice,
+                    RangeSlice, ShapeType, SliceType)
 
 
 def logsumexp(t: Tensor, dim: Union[None, int, List[int], Tuple[int, ...]] = None,
@@ -134,7 +134,7 @@ def canonical_range(r: range) -> range:
         return range(0)
 
 
-def canonical_maybe_range(r: MaybeRange) -> MaybeRange:
+def canonical_range_slice(r: RangeSlice) -> RangeSlice:
     if isinstance(r, int):
         return r
     elif isinstance(r, range):
@@ -192,14 +192,14 @@ def canonical_maybe_range(r: MaybeRange) -> MaybeRange:
 #     return slice(out.start, out.stop, out.step)
 
 
-def slice_to_range(one_slice: SliceType, length: int) -> MaybeRange:
+def slice_to_range(one_slice: SliceType, length: int) -> RangeSlice:
     if isinstance(one_slice, slice):
         return range(length)[one_slice]
     else:
         return one_slice
 
 
-def range_to_slice(one_range: Union[MaybeRange, Any]) -> SliceType:
+def range_to_slice(one_range: Union[RangeSlice, Any]) -> SliceType:
     if isinstance(one_range, range):
         return slice(0 if one_range.start is None else one_range.start,
                      one_range.stop,
@@ -213,20 +213,19 @@ def canonical_ndslice(s: NDSlice, shape: ShapeType
     if s is ...:
         return (...,)
     r = as_ndrange(s, shape)
-    if isinstance(r, tuple):
-        return tuple(map(range_to_slice, r))
-    else:
-        return range_to_slice(r)
+    return tuple(
+        range_to_slice(canonical_range_slice(ri))
+        for ri in cast(Tuple[RangeSlice, ...], r))
 
 
-def as_range(one_slice: SliceType, length: int) -> MaybeRange:
+def as_range(one_slice: SliceType, length: int) -> RangeSlice:
     """returns a range (or tuple of int when not representable by a range)
     representing the same subset of integers as the given
     slice assuming the given length"""
-    return canonical_maybe_range(slice_to_range(one_slice, length))
+    return canonical_range_slice(slice_to_range(one_slice, length))
 
 
-def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> NDRange:
+def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> NDRangeSlice:
     r"""
     slices are used to index into a subset of a tensor, but the are not
     hashable; this converts something that could index into a hashable
@@ -253,14 +252,14 @@ def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> NDRange:
                     tuple(as_ndrange(ndslice[1:], shape[1:])))
     elif isinstance(ndslice, int):
         return (ndslice,)
-    else:
-        raise NotImplementedError("haven't implemented support for that kind of ndslice")
+    elif isinstance(ndslice, slice):
+        return (as_range(ndslice, shape[0]),)
 
 
 def compose_single(lhs: SliceType, rhs: SliceType, length: int
                    ) -> SliceType:
     lhs_range = as_range(lhs, length)
-    out: MaybeRange
+    out: RangeSlice
     if isinstance(lhs_range, (int, GeneralizedDimensionDrop)):
         raise ValueError("cannot index into a 0-dimensional")
     elif isinstance(rhs, GeneralizedDimensionDrop):
@@ -275,7 +274,7 @@ def compose_single(lhs: SliceType, rhs: SliceType, length: int
     else:
         out = lhs_range[rhs]
     # don't keep sequences if they can be replaced
-    canonical = canonical_maybe_range(out)
+    canonical = canonical_range_slice(out)
     to_slice = range_to_slice(canonical)
     return to_slice
     # rhs_range = as_range(rhs)

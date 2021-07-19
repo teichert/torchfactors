@@ -92,8 +92,8 @@ FULL_SLICE = slice(None, None, None)
 
 # MaybeRange = Union[range, int, List[int], Tuple[int, ...]]
 # MaybeRange = Union[range, int, GeneralizedSlice, GeneralizedDimensionDrop]
-MaybeRange = Union[range, int, GeneralizedDimensionDrop]
-NDRange = Tuple[Union[MaybeRange, Any], ...]
+RangeSlice = Union[range, int, GeneralizedDimensionDrop]
+NDRangeSlice = Tuple[Union[RangeSlice, Any], ...]
 # SliceType = Union[slice, int, List[int], Tuple[int, ...]]
 # SliceType = Union[slice, int, GeneralizedSlice, GeneralizedDimensionDrop]
 SliceType = Union[slice, int, GeneralizedDimensionDrop]

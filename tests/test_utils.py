@@ -3,9 +3,10 @@ import torch
 import torchfactors as tx
 from torch import arange
 from torchfactors.types import gdrop
-from torchfactors.utils import (as_ndrange, canonical_maybe_range, compose,
-                                compose_single, ndarange, ndslices_cat,
-                                ndslices_overlap, outer, stereotype)
+from torchfactors.utils import (as_ndrange, canonical_ndslice,
+                                canonical_range_slice, compose, compose_single,
+                                ndarange, ndslices_cat, ndslices_overlap,
+                                outer, stereotype)
 
 
 def test_compose_single():
@@ -158,7 +159,7 @@ def test_stereotype():
 #     assert out == (4, 4)
 
 def test_canonical_maybe_range2():
-    out = canonical_maybe_range(gdrop(4, 4))
+    out = canonical_range_slice(gdrop(4, 4))
     assert out == 4
 
 
@@ -255,3 +256,65 @@ def test_gdrop2():
 def test_gdrop3():
     a = tx.gdrop((3, 2, 5))
     assert a.indexPerIndex == (3, 2, 5)
+
+
+def test_end():
+    assert tx.utils.end(5, 3) == 6
+    assert tx.utils.end(5, -3) == 4
+    assert tx.utils.end(-5, 3) == -4
+    assert tx.utils.end(-5, -3) == -6
+
+
+def test_canonical_range_slice():
+    assert canonical_range_slice(5) == 5
+    assert canonical_range_slice(range(5)) == range(5)
+    assert canonical_range_slice(range(3, 20, 10)) == range(3, 14, 10)
+    assert canonical_range_slice(range(20, 3, -10)) == range(20, 9, -10)
+    assert canonical_range_slice(tx.gdrop(3, 7, 2)) == tx.gdrop(3, 7, 2)
+    assert canonical_range_slice(tx.gdrop(3, 3, 3)) == 3
+    assert canonical_range_slice(range(10, 10)) == range(0)
+    with pytest.raises(TypeError):
+        # don't know how to canonicalize a string
+        canonical_range_slice("test")  # type: ignore
+
+
+def test_canonical_ndslice():
+    assert canonical_ndslice(..., (8,)) == (...,)
+    assert canonical_ndslice(4, (8,)) == (4,)
+    out = canonical_ndslice(slice(4, 9), (12,))
+    expected = (slice(4, 9, 1),)
+    assert out == expected
+
+
+def test_canonical_ndslice2():
+    ndslice = [slice(4, 9), 3, slice(-1, 3, -10), 4]
+    shape = [12, 5, 30, 8]
+    out = canonical_ndslice(ndslice, shape)
+    expected = (slice(4, 9, 1), 3, slice(29, 8, -10), 4)
+    assert out == expected
+
+
+def test_bad_compose():
+    with pytest.raises(ValueError):
+        compose_single(4, slice(4, 2), 10)
+
+
+def test_gdrop_single():
+    out = compose_single(slice(5, 8), tx.gdrop(4, 2, 7), 10)
+    assert out == tx.gdrop(4, 2, 7)
+
+
+def test_gdrop_multi():
+    shape = (10, 15, 11, 12, 13)
+    a = (5, slice(5, 8), slice(None, 8), slice(None), 3)  # 3 x 11 x 12
+    b = (tx.gdrop(4, 2, 7), slice(None))  # 3 x 12
+    expected = (5, slice(5, 8), tx.gdrop(4, 2, 7), slice(None), 3)
+    out = compose_single(a, b, shape)
+    assert out == expected
+
+
+def test_bad_compose2():
+    with pytest.raises(ValueError):
+        compose_single(slice(5, 8), tx.gdrop(4, 2, 7, 10), 10)
+    with pytest.raises(ValueError):
+        compose_single(slice(5, 8), tx.gdrop(4, 2), 10)
