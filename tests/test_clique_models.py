@@ -6,6 +6,7 @@ from torchfactors.clique import (BinaryScoresModule,
                                  make_binary_label_variables,
                                  make_binary_threshold_variables)
 from torchfactors.components.at_least import KIsAtLeastJ
+from torchfactors.components.binary import Binary
 from torchfactors.subject import Environment
 from torchfactors.testing import DummyParamNamespace, DummyVar
 
@@ -168,4 +169,29 @@ def testKIsAtLeastJ():
     # vars = make_binary_label_variables(env, a, key='root')
 
 
-testKIsAtLeastJ()
+def test_binary():
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
+    assert a.marginal_shape == (5, 4)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    assert b.marginal_shape == (5, 3)
+
+    env = Environment()
+    params = DummyParamNamespace()
+    model = Binary(latent=False)
+    input = torch.tensor([[1, 2, 3, 9, 2, 3, 10]] * 5)
+    factors = list(model.factors(env, params, a, b, input=input))
+    # factor for the pair and for each ordinal to binary
+    assert len(factors) == 3
+    assert factors[0].shape == (5, 2, 2)
+    assert factors[1].shape == (5, 4, 2)
+    assert factors[2].shape == (5, 3, 2)
+
+    assert len(factors[0]) == 2
+    bin_a, bin_b = factors[0].variables
+    assert len(bin_a.domain) == 2
+    assert bin_a.marginal_shape == (5, 2)
+    assert bin_b.marginal_shape == (5, 2)
+    vars1 = factors[1].variables
+    assert tuple(vars1) == (a, bin_a)
+    vars2 = factors[2].variables
+    assert tuple(vars2) == (b, bin_b)

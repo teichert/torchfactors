@@ -24,4 +24,4 @@ class Binary(CliqueModel):
                            *binary_variables.values(), input=input)
         for ordinal, binary in binary_variables.items():
             yield env.factor(ordinal, lambda: LinearFactor(params.namespace('binary-to-ordinal'),
-                                                           binary, ordinal, input=None))
+                                                           ordinal, binary, input=None))
