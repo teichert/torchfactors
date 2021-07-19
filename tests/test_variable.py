@@ -671,6 +671,3 @@ def test_list_variable2():
     a = v1.tensor.tolist()
     b = v2.tensor.tolist()
     assert a == b
-
-
-test_no_late_change()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field, fields
 from typing import (Callable, Dict, FrozenSet, Generic, Hashable, List,
-                    Sequence, Sized, TypeVar, Union, cast)
+                    Optional, Sequence, Sized, TypeVar, Union, cast)
 
 from torch.utils.data import DataLoader, Dataset
 
@@ -39,25 +39,38 @@ class Environment(object):
         self.variables: Dict[Hashable, Var] = {}
         self.factors: Dict[Hashable, Factor] = {}
 
-    def variable(self, key: Hashable, factory: Callable[[], Var]) -> Var:
+    def variable(self, key: Hashable, factory: Optional[Callable[[], Var]] = None) -> Var:
         try:
             out = self.variables[key]
             return out
         except KeyError:
-            out = factory()
-            return self.variables.setdefault(key, out)
+            if factory is None:
+                raise KeyError(f"key {key} not found and no factory provided")
+            else:
+                out = factory()
+                return self.variables.setdefault(key, out)
 
-    def factor(self, key: Hashable, factory: Callable[[], Factor]) -> Factor:
+    def factor(self, key: Hashable, factory: Optional[Callable[[], Factor]] = None) -> Factor:
         try:
             out = self.factors[key]
             return out
         except KeyError:
-            out = factory()
-            return self.factors.setdefault(key, out)
+            if factory is None:
+                raise KeyError(f"key {key} not found and no factory provided")
+            else:
+                out = factory()
+                return self.factors.setdefault(key, out)
 
 
 @ dataclass
 class Subject:
+    # TODO: [ ] a model should be agnostic whether (and how many times) this
+    # subject has been stacked the idea is that a model should be a model of a
+    # single one of these; [ ] there should be a canonical way to slice with
+    # respect to the original boundary; [ ] the subject should know its batch
+    # dimensions; when it comes to variables, non batch dimensions except the
+    # last one should be a short-hand for separate factors (hopefully for which
+    # messages can be computed and sent in parallel?)
     is_stacked: bool = field(init=False, default=False)
     __lists: Dict[str, List[object]] = field(init=False, default_factory=dict)
     __varset: FrozenSet = field(init=False, default=frozenset())

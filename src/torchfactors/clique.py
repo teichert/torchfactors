@@ -1,6 +1,6 @@
 
 from abc import ABC, abstractmethod
-from typing import Dict, Hashable, Sequence, Tuple
+from typing import Dict, Hashable, Sequence, Tuple, cast
 
 from torch.functional import Tensor
 
@@ -26,6 +26,13 @@ class CliqueModel(ABC):
 def make_binary_label_variables(env: Environment, *variables: Var, key: Hashable = None,
                                 latent: bool = False, only_equals: bool = False
                                 ) -> Dict[Tuple[Var, int], Var]:
+    r"""
+    Returns a dictionary from each (`orig` variable, `label`) to a binary
+    variable that is 1 when `orig.tensor >= label` (or, if `only_equals`, then
+    the value of the binary variable is 1 when `orig.tensor == label`) only
+    strictly positive labels are modeled.
+
+    """
     def binary_variable(v: Var, label: int):
         if latent:
             usage = v.usage.clone().masked_fill(v.usage != VarUsage.PADDING, VarUsage.LATENT)
@@ -43,7 +50,7 @@ def make_binary_label_variables(env: Environment, *variables: Var, key: Hashable
     binary_variables: Dict[Tuple[Var, int], Var] = {
         (v, label): env.variable((v, label, key), lambda: binary_variable(v, label))
         for v in variables
-        for label in range(len(v.domain))
+        for label in range(1, len(v.domain))
     }
     return binary_variables
 
@@ -51,6 +58,12 @@ def make_binary_label_variables(env: Environment, *variables: Var, key: Hashable
 def make_binary_threshold_variables(env: Environment, *variables: Var, key: Hashable = None,
                                     latent: bool = False
                                     ) -> Dict[Var, Var]:
+    r"""
+    Returns a dictionary from original variable to a binary version;
+    if observed then the value is assigned so that
+    roughly half of the labels are negative and the half are positive
+    (with one more negative label than positive if there is a tie)
+    """
     # TODO: allow different ways of thresholding
     def binary_variable(v: Var):
         if latent:
@@ -71,7 +84,7 @@ def make_binary_threshold_variables(env: Environment, *variables: Var, key: Hash
 
 def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
                        input: Tensor,
-                       bias: bool = False):
+                       bias: bool = False) -> ShapedLinear:
     num_batch_dims = len(variables[0].shape) - 1
 
     def factory():
@@ -80,4 +93,4 @@ def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
                            bias=bias)
         return out
     out = params.module(factory)
-    return out
+    return cast(ShapedLinear, out)

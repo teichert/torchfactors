@@ -72,7 +72,7 @@ def each_epoch(system, data_loader, data):
 
 
 system = tx.learning.example_fit_model(
-    model, data, iterations=1000, lr=0.1, passes=5, penalty_coeff=1,
+    model, data, iterations=1000, lr=0.01, passes=10, penalty_coeff=1,
     log_info=log_info,
     each_epoch=each_epoch)
 
