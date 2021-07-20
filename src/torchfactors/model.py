@@ -4,7 +4,6 @@ from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
                     Optional, Sequence, overload)
 
 import torch
-# from multimethod import multidispatch as overload
 from multimethod import multimethod
 from torch import Tensor
 from torch.nn import Module, ModuleDict, ParameterDict

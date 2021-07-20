@@ -64,58 +64,30 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
     optimizer = optimizer_cls(model.parameters(), **optimizer_kwargs)
     # optimizer = torch.optim.LBFGS(model.parameters(), lr=lr)
     # optimizer = torch.optim.Rprop(model.parameters(), lr=lr)
-    # optimizer = torch.optim.Rprop(model.parameters(), lr=lr)
-
-    # iterations=1000, lr=0.1, passes=3, penalty_coeff=100)
-    # bits.py | 316/1000 [01:28<03:11,  3.58it/s, combo=251, i=315, j=0, loss=6.07, penalty=0.894]
     # optimizer = optim.RAdam(model.parameters(), lr=lr)
     # optimizer = optim.AdaBound(model.parameters(), lr=lr)
-    # # | 373/1000 [02:03<03:04,  3.40it/s, combo=402, i=372, j=0, loss=6.02, penalty=1.38]
-    # optimizer = optim.AdaBound(model.parameters(), lr=lr)
-    # scheduler = torch.optim.lr_scheduler.OneCycleLR(
-    #     optimizer, max_lr=lr, epochs=iterations // 3, steps_per_epoch=3)
     logging.info('staring training...')
     if log_info is None:
         log_info = {}
     data: SubjectType
-    for i, j, data in tnested(data_loader, iterations, log_info=log_info):  # , mininterval=1.0):
+    for i, j, data in tnested(data_loader, iterations, log_info=log_info):
         log_info['i'] = i
         log_info['j'] = j
-        # logging.info(f'iteration: {i}')
-        # logging.info('\tzeroing grad...')
 
         def closure():
             optimizer.zero_grad()
-            # logging.info('\tclamped inference...')
             clamped = data.clamp_annotated()
             free = data.unclamp_annotated()
             logz_clamped = system.product_marginal(clamped)
-            # for t in system.model(data):
-            #     logging.info('\t\t\t---')
-            #     for row in t.dense.tolist()[0]:
-            #         logging.info(f'\t\t\t{row}')
-            # logging.info(f'\t\tlogz_clamped: {logz_clamped}')
-            # logging.info('\tunclamped inference...')
             logz_free, penalty = system.partition_with_change(free)
-            # for t in system.model(data):
-            #     logging.info('\t\t\t---')
-            #     for row in t.dense.tolist()[0]:
-            #         logging.info(f'\t\t\t{row}')
-            # logging.info(f'\t\tlogz_free: {logz_free}')
-            # logging.info(f'\t\tpenalty: {penalty}')
             loss = (logz_free - logz_clamped).clamp_min(0).sum()
             log_info['loss'] = float(loss)
             log_info['penalty'] = float(penalty)
-            # logging.info(f'\t\tloss: {loss}')
             if penalty_coeff != 0:
                 loss = loss + penalty_coeff * penalty.sum().exp()
             log_info['combo'] = float(loss)
-            # logging.info(f'\t\tpenalty coeff: {penalty_coeff}')
-            # logging.info(f'\t\tpenalized loss: {loss}')
-            # logging.info('\tcomputing gradient...')
-            loss.backward()
-            # print([p.grad for p in system.model.parameters()])
-            # logging.info('\tupdating...')
+            if loss.requires_grad:
+                loss.backward()
             return loss
 
         optimizer.step(closure)
