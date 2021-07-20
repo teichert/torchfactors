@@ -51,21 +51,17 @@ class Region(object):
     def product_marginals(self,
                           queries: Sequence[Sequence[Var]] = (()),
                           other_factors: Sequence[Factor] = (()),
-                          #   exclude: Optional[Region] = None
                           ):
         r"""
         analogous to the function with the same name on the Factor class except with a slightly
         different interface (to avoid needing to special-case or risk errors) and with the
         ability to exclude the factors from a particular region
         """
-        return self.marginals_closure(queries, other_factors=other_factors,
-                                      #   exclude=exclude
-                                      )()
+        return self.marginals_closure(queries, other_factors=other_factors)()
 
     def marginals_closure(self,
                           queries: Sequence[Sequence[Var]] = (()),
                           other_factors: Sequence[Factor] = (()),
-                          #   exclude: Optional[Region] = None
                           ) -> Callable[[], Sequence[Tensor]]:
         r"""
         returns the function that will compute the product_marginals given the

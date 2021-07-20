@@ -55,7 +55,7 @@ class ParamNamespace:
     def get_saved_parameter(self) -> Parameter:
         return self.model._get_param(self.key)
 
-    # # extra stubs and ignores are in here to help vscode intellisense work without making mypy mad
+    # # extra stubs are in here to help vscode intellisense work without making mypy mad
     @overload
     def parameter(self, shape: ShapeType,
                   initialization: Optional[Callable[[Tensor], None]] = None
@@ -71,36 +71,10 @@ class ParamNamespace:
         return self.model._get_module(self.key, default_factory=constructor)
 
 
-# class GroundedNamespace(ParamNamespace):
-
-#     def __init__(self, model: 'Model', key: Hashable,
-#                  grounding: Optional[Grounding] = None):
-#         super().__init__(model, key)
-#         if grounding is None:
-#             grounding = Grounding()
-#         self.grounding = Grounding()
-
-#     def namespace(self, key: Hashable) -> GroundedNamespace:
-#         r"""
-#         Returns a new namespace branch labeled with the given key
-#         """
-#         return GroundedNamespace(
-#             model=self.model, key=(self.key, key),
-#             grounding=self.grounding)
-
-#     def variable(self, factory: Callable[[], Var]) -> Var:
-#         return self.grounding.variable(self.key, factory)
-
-#     def factor(self, factory: Callable[[], Factor]) -> Factor:
-#         return self.grounding.factor(self.key, factory)
-
-
 class Model(torch.nn.Module, Generic[SubjectType]):
 
     def __init__(self):
         super(Model, self).__init__()
-        # self._model_factor_generators: List[Callable[[T], Iterable[Factor]]] = []
-        # self._model_domains: Dict[Hashable, Domain] = {}
         self._model_parameters = ParameterDict()
         self._model_modules = ModuleDict()
         # TODO: these domains are not actually saved anywhere to file
@@ -117,16 +91,8 @@ class Model(torch.nn.Module, Generic[SubjectType]):
     def namespace(self, key: Hashable) -> ParamNamespace:
         return ParamNamespace(self, key)
 
-    # def grounded_namespace(self, key: Hashable = 'root') -> GroundedNamespace:
-    #     return GroundedNamespace(self, key)
-
-    # def factors_from(self, factor_generator: Callable[[T], Iterable[Factor]]) -> None:
-    #     self._model_factor_generators.append(factor_generator)
-
     def factors(self, subject: SubjectType) -> Iterable[Factor]:
         return []
-        # for gen in self._model_factor_generators:
-        #     yield from gen(subject)
 
     def _get_param(self, key: Hashable, check_shape: Optional[ShapeType] = None,
                    default_factory: Optional[Callable[[], Parameter]] = None
@@ -151,12 +117,6 @@ class Model(torch.nn.Module, Generic[SubjectType]):
                     f"{check_shape} vs {param.shape}")
             return param
 
-    # def set_param(self, key: Hashable, value: Parameter, first=True) -> None:
-    #     repr = f'{key}:{hash(key)}'
-    #     if first and repr in self._model_parameters:
-    #         raise ValueError(f"This key has already been used!: {repr}")
-    #     self._model_parameters[repr] = value
-
     def _get_module(self, key: Hashable,
                     default_factory: Optional[Callable[[], Module]] = None
                     ) -> Module:
@@ -178,15 +138,3 @@ class Model(torch.nn.Module, Generic[SubjectType]):
     def __call__(self, subject: SubjectType) -> List[Factor]:
         subject.environment = Environment()
         return list(self.factors(subject))
-
-
-# class Clique(torch.nn.Module, Generic[T]):
-
-#     def __init__(self, variables: Sequence[Var]):
-#         self.variables = variables
-
-
-#     def i
-
-#     def factors(self, subject: T) -> Iterable[Factor]:
-#         return []
