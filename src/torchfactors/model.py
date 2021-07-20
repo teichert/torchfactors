@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
-                    Optional, Sequence, overload)
+                    Optional, Sequence, cast, overload)
 
 import torch
 from multimethod import multimethod
@@ -43,11 +43,11 @@ class ParamNamespace:
                 def initialization(t): return zeros_(t)
             else:
                 def initialization(t): return xavier_uniform_(t)
+        non_none_initialization = cast(Callable[[Tensor], None], initialization)
 
         def gen_param():
-            tensor = torch.zeros(shape)
-            if initialization is not None:
-                initialization(tensor)
+            tensor = torch.empty(shape)
+            non_none_initialization(tensor)
             return Parameter(tensor)
         return self.model._get_param(self.key, check_shape=shape, default_factory=gen_param)
 

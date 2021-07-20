@@ -6,11 +6,13 @@ import pytest
 import torch
 import torchfactors as tx
 from pytest import approx
+from torch.functional import Tensor
 from torch.nn import functional as F
 from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
                           Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.model import ParamNamespace
+from torchfactors.testing import DummyParamNamespace
 
 
 @dataclass
@@ -205,3 +207,16 @@ def test_prime_linear_params():
     assert len(list(model.parameters())) == 0
     system.prime(Characters.from_string('testing'))
     assert len(list(model.parameters())) > 0
+
+
+def test_custom_init():
+    params = DummyParamNamespace()
+    constant = 3.0
+
+    def my_init(t: Tensor):
+        t[(...,)] = constant
+
+    out = params.parameter((3, 4), initialization=my_init)
+    assert out.allclose(torch.ones(3, 4) * constant)
+    out2 = params.parameter()
+    assert out2 is out
