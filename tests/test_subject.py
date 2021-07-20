@@ -4,6 +4,7 @@ from typing import ClassVar, List
 import pytest
 import torch
 import torchfactors as tx
+from torch.utils.data import Dataset
 from torchfactors import (ANNOTATED, CLAMPED, LATENT, OBSERVED, Range, Subject,
                           TensorFactor, TensorVar, VarField)
 from torchfactors.subject import Environment
@@ -137,9 +138,6 @@ def test_clamp_annotated():
     assert (u3.items2.usage == CLAMPED).sum() == 0
 
 
-test_clamp_annotated()
-
-
 def test_stacked():
     @dataclass
     class Utterance(Subject):
@@ -160,6 +158,17 @@ def test_stacked():
     ]
     loader = Utterance.data_loader(data, batch_size=2)
     instances: List[Utterance] = list(loader)
+
+    class MyDataset(Dataset):
+        def __len__(self):
+            return len(data)
+
+        def __getitem__(self, idx: int):
+            return data[idx]
+
+    loader2 = Utterance.data_loader(MyDataset(), batch_size=2)
+    instances2 = list(loader2)
+    assert [x.id1 for x in instances] == [x.id1 for x in instances2]
     assert len(instances) == 3
     a, b, c = instances
     assert a.id1 == 1
@@ -302,12 +311,15 @@ def test_subject_bad_shape2():
         a: Var = VarField(Range(5), shape=(3, 5))
 
     with pytest.raises(ValueError):
+        # cannot specify tensor if already specified shape
         MySubject(vtensor([1, 2, 3]))
 
 
-# def test_subject_bad_shape3():
-#     @tx.dataclass
-#     class MySubject(tx.Subject):
-#         a: Var = VarField(Range(5), shape=(3,))
+def test_subject_bad_shape3():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5), shape=(3,))
 
-#     MySubject(vtensor([1, 2, 3]))
+    with pytest.raises(ValueError):
+        # cannot specify tensor if already specified shape (even if it matches)
+        MySubject(vtensor([1, 2, 3]))

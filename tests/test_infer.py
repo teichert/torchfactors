@@ -59,9 +59,6 @@ def test_predict_simple():
     assert coin.tensor == 0
 
 
-test_predict_simple()
-
-
 def test_predict_simple2():
     coin = TensorVar(Range(2), torch.tensor(0), ANNOTATED)
     factor = TensorFactor(coin, tensor=torch.tensor([0, 1]).log())
