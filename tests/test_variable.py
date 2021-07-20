@@ -231,6 +231,25 @@ def test_usage3():
     assert (v.usage == OBSERVED).sum() == 2
 
 
+def test_usage4():
+    t = torch.ones(3, 4)
+    v = TensorVar(t, Range(4))
+    v[1, 2:4].set_usage(torch.tensor(
+        [tx.PADDING, tx.LATENT]
+    ))
+    assert v[1, 2:4].usage.tolist() == [tx.PADDING, tx.LATENT]
+
+
+def test_bad_usage4():
+    t = torch.ones(3, 4)
+    v = TensorVar(t, Range(4))
+    with pytest.raises(RuntimeError):
+        # shape doesn't match
+        v[1, 2:4].set_usage(torch.tensor(
+            [tx.PADDING, tx.LATENT, tx.ANNOTATED]
+        ))
+
+
 def test_bad_var_usage():
     v = TensorVar(domain=Range(10))
     with pytest.raises(TypeError):
