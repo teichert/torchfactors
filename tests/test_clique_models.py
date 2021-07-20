@@ -13,7 +13,7 @@ from torchfactors.components.prop_odds import ProportionalOdds
 from torchfactors.components.stereotype import Stereotype
 from torchfactors.subject import Environment
 from torchfactors.testing import DummyParamNamespace, DummyVar
-from torchfactors.utils import num_params
+from torchfactors.utils import num_trainable
 
 
 def test_make_binary_label_variables():
@@ -162,7 +162,7 @@ def test_binary():
 
     [f.dense for f in factors]
 
-    out_params = num_params(params.model)
+    out_params = num_trainable(params.model)
     # binary configs (4) * (features plus bias) + binary to label mapping (for each)
     expected_params = 4 * (7 + 1) + 2 * (4 + 3)
     assert out_params == expected_params
@@ -178,7 +178,7 @@ def test_nominal():
     factors = list(model.factors(env, params, a, b, input=input))
     [f.dense for f in factors]
 
-    out_params = num_params(params.model)
+    out_params = num_trainable(params.model)
     # configs times (labels plus bias)
     expected_params = 4 * 3 * (8 + 1)
     assert out_params == expected_params
@@ -206,7 +206,7 @@ def test_prop_odds():
     assert all(f.shape == (5, 4, 2) for f in factors[6:9])
     assert all(f.shape == (5, 3, 2) for f in factors[9:])
 
-    out_params = num_params(params.model)
+    out_params = num_trainable(params.model)
     # features * num_bin_configs + num_full_configs for bias
     expected_params = 9 * 4 + 4 * 3
     assert out_params == expected_params
@@ -222,7 +222,7 @@ def test_non_linear_stereotype():
     factors = [f.dense for f in model.factors(env, params, a, b, input=input)]
     assert len(factors) == 2
 
-    out_params = num_params(params.model)
+    out_params = num_trainable(params.model)
     # features * num_bin_configs + num_full_configs for bias + scale for each config
     expected_params = 9 * 4 + 4 * 3 + 4 * 3
     assert out_params == expected_params
@@ -238,7 +238,7 @@ def test_linear_stereotype():
     factors = [f.dense for f in model.factors(env, params, a, b, input=input)]
     assert len(factors) == 2
 
-    out_params = num_params(params.model)
+    out_params = num_trainable(params.model)
     # features * num_bin_configs + num_full_configs for bias
     expected_params = 9 * 4 + 4 * 3
     assert out_params == expected_params
@@ -253,7 +253,7 @@ def test_linear_stereotyp_bias_only():
     factors = [f.dense for f in model.factors(env, params, a, b, input=None)]
     assert len(factors) == 1
 
-    out_params = num_params(params.model)
+    out_params = num_trainable(params.model)
     # num_full_configs for bias
     expected_params = 4 * 3
     assert out_params == expected_params

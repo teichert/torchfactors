@@ -277,15 +277,11 @@ def stereotype(scales: Tensor, binary: Tensor) -> Tensor:
     return full
 
 
-def num_params(m: torch.nn.Module, only_trainable: bool = True) -> int:
+def num_trainable(m: torch.nn.Module) -> int:
     """
     (from my answer on stackoverflow: https://stackoverflow.com/a/62764464/3780389)
-    returns the total number of parameters used by `m` (only counting
-    shared parameters once); if `only_trainable` is True, then only
-    includes parameters with `requires_grad = True`
+    returns the total number of parameters requiring grad used by `m` (only counting
+    shared parameters once)
     """
-    parameters = list(m.parameters())
-    if only_trainable:
-        parameters = [p for p in parameters if p.requires_grad]
-    unique = {p.data_ptr(): p for p in parameters}.values()
+    unique = {p.data_ptr(): p for p in m.parameters() if p.requires_grad}.values()
     return sum(p.numel() for p in unique)
