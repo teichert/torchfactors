@@ -21,8 +21,6 @@ def check_queries(queries: Sequence[Union[Var, Sequence[Var]]]):
                          "consider using product_marginal() if you only have one variable "
                          "or if you want to just get the partition function.")
 
-# @dataclass
-
 
 def uncache(factors: Sequence[Factor]):
     for f in factors:
@@ -41,8 +39,6 @@ class Factor:
     """
 
     def __init__(self, variables: Sequence[Var]):
-        # if isinstance(variables, Var):
-        #     variables = (variables,)
         self.cached: Optional[Tensor] = None
         for v in variables:
             if not isinstance(v, Var):
@@ -60,22 +56,6 @@ class Factor:
         self._usage_equation = self.__vars_equation(
             [(v,) for v in self.variables],
             [self.variables])
-        # if self._usage_equation.input_variables == [[0], [0]]:
-        #     self._usage_equation = self.__vars_equation(
-        #         [(v,) for v in self.variables],
-        #         [self.variables])
-        # self.versions: List[int] = []
-        # self.update_versions()
-
-    # def update_versions(self):
-    #     self.versions = self.variable_versions()
-
-    # def variable_versions(self):
-    #     return [v.version for v in self.variables]
-
-    # @property
-    # def _is_stale(self):
-    #     return self.variable_versions() != self.versions
 
     def clear_cache(self):
         self.cached = None
@@ -162,14 +142,6 @@ class Factor:
         """
         return math.prod(self.shape)
 
-    # @cached_property
-    # def out_cells(self):
-    #     r"""
-    #     The number of cells in the (possibly implicit) output for each batch
-    #     element
-    #     """
-    #     return math.prod(self.out_shape)
-
     @cached_property
     def batch_cells(self):
         r"""
@@ -205,14 +177,10 @@ class Factor:
 
     @property
     def _is_possible(self) -> Tensor:
-        # possibilities =
-        # return einsum(self._usage_equation, *possibilities)
         return outer(*[v.is_possible for v in self.variables], num_batch_dims=self.num_batch_dims)
 
     @property
     def _is_not_padding(self) -> Tensor:
-        # not_paddings = [v.is_padding.logical_not() for v in self.variables]
-        # return einsum(self._usage_equation, *not_paddings)
         return outer(*[v.is_padding.logical_not() for v in self.variables],
                      num_batch_dims=self.num_batch_dims)
 
@@ -222,6 +190,10 @@ class Factor:
         A tensor representing the factor (should have the same shape as
         the factor and dimensions should correspond to the variables in the same
         order as given by the factor).
+        TODO: ISSUES: it might be cleaner and more economical to handle clamping
+        by introducing additional factors, but in some ways it is nice to have the
+        number of factors not change.  Another issue is that non-densable factors will
+        need to separately implement this logic :(
         """
         if self.cached is not None:
             return self.cached
@@ -229,13 +201,6 @@ class Factor:
         if d.shape != self.shape:
             d = d[None].expand(self.shape)
 
-        # really, I think I just want two masks:
-        # 1) possible [clamps, observed, and padding make other things impossible]
-        # 2) padding [padding sets the score to (log) 1]
-        # return d.masked_fill(
-        #     self._is_not_padding.logical_not(), 0
-        # ).masked_fill(
-        #     self._is_possible.logical_not(), float('-inf'))
         self.cached = d.where(
             self._is_not_padding,
             torch.zeros_like(d)
@@ -243,125 +208,7 @@ class Factor:
             self._is_possible,
             torch.full_like(d, float('-inf'))
         )
-        # self.update_versions()
         return self.cached
-        # masks = [v.usage_mask for v in self.variables]
-        # maksed: Tensor = log_einsum(self._usage_equation, d, *masks)[0]
-        # return maksed.nan_to_num(nan=1, posinf=float('inf'), neginf=float('-inf'))
-        # return maksed.nan_to_num(posinf=float('inf'), neginf=float('-inf'))
-
-        # todo: start here do and einsum with all of the usage masks and the
-        # dense factor then replace nans with 1's(that is different that just
-        # having 1s in the mast to begin with because only one var needs to be
-        # padding to send the factor Value to 1)
-        # # v.as_used for v
-        # return self.dense_() I only care about fixing the output here (don't
-        # care about observed inputs since those have already been clamped and
-        # set to nan) excluded_mask is anything that is clamped or observed and
-        # not the current value as well as anything that is padded and not 0
-        # TODO: finish this I have a tensor where the value at position x,y is
-        # the index of the z coordinate that I want
-
-        # observed, clamped, and padding should be the only ones allowed
-
-        # for i, v in enumerate(reversed(self.variables)):
-        #     mask = torch.ones_like(v.tensor, dtype=bool)
-        #     # only keep the values represented in the current tensor
-        #     # for observed, clamped, or padding (not for annotated or latent)
-        #     v.usage_is_fixed
-        #     # TODO: merge in above
-        #     torch.logical_or(
-        #         (v.usage == VarUsage.OBSERVED),
-        #         torch.logical_or(
-        #             (v.usage == VarUsage.CLAMPED),
-        #             (v.usage == VarUsage.PADDING)))
-
-        #      v.usage == VarUsage.PADDING).logical_or(
-        #     (d.movedim(self.num_batch_dims, self.num_batch_dims + i)
-        #       [[((
-        #             v.usage == VarUsage.OBSERVED).logical_or(
-        #             v.usage == VarUsage.CLAMPED).logical_or(
-        #             v.usage == VarUsage.CLAMPED).logical_or(
-        #         v.usage == VarUsage.PADDING) > 0]+[...]]=fl
-
-        # d[self.excluded_mask]=float('-inf')
-        # # clamped_mask is anything that is clamped or observed and is the target
-        # d[self.clamped_mask]=0.0
-        # # padded_mask is anything that is padded and is 0
-        # d[self.padded_mask]=float('nan')
-        # return d
-
-        # import math
-        # inp = torch.tensor([
-        #     [  # b0
-        #         2,  # i0
-        #         3,  # i2
-        #     ],
-        #     [  # b1
-        #         3,  # i0
-        #         2,  # i2
-        #     ],
-        # ])
-
-        # dims = (*inp.shape, 4)
-        # t = torch.arange(math.prod(dims)).reshape(dims)
-        # # t.reshape(-1, inp.numel())[range(inp.numel()), inp.reshape(inp.numel())]
-        # mask = torch.ones_like(t).bool()
-        # mask.reshape(-1, inp.numel())[range(inp.numel()), inp.reshape(inp.numel())] = 0
-
-        # t[mask]
-        # input[batch_row, batch_col, index]: (v: 5)
-        # [ # br0
-        #     [ # bc0
-        #         0,  # i0
-        #         1,  # 11
-        #         2,  # i2
-        #     ],
-        #     [ # bc1
-        #         1,  # i0
-        #         2,  # 11
-        #         3,  # i2
-        #     ],
-        #     [ # bc2
-        #         2,  # i0
-        #         3,  # 11
-        #         4,  # i2
-        #     ],
-        # ],
-        # [ # br1
-        #     [ # bc0
-        #         0,  # i0
-        #         1,  # 11
-        #         2,  # i2
-        #     ],
-        #     [ # bc1
-        #         1,  # i0
-        #         2,  # 11
-        #         3,  # i2
-        #     ],
-        #     [ # bc2
-        #         2,  # i0
-        #         3,  # 11
-        #         4,  # i2
-        #     ],
-        # ],
-        # [ # br2
-        #     [ # bc0
-        #         0,  # i0
-        #         1,  # 11
-        #         2,  # i2
-        #     ],
-        #     [ # bc1
-        #         1,  # i0
-        #         2,  # 11
-        #         3,  # i2
-        #     ],
-        #     [ # bc2
-        #         2,  # i0
-        #         3,  # 11
-        #         4,  # i2
-        #     ],
-        # ],
 
     def marginals_closure(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
                           ) -> Callable[[], Sequence[Tensor]]:
@@ -372,7 +219,6 @@ class Factor:
 
         """
         check_queries(queries)
-        # return dense_factors_log_einsum([self, *other_factors], queries, force_multi=True)
         equation = self.__vars_equation(
             [self.variables, *[other.variables for other in other_factors]],
             queries, force_multi=True)
@@ -447,61 +293,11 @@ class Factor:
                              for v in f.variables))
         log_belief = self.product_marginal(variables, other_factors=[*other_energy, *messages])
         log_belief = Factor.normalize(log_belief, num_batch_dims=self.num_batch_dims)
-        # sum_i x_i log y_i =
-        # sum_{i : x_i != 0, y_i >= 0} x_i log y_i + sum_{i : x_i != 0, y_i < 0} x_i log -y_i +
-        # log(b log y) = log b + log y
-
-        # logb + log
-        # positives = torch.logsumexp(log_belief.clamp_min(0) +
-        #                             torch.where(log_belief >= 0,
-        #                             log_belief.clamp_min(0).log(), 0.),
-        #                             dim=variable_dims)
-        # negatives = torch.logsumexp(-log_belief.clamp_max(0) +
-        #                             torch.where(log_belief < 0,
-        #                             (-log_belief.clamp_max(0)).log(), 0.),
-        #                             dim=variable_dims)
-        # entropy = torch.logsumexp(log_belief * log_belief.log(), dim=variable_dims)
         log_potentials = self.product_marginal(variables, other_factors=other_energy)
         belief = log_belief.exp()
-        # tensor = self.dense
-        # num_dims = len(tensor.shape)
-        # num_batch_dims = len(tensor.shape) - len(variables)
-        # # normalize by subtracting out the sum of the last |V| dimensions
-        # variable_dims = list(range(num_batch_dims, num_dims))
         variable_dims = list(range(self.num_batch_dims, len(self.shape)))
         masked_belief = belief.masked_fill(belief <= 0, 1.0)
         masked_log_belief = log_belief.masked_fill(belief <= 0, 0.0)
         masked_log_potentials = log_potentials.masked_fill(belief <= 0, 0.0)
         return (masked_belief * (masked_log_belief - masked_log_potentials)).sum(
             dim=variable_dims)
-        # terms = belief * (log_belief - log_potentials)
-        # filtered = terms.where((belief > 1).logical_and(log_potentials.exp() > 1),
-        #    torch.zeros_like(belief))
-        # return filtered.sum(dim=variable_dims)
-        # return torch.zeros(self.batch_shape)
-
-        # avg_free = torch.sum((
-        #                       ).where((belief > 0).logical_and(), torch.zeros_like(belief)),
-        # dim=variable_dims)
-        # avg_energy = torch.sum(
-        # belief * replace_negative_infinities(log_potentials), dim=variable_dims)
-        # return avg_free
-        # return log_sum_xlogy(log_belief, log_potentials)
-
-
-# class Factors(ABC, Iterable[Factor]):
-#     r"""
-#     A collection of factors (sometimes a coherent model component is most easily
-#     described as a subclass of this)
-#     """
-
-#     def __iter__(self) -> Iterator[Factor]:
-#         return self.factors()
-
-#     @abstractmethod
-#     def factors(self) -> Iterator[Factor]:
-#         pass
-
-# def dense_factor_log_einsum(factors: Sequence[Factor], *queries: Sequence[Var],
-#                             force_multi=False):
-#     pass
