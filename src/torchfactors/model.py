@@ -59,10 +59,10 @@ class ParamNamespace:
     @overload
     def parameter(self, shape: ShapeType,
                   initialization: Optional[Callable[[Tensor], None]] = None
-                  ) -> Parameter: ...
+                  ) -> Parameter: ...  # pragma: no cover
 
     @overload
-    def parameter(self) -> Parameter: ...
+    def parameter(self) -> Parameter: ...  # pragma: no cover
 
     def parameter(self, *args, **kwargs):
         return self._parameter(*args, **kwargs)

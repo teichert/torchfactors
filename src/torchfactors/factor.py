@@ -173,7 +173,7 @@ class Factor:
         return len(self.batch_shape)
 
     @abstractmethod
-    def dense_(self) -> Tensor: ...
+    def dense_(self) -> Tensor: ...  # pragma: no cover
 
     @property
     def _is_possible(self) -> Tensor:

@@ -38,7 +38,7 @@ class SystemRunner(Protocol):
 
     def __call__(self, system: System[SubjectType],
                  data_loader: DataLoader[SubjectType],
-                 data: SubjectType): ...
+                 data: SubjectType): ...  # pragma: no cover
 
 
 def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType],

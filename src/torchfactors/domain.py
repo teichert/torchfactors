@@ -18,10 +18,10 @@ class Domain(ABC):
     OPEN: ClassVar[Domain]
 
     @abstractmethod
-    def __iter__(self): ...
+    def __iter__(self): ...  # pragma: no cover
 
     @abstractmethod
-    def __len__(self): ...
+    def __len__(self): ...  # pragma: no cover
 
 
 class __OpenDomain(Domain):
@@ -127,10 +127,10 @@ class _Range:
         return SeqDomain(range(stop))
 
     @overload
-    def __call__(self, start: int, stop: int, step: int = 1) -> Domain: ...
+    def __call__(self, start: int, stop: int, step: int = 1) -> Domain: ...  # pragma: no cover
 
     @overload
-    def __call__(self, stop: int) -> Domain: ...
+    def __call__(self, stop: int) -> Domain: ...  # pragma: no cover
 
     def __call__(self, *args, **kwargs):
         return self.___call__(*args, **kwargs)

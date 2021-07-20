@@ -48,11 +48,11 @@ def _(*shape: int) -> Tensor:
 
 
 @overload
-def ndarange(shape: ShapeType) -> Tensor: ...
+def ndarange(shape: ShapeType) -> Tensor: ...  # pragma: no cover
 
 
 @overload
-def ndarange(*shape: int) -> Tensor: ...
+def ndarange(*shape: int) -> Tensor: ...  # pragma: no cover
 
 
 def ndarange(*args, **kwargs):

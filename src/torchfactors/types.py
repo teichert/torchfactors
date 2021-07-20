@@ -30,15 +30,15 @@ def _gdrop_from_tuple(indexes: Tuple[int, ...]) -> GeneralizedDimensionDrop:
 
 
 @overload
-def gdrop(*indexes: int) -> GeneralizedDimensionDrop: ...
+def gdrop(*indexes: int) -> GeneralizedDimensionDrop: ...  # pragma: no cover
 
 
 @overload
-def gdrop(indexes: List[int]) -> GeneralizedDimensionDrop: ...
+def gdrop(indexes: List[int]) -> GeneralizedDimensionDrop: ...  # pragma: no cover
 
 
 @overload
-def gdrop(indexes: Tuple[int, ...]) -> GeneralizedDimensionDrop: ...
+def gdrop(indexes: Tuple[int, ...]) -> GeneralizedDimensionDrop: ...  # pragma: no cover
 
 
 def gdrop(*args, **kwargs):
@@ -69,15 +69,15 @@ def gdrop(*args, **kwargs):
 
 
 # @overload
-# def gslice(*indexes: int) -> GeneralizedSlice: ...
+# def gslice(*indexes: int) -> GeneralizedSlice: ...  # pragma: no cover
 
 
 # @overload
-# def gslice(indexes: List[int]) -> GeneralizedSlice: ...
+# def gslice(indexes: List[int]) -> GeneralizedSlice: ...  # pragma: no cover
 
 
 # @overload
-# def gslice(indexes: Tuple[int, ...]) -> GeneralizedSlice: ...
+# def gslice(indexes: Tuple[int, ...]) -> GeneralizedSlice: ...  # pragma: no cover
 
 
 # def gslice(*args, **kwargs):

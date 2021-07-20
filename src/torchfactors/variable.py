@@ -131,25 +131,25 @@ class Var(ABC):
         return self._get_domain()
 
     @abstractmethod
-    def _get_tensor(self) -> Tensor: ...
+    def _get_tensor(self) -> Tensor: ...  # pragma: no cover
 
     @abstractmethod
-    def __getitem__(self, ndslice: NDSlice) -> Var: ...
+    def __getitem__(self, ndslice: NDSlice) -> Var: ...  # pragma: no cover
 
     @abstractmethod
-    def _set_tensor(self, value: Tensorable): ...
+    def _set_tensor(self, value: Tensorable): ...  # pragma: no cover
 
     @abstractmethod
-    def _get_usage(self) -> Tensor: ...
+    def _get_usage(self) -> Tensor: ...  # pragma: no cover
 
     @abstractmethod
-    def _set_usage(self, value: Union[Tensor, VarUsage]): ...
+    def _set_usage(self, value: Union[Tensor, VarUsage]): ...  # pragma: no cover
 
     @abstractmethod
-    def _get_domain(self) -> Domain: ...
+    def _get_domain(self) -> Domain: ...  # pragma: no cover
 
     @abstractmethod
-    def _get_origin(self) -> TensorVar: ...
+    def _get_origin(self) -> TensorVar: ...  # pragma: no cover
 
     @property
     def origin(self) -> TensorVar:
@@ -201,7 +201,7 @@ class Var(ABC):
         self.usage[self.usage == VarUsage.CLAMPED] = VarUsage.ANNOTATED
 
     @abstractmethod
-    def _get_ndslice(self) -> NDSlice: ...
+    def _get_ndslice(self) -> NDSlice: ...  # pragma: no cover
 
     @property
     def ndslice(self) -> NDSlice:
@@ -338,7 +338,7 @@ class VarField(Var):
                  usage: Optional[VarUsage] = VarUsage.DEFAULT,
                  shape: Union[Var, ShapeType, None] = None,
                  init: Callable[[ShapeType], Tensor] = torch.zeros,
-                 info: typing_extensions._AnnotatedAlias = None): ...
+                 info: typing_extensions._AnnotatedAlias = None): ...  # pragma: no cover
 
     @overload
     def __init__(self,
@@ -346,7 +346,7 @@ class VarField(Var):
                  domain: Domain = Domain.OPEN,
                  shape: Union[Var, ShapeType, None] = None,
                  init: Callable[[ShapeType], Tensor] = torch.zeros,
-                 info: typing_extensions._AnnotatedAlias = None): ...
+                 info: typing_extensions._AnnotatedAlias = None): ...  # pragma: no cover
 
     def __init__(self, *args, **kwargs):
         self.___init__(*args, **kwargs)
@@ -445,28 +445,28 @@ class TensorVar(Var):
                  usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT,
                  tensor: Optional[Tensor] = None,
                  info: typing_extensions._AnnotatedAlias = None,
-                 stack_shapes: Optional[Sequence[ShapeType]] = None): ...
+                 stack_shapes: Optional[Sequence[ShapeType]] = None): ...  # pragma: no cover
 
     @overload
     def __init__(self, domain: Domain,
                  tensor: Tensor,
-                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT): ...
+                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT): ...  # pragma: no cover
 
     @overload
     def __init__(self, tensor: Tensor, domain: Domain = Domain.OPEN,
-                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT): ...
+                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT): ...  # pragma: no cover
 
     @overload
     def __init__(self, tensor: Tensor, usage: Union[VarUsage, Tensor],
-                 domain: Domain = Domain.OPEN): ...
+                 domain: Domain = Domain.OPEN): ...  # pragma: no cover
 
     @overload
     def __init__(self, usage: VarUsage, domain: Domain = Domain.OPEN,
-                 tensor: Optional[Tensor] = None): ...
+                 tensor: Optional[Tensor] = None): ...  # pragma: no cover
 
     @overload
     def __init__(self, usage: VarUsage, tensor: Tensor,
-                 domain: Domain = Domain.OPEN): ...
+                 domain: Domain = Domain.OPEN): ...  # pragma: no cover
 
     def __init__(self, *args, **kwargs):
         self.___init__(*args, **kwargs)

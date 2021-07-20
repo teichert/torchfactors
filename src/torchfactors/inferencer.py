@@ -13,7 +13,7 @@ class Inferencer(ABC):
     @abstractclassmethod
     def product_marginals_(self, factors: Sequence[Factor], *queries: Sequence[Var],
                            normalize: bool = True, append_total_change: bool = False
-                           ) -> Sequence[Tensor]: ...
+                           ) -> Sequence[Tensor]: ...  # pragma: no cover
 
     def partition_with_change(self, factors: Iterable[Factor]) -> Tuple[Tensor, Tensor]:
         r"""

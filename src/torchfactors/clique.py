@@ -17,7 +17,8 @@ from .variable import TensorVar, Var, VarUsage
 class CliqueModel(ABC):
 
     @abstractmethod
-    def factors(self, env: Environment, params: ParamNamespace, *variables: Var, input: Tensor): ...
+    def factors(self, env: Environment, params: ParamNamespace, *
+                variables: Var, input: Tensor): ...  # pragma: no cover
     # TODO: when needed later, will accept an additional (optional) input map from
     # variable subset (frozenset?) to tensor and the ability to specify `cat` or `add`
     # for the variables subsets that match a subset of interest.  This
