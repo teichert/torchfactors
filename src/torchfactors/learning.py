@@ -84,13 +84,15 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
             logz_clamped = system.product_marginal(clamped)
             logz_free, penalty = system.partition_with_change(free)
             loss = (logz_free - logz_clamped).clamp_min(0).sum()
+            penalty = penalty.sum()
             if isinstance(log_info, dict):
                 log_info['loss'] = float(loss)
                 log_info['penalty'] = float(penalty)
             if penalty_coeff != 0:
-                loss = loss + penalty_coeff * penalty.sum().exp()
+                loss = loss + penalty_coeff * penalty.exp()
             if isinstance(log_info, dict):
                 log_info['combo'] = float(loss)
+            print(torch.is_grad_enabled())
             if loss.requires_grad:
                 loss.backward()
             return loss

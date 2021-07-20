@@ -1,7 +1,10 @@
 
+import math
 from typing import Dict
 
+import torch
 import torchfactors as tx
+from pytest import approx
 from torchfactors.components.linear_factor import LinearFactor
 from torchfactors.learning import example_fit_model, tnested
 
@@ -69,9 +72,61 @@ def test_learning4():
     assert out.v.flatten().tolist() == [1, 1]
 
 
+def test_learning4_lbfgs():
+    model = MyModel()
+    system = example_fit_model(model, examples=examples1, iterations=5,
+                               batch_size=-1, lr=1.0, optimizer_cls=torch.optim.LBFGS,
+                               line_search_fn='strong_wolfe')
+    out = system.predict(stacked_examples)
+    assert out.v.flatten().tolist() == [1, 1]
+
+
+def test_learning4_nograd():
+    # exercises the code that runs if grad is not enabled during step
+    out = []
+
+    class MyOptimizer(torch.optim.Optimizer):
+        def __init__(self, params, **kwargs):
+            super().__init__(params, {})
+            self.params = params
+            self.kwargs = kwargs
+
+        def step(self, closure):
+            with torch.set_grad_enabled(False):
+                loss = closure()
+                out.append(1)
+                return loss
+
+    model = MyModel()
+    iterations = 5
+    example_fit_model(model, examples=examples1, iterations=iterations,
+                      batch_size=1, lr=1.0, optimizer_cls=MyOptimizer)
+    assert out == [1] * iterations * 2
+
+
+def test_learning4_with_penalty():
+    model = MyModel()
+    log_info: Dict[str, float] = {}
+    coeff = 10.0
+    example_fit_model(model, examples=examples1, iterations=5,
+                      batch_size=-1, lr=1.0, penalty_coeff=coeff,
+                      log_info=log_info)
+    assert log_info['combo'] == approx(
+        log_info['loss'] + coeff * math.exp(log_info['penalty']))
+
+
+def test_learning4_without_penalty():
+    model = MyModel()
+    log_info: Dict[str, float] = {}
+    example_fit_model(model, examples=examples1, iterations=5,
+                      batch_size=-1, lr=1.0, penalty_coeff=0.0,
+                      log_info=log_info)
+    assert float(log_info['combo']) == float(log_info['loss'])
+
+
 def test_learning5():
     model = MyModel()
-    log_info: Dict[str, object] = {}
+    log_info: Dict[str, float] = {}
     system = example_fit_model(model, examples=examples1, iterations=5,
                                batch_size=-1, log_info=log_info)
     out = system.predict(stacked_examples)
@@ -100,9 +155,6 @@ def test_learning6():
     assert out.v.flatten().tolist() == [1, 1]
     assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
     assert sets == ['i', 'j', 'loss', 'penalty', 'combo'] * num_iters
-
-
-test_learning6()
 
 
 def test_tnested():
