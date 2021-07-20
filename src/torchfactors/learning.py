@@ -1,7 +1,9 @@
 import logging
-from typing import Iterable, Optional, Protocol, Sequence, Tuple, TypeVar
+from typing import (Iterable, Optional, Protocol, Sequence, Tuple, Type,
+                    TypeVar)
 
 import torch
+from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm  # type: ignore
 
@@ -44,15 +46,17 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
                       optimizer=torch.optim.Adam, iterations: int = 10,
                       each_step: Optional[SystemRunner] = None,
                       each_epoch: Optional[SystemRunner] = None,
-                      lr=1.0, batch_size: int = -1, penalty_coeff=1, passes=3,
+                      batch_size: int = -1, penalty_coeff=1, passes=3,
                       log_info=None,
+                      optimizer_cls: Type[Optimizer] = torch.optim.Adam,
+                      **optimizer_kwargs
                       ) -> System[SubjectType]:
     logging.info('loading...')
     data_loader = examples[0].data_loader(list(examples), batch_size=batch_size)
     logging.info('done loading.')
     system = System(model, BP(passes=passes))
     system.prime(data_loader)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = optimizer_cls(model.parameters(), **optimizer_kwargs)
     # optimizer = torch.optim.LBFGS(model.parameters(), lr=lr)
     # optimizer = torch.optim.Rprop(model.parameters(), lr=lr)
     # optimizer = torch.optim.Rprop(model.parameters(), lr=lr)
