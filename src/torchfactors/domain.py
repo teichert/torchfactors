@@ -40,6 +40,13 @@ Domain.OPEN = __OpenDomain()
 
 
 class FlexDomain(Domain):
+    r"""
+    Represents a set of labels that can grow (until it it frozen).
+    Useful for open-ended label-sets.  In order for parameters
+    to still be meaningful, the flexdomain would need to be
+    saved along with the model since encountering the labels in
+    a different order could change their id.
+    """
 
     def __init__(self, name: str):
         self.name = name
@@ -85,17 +92,6 @@ class SeqDomain(Domain):
 
     def __repr__(self):
         return f"SeqDomain{self.range}"
-
-    # for torchtyping.details if we every want to support that
-    # @classmethod
-    # def tensor_repr(cls, tensor: Tensor):
-    #     return "??"
-
-    # def check(self, tensor: Tensor) -> bool:
-    #     return bool((tensor < len(self.range)).all() and (tensor >= 0).all())
-
-
-# should have been able to do @object.__new__ but mypy doesn't get it
 
 
 class _Range:

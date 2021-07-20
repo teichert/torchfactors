@@ -1,6 +1,5 @@
 import logging
-from typing import (Iterable, Optional, Protocol, Sequence, Tuple, Type,
-                    TypeVar)
+from typing import Iterable, Optional, Protocol, Sequence, Tuple, Type, TypeVar
 
 import torch
 from torch.optim.optimizer import Optimizer
@@ -43,7 +42,7 @@ class SystemRunner(Protocol):
 
 
 def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType],
-                      optimizer=torch.optim.Adam, iterations: int = 10,
+                      iterations: int = 10,
                       each_step: Optional[SystemRunner] = None,
                       each_epoch: Optional[SystemRunner] = None,
                       batch_size: int = -1, penalty_coeff=1, passes=3,
@@ -51,6 +50,12 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
                       optimizer_cls: Type[Optimizer] = torch.optim.Adam,
                       **optimizer_kwargs
                       ) -> System[SubjectType]:
+    r"""
+    Trains the model on the given training examples and returns the trained system.
+    """
+    if 'lr' not in optimizer_kwargs:
+        optimizer_kwargs['lr'] = 1.0
+
     logging.info('loading...')
     data_loader = examples[0].data_loader(list(examples), batch_size=batch_size)
     logging.info('done loading.')

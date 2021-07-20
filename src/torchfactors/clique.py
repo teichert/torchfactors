@@ -19,7 +19,7 @@ class CliqueModel(ABC):
     @abstractmethod
     def factors(self, env: Environment, params: ParamNamespace, *variables: Var, input: Tensor): ...
     # TODO: when needed later, will accept an additional (optional) input map from
-    # variable subset (frozenset?) to tensor and the ability to specify cat or add
+    # variable subset (frozenset?) to tensor and the ability to specify `cat` or `add`
     # for the variables subsets that match a subset of interest.  This
     # will allow sufficient generalization as to simulate separate keys per variable
     # and per element of the same batch.
@@ -88,6 +88,12 @@ def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
                        input_shape: Optional[ShapeType] = None,
                        input: Optional[Tensor] = None,
                        bias: bool = False) -> ShapedLinear:
+    r"""
+    Returns a module that will create a score for each binary configuration of
+    the given variables (i.e. if there are 7 variables, will produce 2**7
+    scores) as a function of the given input_shape (if input in provided, the
+    batch_dimensions are removed from it).
+    """
     if input_shape is None and input is not None:
         num_batch_dims = len(variables[0].shape)
         input_shape = input.shape[num_batch_dims:]
