@@ -45,7 +45,7 @@ def test_learning():
     assert out.v.flatten().tolist() == [1, 1]
 
     system = example_fit_model(model, examples=examples1, each_epoch=each_epoch, iterations=iters,
-                               batch_size=-1)
+                               batch_size=-1, log_info='off')
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
 
@@ -67,3 +67,9 @@ def test_tnested():
         (3, 2, 2),
     ]
     assert out == expected
+    # try it with log-info off
+    out2 = list(tnested([3, 4, 2], 4, log_info=None))
+    assert out2 == expected
+
+
+test_tnested()

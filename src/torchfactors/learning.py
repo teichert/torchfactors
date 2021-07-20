@@ -1,5 +1,6 @@
 import logging
-from typing import Iterable, Optional, Protocol, Sequence, Tuple, Type, TypeVar
+from typing import (Iterable, Optional, Protocol, Sequence, Tuple, Type,
+                    TypeVar, Union)
 
 import torch
 from torch.optim.optimizer import Optimizer
@@ -30,8 +31,7 @@ def tnested(itr: Iterable[T], times: int, log_info=None, leave=True, **kwargs
         with tqdm(nested(items, times), total=len(items) * times, leave=leave, **kwargs) as t:
             for i, j, obj in t:
                 yield i, j, obj
-                if log_info is not None:
-                    t.set_postfix(**log_info, refresh=False)
+                t.set_postfix(**log_info, refresh=False)
 
 
 class SystemRunner(Protocol):
@@ -46,7 +46,7 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
                       each_step: Optional[SystemRunner] = None,
                       each_epoch: Optional[SystemRunner] = None,
                       batch_size: int = -1, penalty_coeff=1, passes=3,
-                      log_info=None,
+                      log_info: Union[None, dict, str] = None,
                       optimizer_cls: Type[Optimizer] = torch.optim.Adam,
                       **optimizer_kwargs
                       ) -> System[SubjectType]:
@@ -69,10 +69,13 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
     logging.info('staring training...')
     if log_info is None:
         log_info = {}
+    elif log_info == 'off':
+        log_info = None
     data: SubjectType
     for i, j, data in tnested(data_loader, iterations, log_info=log_info):
-        log_info['i'] = i
-        log_info['j'] = j
+        if isinstance(log_info, dict):
+            log_info['i'] = i
+            log_info['j'] = j
 
         def closure():
             optimizer.zero_grad()
@@ -81,11 +84,13 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
             logz_clamped = system.product_marginal(clamped)
             logz_free, penalty = system.partition_with_change(free)
             loss = (logz_free - logz_clamped).clamp_min(0).sum()
-            log_info['loss'] = float(loss)
-            log_info['penalty'] = float(penalty)
+            if isinstance(log_info, dict):
+                log_info['loss'] = float(loss)
+                log_info['penalty'] = float(penalty)
             if penalty_coeff != 0:
                 loss = loss + penalty_coeff * penalty.sum().exp()
-            log_info['combo'] = float(loss)
+            if isinstance(log_info, dict):
+                log_info['combo'] = float(loss)
             if loss.requires_grad:
                 loss.backward()
             return loss
