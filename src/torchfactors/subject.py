@@ -64,6 +64,14 @@ class Environment(object):
 
 @ dataclass
 class Subject:
+    r"""
+    Represents something to be modeled.
+    Subjects can automatically be stacked in a way that pads tensor variables.
+    Subclasses of Subject should also be decorated with `@dataclass`.
+    VarFields can be used to give variable information that will not
+    have to be repeated for each instance.
+
+    """
     # TODO: [ ] a model should be agnostic whether (and how many times) this
     # subject has been stacked the idea is that a model should be a model of a
     # single one of these; [ ] there should be a canonical way to slice with
@@ -136,13 +144,6 @@ class Subject:
         r"""returns a list of all variable fields defined for this subjec"""
         return self.__variables
 
-    # if this object has been stacked, then:
-    # 1) (it will know it and not allow stacking again for now)
-    # 2) all variable fields will be replaced with stacked and padded variables
-    # 3) other values will take the value of the first object, but
-    #    --- the full list will be accessible via stacked.list(stacked.item)
-    #
-
     @staticmethod
     def stack(subjects: Sequence[SubjectType]) -> SubjectType:
         if not subjects:
@@ -204,38 +205,27 @@ class Subject:
     def data_loader(data: Union[List[ExampleType], Dataset[ExampleType]],
                     batch_size: int = -1,
                     **kwargs) -> DataLoader[ExampleType]:
+        """
+        Given a set of examples, returns a dataloader with the appropriate `collate_fn`
+        """
         if not isinstance(data, Dataset):
             data = ListDataset(data)
         if batch_size == -1:
             batch_size = len(cast(Sized, data))
         return DataLoader(cast(Dataset, data), collate_fn=Subject.stack, batch_size=batch_size,
                           **kwargs)
-        # def shapes(self):
-        #     cls = type(obj)
-        #     for attr_name in dir(cls):
-        #         attr = getattr(cls, attr_name)
-        #         if isinstance(attr, Var):
-        #             property = cast(Var, getattr(obj, attr_name))
-        #             if property.tensor is None:
-        #                 raise ValueError(
-        #                     "need to specify an actual tensor for every variable in the subject")
-        #             if property.domain is Domain.OPEN:
-        #                 property._domain = attr.domain
-        #             if property.usage is None:
-        #                 property.usage = torch.full_like(property.tensor, attr.usage.value)
-
-        # @staticmethod
-        # def collate(subjects: Sequence[SubjectType]) -> SubjectType:
-
-        #     return
 
     def clamp_annotated(self: SubjectType) -> SubjectType:
+        r"""Returns a clone of the input example with annotated variable cells
+        being marked as clamped"""
         out = self.clone()
         for attr_name in out.__varset:
             cast(TensorVar, getattr(out, attr_name)).clamp_annotated()
         return out
 
     def unclamp_annotated(self: SubjectType) -> SubjectType:
+        r"""Returns a clone of the input example with clamped variable cells
+        being marked as annotated"""
         out = self.clone()
         for attr_name in out.__varset:
             cast(TensorVar, getattr(out, attr_name)).unclamp_annotated()
@@ -255,29 +245,3 @@ class Subject:
         raise ValueError(
             "you shouldn't call this initializer: make a subclass Subject and "
             "use the @dataclass decorator on it")
-
-
-# def subject(cls):
-#     def post_init(self):
-#         for k, v in get_type_hints(self, include_extras=True).items():
-#             print(v)
-#             if isinstance(v, VariableTensor):
-#                 if v.__metadata__:
-#                     meta = v.__metadata__[0]
-#                     for detail in meta.get('details', []):
-#                         if isinstance(detail, Domain):
-#                             self.domain = detail
-#                 # if hasattr(v, '__metadata__'):
-#                 #     for detail in v.__metadata__[0]['details']:
-#                 #         if isinstance(detail, Domain):
-#                 #             return detail
-
-#     cls.__post_init__ = post_init
-#     cls = dataclass(cls)
-#     return cls
-
-
-# class ExactlyOneFactor(Factor):
-
-#     def __init__(self, variables):
-#         pass
