@@ -17,7 +17,6 @@ class FactorGraph:
         self.factors = factors
         self.num_factors = len(factors)
         self.variables = list(set(v for factor in factors for v in factor))
-        # self.nodes = list(factors) + variables
         self.num_nodes = len(factors) + len(self.variables)
         self.factor_nodes = range(self.num_factors)
         self.variable_nodes = range(self.num_factors, self.num_nodes)

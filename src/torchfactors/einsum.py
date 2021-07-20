@@ -9,6 +9,10 @@ from torch import Tensor
 
 
 class MultiEquation(object):
+    r"""
+    Represents multiple einsum equations to operate on the same input
+    """
+
     def __init__(self, equations: Sequence[tse.equation.Equation]):
         self.equations = list(equations)
 
@@ -17,10 +21,6 @@ class MultiEquation(object):
 def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 100):
     return log_einsum2(compiled_equation, *[t for t in tensors],
                        block_size=block_size)
-    # return log_einsum2(compiled_equation, *[t for t in tensors],
-    #                    block_size=block_size)
-    # return tse.log_einsum(compiled_equation, *[t.nan_to_num() for t in tensors],
-    #                       block_size=block_size)
 
 
 @log_einsum.register
@@ -28,11 +28,6 @@ def _from_multi(compiled_equation: MultiEquation,
                 *tensors: Tensor, block_size: int = 100):
     return tuple(log_einsum(eq, *tensors, block_size=block_size)
                  for eq in compiled_equation.equations)
-
-
-# def einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 50):
-#     # return log_einsum2(compiled_equation, *tensors, block_size=block_size)
-#     return tse.einsum(compiled_equation, *tensors, block_size=block_size)
 
 
 def compile_equation(equation: str, force_multi: bool = False
@@ -83,16 +78,11 @@ def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
         return equations[0]
 
 
-def logsumexp(a: Tensor, dims):
+def nonan_logsumexp(a: Tensor, dims):
     if dims:
         return torch.logsumexp(a.nan_to_num(), dim=dims)
-        # return torch.logsumexp(a, dim=dims)
     else:
         return a
-
-
-# def logsumadd_(a: Tensor, b: Tensor):
-#     torch.logaddexp(a.nan_to_num(), b.nan_to_num(), out=a)
 
 
 def log_einsum2(
@@ -103,7 +93,7 @@ def log_einsum2(
         return compute_sum(
             # (lambda a, b: torch.logaddexp(a.nan_to_num(), b.nan_to_num(), out=a)),
             None,
-            logsumexp,
+            nonan_logsumexp,
             tse.utils.add_in_place)
 
     writeable_args = [t.as_subclass(torch.Tensor) for t in args]  # type: ignore
@@ -149,175 +139,3 @@ def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
         product.logsumexp(dim=list(names_set.difference(q))).align_to(*q).rename(None)
         for q in named_queries]
     return answers
-
-# # def log_expectation_exp_einsum2(
-# #         equation: tse.equation.Equation,
-# #         *args: torch.Tensor,
-# #         block_size: int) -> torch.Tensor:
-# #     def callback(compute_sum):
-# #         return compute_sum(logsumadd_, logsumexp, tse.utils.add_in_place)
-
-# #     return tse.semiring_einsum_forward(equation, args, block_size, callback)
-
-# def log_sum_xlogy(logx: Tensor, logy: Tensor, dim: Sequence[int]):
-#     slog1 = torch.ones_like(logx, dtype=torch.bool)
-#     llog1 = logx
-#     slog2 = (logy >= 0)
-#     llog2 = logy.abs().log()
-#     order = llog1 >= llog2
-#     sloga = slog1.where(order, slog2)
-#     lloga = llog1.where(order, llog2)
-#     slogb = slog1.where(order.logical_not(), slog2)
-#     llogb = llog1.where(order.logical_not(), llog2)
-#     sprods = sloga == slogb
-#     lprods = lloga + llogb
-#     zeros = torch.zeros_like(lprods).log()
-#     lpositive = torch.where(sprods, lprods, zeros).logsumexp(dim=dim)
-#     spositive = torch.ones_like(lpositive, dtype=torch.bool)
-#     lnegative = torch.where(sprods.logical_not(), lprods, zeros).logsumexp(dim=dim)
-#     snegative = torch.ones_like(lnegative, dtype=torch.bool).logical_not()
-#     order = lpositive >= lnegative
-#     sloga = spositive.where(order, snegative)
-#     lloga = lpositive.where(order, lnegative)
-#     slogb = spositive.where(order.logical_not(), snegative)
-#     llogb = lpositive.where(order.logical_not(), lnegative)
-#     ssum = sloga
-#     expdiff = (llogb - lloga).exp()
-#     add = sloga == slogb
-#     lsum = lloga + torch.log1p(expdiff.where(add, -expdiff))
-#     out = lsum.exp()
-#     return out.where(ssum, -out)
-
-
-# def sum_xlogx_minus_sum_xlogy(logx: Tensor, logy: Tensor, dim: Sequence[int]):
-#     log_entropy =
-
-# def expectation_forward_sl(equation, *args: torch.Tensor, block_size: int):
-#     r"""
-#     follows tables 1 and 3 from https://cs.jhu.edu/~jason/papers/li+eisner.emnlp09.pdf
-#     The input is assumed to have an extra last dimension of size 2:
-#     since inputs are already in log space, s_p and s_r are always both +
-#     0: log |p|
-#     1: log |r|
-
-#     <p1,r1>x<p2,r2> = <p1.r2, p1.r2 + p2.r1>
-#     <p1,r1>+<p2,r2> = <p1+p2, r1+r2>
-#     <p,r>* = <p*, p*.p*.r>
-#     0 = <0,0>
-#     1 = <1,0>
-#     (assumes la >= lb)!!
-#     <sa=+, la> + <sb=+, lb> = <+, la + log1p(e^(lb-la))>
-#     # <sa=+, la> + <sb=-, lb> = <+, la + log1p(-e^(lb-la))>
-#     # <sa=-, la> + <sb=+, lb> = <-, la + log1p(-e^(lb-la))>
-#     # <sa=-, la> + <sb=-, lb> = <-, la + log1p(e^(lb-la))>
-
-#     <sa=+, la> . <sb=+, lb> = <+, la + lb>
-#     # <sa=+, la> . <sb=-, lb> = <-, la + lb>
-#     # <sa=-, la> . <sb=+, lb> = <-, la + lb>
-#     # <sa=-, la> . <sb=-, lb> = <+, la + lb>
-#     """
-
-#     # def lplus(sa, la, sb, lb):
-#     #     return sa, torch.log1p(sa*sb*torch.exp(lb - la))
-
-#     # def ltimes(sa, la, sb, lb):
-#     #     return sa*sb, la+lb
-
-#     def lplus(a, b):
-#         sa, la = a
-#         sb, lb = b
-#         return sa, torch.log1p(sa*sb*torch.exp(lb - la))
-
-#     def ltimes(a, b):
-#         sa, la = a
-#         sb, lb = b
-#         return sa*sb, la+lb
-
-#     def times(a, b):
-#         """
-#         a, b -> o
-#         <pa,ra>, <pb,rb> -> <po, ro>
-#         <<spa, lpa>, <sra, lra>>, <<spb, lpb>, <srb, lrb>> -> <<spo, lpo>, <sro, lro>>
-#         a is first arg, b is second arg
-#         o is output
-#         s for sign, l for log of absolute value
-#         """
-#         spa, lpa, sra, lra = a.unbind(-1)
-#         spb, lpb, srb, lrb = b.unbind(-1)
-#         pa, ra = (spa, lpa), (sra, lra)
-#         pb, rb = (spb, lpb), (srb, lrb)
-#         po = ltimes(pa, pb)
-#         ro1 = ltimes(pa, rb)
-#         ro2 = ltimes(pb, ra)
-#         ro = lplus(ro1, ro2)
-#         return torch.stack(tuple(*po, *ro), -1)
-
-#     def add(a, b):
-#         spa, lpa, sra, lra = a.unbind(-1)
-#         spb, lpb, srb, lrb = b.unbind(-1)
-#         pa, ra = (spa, lpa), (sra, lra)
-#         pb, rb = (spb, lpb), (srb, lrb)
-#         po = lplus(pa, pb)
-#         ro = lplus(ra, rb)
-#         return torch.stack(tuple(*po, *ro), -1)
-
-#     def add_in_place(a, b):
-#         a.data = add(a, b)
-
-#     def mul_in_place(a, b):
-#         a.data = times(a, b)
-#         # lpa, lra = a.unbind(-1)
-#         # lpb, lrb = b.unbind(-1)
-#         # outp = lpa + lpb
-#         # parb = (lpa + lrb)
-#         # pbra = (lpb + lra)
-#         # outr = parb + torch.log1p(torch.exp(pbra - parb))
-#         # a.data = torch.stack((outp, outr), -1)
-
-#     # def mul_in_place(a, b):
-
-#     # def sum_block(a, dims):
-#     #     lpa, lra = a.unbind()
-#     #     lpb, lrb = b.unbind()
-#     #     outp = lpa + torch.log1p(torch.exp(lpb-lpa))
-#     #     outr = lra + torch.log1p(torch.exp(lrb-lra))
-#     #     a.data = torch.stack((outp, outr))
-
-#     # def max_in_place(a, b):
-#     #     torch.max(a, b, out=a)
-
-#     def add_block(a, dims):
-#         if dims:
-#             return torch.sum(a, dim=dims)
-#         else:
-#             return a
-#         # result = a
-#         # for dim in reversed(sorted(dims)):
-#         #     ts = result.unbind(dim)
-#         #     result = reduce(add_in_place, ts)
-#         # return result
-
-#     def callback(compute_sum):
-#         return compute_sum(add_in_place, add_block, mul_in_place)
-
-#     return tse.semiring_einsum_forward(equation, args, block_size, callback)
-
-
-# def plogp(logp: Tensor):
-#     sp = torch.ones_like(logp).float()
-#     lp = logp
-#     sr = torch.where(logp >= 0, 1., -1.)
-#     lr = logp.abs().log()
-#     return torch.stack((sp, lp, sr, lr), -1)
-
-
-# def free_energy(equation, logps):
-#     p_plogps = tuple(plogp(logp) for logp in logps)
-#     out = expectation_forward_sl(equation, *p_plogps, block_size=1)
-#     sp, lp, splogp, lplogp = torch.unbind(out, -1)
-#     print(sp, lp, splogp, lplogp)
-
-
-# ts = [torch.rand(3, 3) for _ in range(3)]
-# eq = tse.compile_equation('ij,jk,kl->')
-# free_energy(eq, ts)
