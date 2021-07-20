@@ -46,6 +46,10 @@ class OptionalBiasLinear(torch.nn.Module):
 
 
 class ShapedLinear(torch.nn.Module):
+    r"""
+    Like a built-in Linear layer, but the output
+    is automatically reshaped and may be bias-only
+    """
 
     def __init__(self, output_shape: ShapeType,
                  bias: bool = True, input_shape: ShapeType = None):
@@ -72,6 +76,10 @@ class ShapedLinear(torch.nn.Module):
 
 
 class LinearFactor(Factor):
+    r"""
+    A factor for which the configuration scores come from a
+    ShapedLinear layer applied to the specified input
+    """
 
     def __init__(self,
                  params: ParamNamespace,
@@ -107,17 +115,4 @@ class LinearFactor(Factor):
                                    output_shape=self.out_shape,
                                    input_shape=self.in_shape,
                                    bias=self.bias))
-        # m = self.params.module(lambda:
-        #                        torch.nn.Linear(
-        #                            in_features=self.in_cells,
-        #                            out_features=self.out_cells,
-        #                            bias=self.bias))
-        # input = self.input
-        # if input is not None:
-        #     if not input.shape:
-        #         input = input.expand((*self.batch_shape, self.in_cells))
-        #     else:
-        #         input = input.reshape((*self.batch_shape, -1))
-        #     input = input.float()
-        # return m(input).reshape(self.shape)
         return m(self.input)

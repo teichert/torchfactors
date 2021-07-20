@@ -11,6 +11,11 @@ from .linear_factor import LinearFactor
 
 
 class Nominal(CliqueModel):
+    r"""
+    A group of variables is modeled with a single linear factor: (optional TODO:
+    allow minimal representation to avoid the one superfluous degree of freedom
+    times number of features)
+    """
 
     def factors(self, env: Environment, params: ParamNamespace,
                 *variables: Var, input: Optional[Tensor] = None,

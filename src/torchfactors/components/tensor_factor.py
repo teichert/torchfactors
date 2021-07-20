@@ -15,9 +15,9 @@ class TensorFactor(Factor):
     r"""
     A factor that is fully specified by a single, fixed tensor. The tensor
     should assign a (log) score for each possible joint configuration of (the
-    last dimension of ) variables. (reminder: all variables should match in all
-    but the last dimension.) (For a paramterized tensor (e.g. bias), use a
-    linear factor with no inputs.)
+    last dimension of ) variables. (reminder: all variables (batch dims not
+    included) should match in all but the last dimension.) (For a paramterized
+    tensor (e.g. bias), use a linear factor with no inputs.)
 
     """
 
@@ -40,12 +40,15 @@ class TensorFactor(Factor):
 
 
 class Message(TensorFactor):
+    r"""
+    A TensorFactor that does not interact with variables nor do any caching.
+    """
+
     def __init__(self, *variables: Var,
                  tensor: Optional[torch.Tensor] = None,
                  init: Callable[[ShapeType], torch.Tensor] = float_zeros):
         super().__init__(*variables, tensor=tensor, init=init)
 
-    # no interaction with the variables nor caching
     @property
     def dense(self):
         return self.tensor

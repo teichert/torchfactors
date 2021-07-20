@@ -13,6 +13,22 @@ from .linear_factor import LinearFactor
 
 
 class Stereotype(CliqueModel):
+    r"""
+    Models an ordinal variable with a log-linear score that is then scaled and
+    then offset by a label-specific coefficient and bias.  Likewise for
+    higher-order configurations, each full configuration aligns with some scale
+    to each binary configuration and these are combined and then transformed by
+    a configuration-specific coefficient and bias.
+
+    TODO: partially ordered: something similar could be applied even if some
+    variables or portions of variables require more than a single score.
+    Essentially, each dimension (i.e. subset of variable-label pairs) that needs
+    a separate scalar, would be treated as a separate output binary variable. (I
+    need to work this out more)
+
+    (This is more motivation for having some concept of "type", "name", or
+    "properties" to come in as part of the variable.)
+    """
 
     def __init__(self, linear: bool = True):
         self.linear = linear
