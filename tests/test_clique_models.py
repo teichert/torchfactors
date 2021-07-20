@@ -90,9 +90,9 @@ def test_binary_scores_module():
     b = tx.TensorVar(torch.tensor([3, 0, 5, 2, 4, 1]), tx.LATENT, tx.Range(6))
     c = tx.TensorVar(torch.tensor([3, 0, 5, 2, 4, 1]), tx.PADDING, tx.Range(6))
     input_a = torch.tensor([1, 2, 3]).float()
-    module = BinaryScoresModule(params, [a, b, c], input_a)
+    module = BinaryScoresModule(params, [a, b, c], (3,))
     out: torch.Tensor = module(input_a)
-    module2 = BinaryScoresModule(params, [a, b, c], input_a)
+    module2 = BinaryScoresModule(params, [a, b, c], (3,))
     out2: torch.Tensor = module2(input_a)
     assert out.allclose(out2)
     input_b = torch.tensor([3, 2, 1]).float()
@@ -207,14 +207,17 @@ def test_prop_odds():
     [f.dense for f in factors]
     # pairing 3 binary to other 2 binary and adding in mapping for each
     assert len(factors) == 3 * 2 + 3 + 2
-    assert all(f.shape == (5, 2,) for f in factors[:-2])
-    assert factors[-2].shape == (5, 4, 2)
-    assert factors[-1].shape == (5, 3, 2)
+    assert all(f.shape == (5, 2, 2) for f in factors[:-5])
+    assert all(f.shape == (5, 4, 2) for f in factors[6:9])
+    assert all(f.shape == (5, 3, 2) for f in factors[9:])
 
     out_params = num_params(params.model)
     # features * num_bin_configs + num_full_configs for bias
     expected_params = 9 * 4 + 4 * 3
     assert out_params == expected_params
+
+
+test_prop_odds()
 
 
 def test_stereotype():

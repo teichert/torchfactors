@@ -4,6 +4,8 @@ from typing import Dict, Hashable, Optional, Sequence, Tuple, cast
 
 from torch.functional import Tensor
 
+from torchfactors.types import ShapeType
+
 from .components.linear_factor import ShapedLinear
 from .domain import Range
 from .model import ParamNamespace
@@ -83,13 +85,16 @@ def make_binary_threshold_variables(env: Environment, *variables: Var, key: Hash
 
 
 def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
-                       input: Optional[Tensor],
+                       input_shape: Optional[ShapeType] = None,
+                       input: Optional[Tensor] = None,
                        bias: bool = False) -> ShapedLinear:
-    num_batch_dims = len(variables[0].shape) - 1
+    if input_shape is None and input is not None:
+        num_batch_dims = len(variables[0].shape)
+        input_shape = input.shape[num_batch_dims:]
 
     def factory():
-        out = ShapedLinear(input_shape=None if input is None else input.shape[num_batch_dims:],
-                           output_shape=tuple(2 for v in variables),
+        out = ShapedLinear(input_shape=input_shape,
+                           output_shape=(2,) * len(variables),
                            bias=bias)
         return out
     out = params.module(factory)
