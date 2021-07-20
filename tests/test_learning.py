@@ -1,23 +1,28 @@
 
+from typing import Dict
+
 import torchfactors as tx
 from torchfactors.components.linear_factor import LinearFactor
 from torchfactors.learning import example_fit_model, tnested
 
 
+@tx.dataclass
+class MySubject(tx.Subject):
+    v: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED)
+
+
+class MyModel(tx.Model[MySubject]):
+    def factors(self, x: MySubject):
+        yield LinearFactor(self.namespace('unary'), x.v)
+
+
+examples = [MySubject(tx.vtensor(0)), MySubject(tx.vtensor(1))]
+examples0 = [MySubject(tx.vtensor(0)), MySubject(tx.vtensor(0))]
+examples1 = [MySubject(tx.vtensor(1)), MySubject(tx.vtensor(1))]
+stacked_examples = MySubject.stack(examples)
+
+
 def test_learning():
-    @tx.dataclass
-    class MySubject(tx.Subject):
-        v: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED)
-
-    examples = [MySubject(tx.vtensor(0)), MySubject(tx.vtensor(1))]
-    examples0 = [MySubject(tx.vtensor(0)), MySubject(tx.vtensor(0))]
-    examples1 = [MySubject(tx.vtensor(1)), MySubject(tx.vtensor(1))]
-    stacked_examples = MySubject.stack(examples)
-
-    class MyModel(tx.Model[MySubject]):
-        def factors(self, x: MySubject):
-            yield LinearFactor(self.namespace('unary'), x.v)
-
     model = MyModel()
     num_steps = 0
 
@@ -31,6 +36,9 @@ def test_learning():
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [0, 0]
 
+
+def test_learning2():
+    model = MyModel()
     num_counted = 0
 
     def each_epoch(system, loader, example):
@@ -44,10 +52,57 @@ def test_learning():
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
 
-    system = example_fit_model(model, examples=examples1, each_epoch=each_epoch, iterations=iters,
+
+def test_learning3():
+    model = MyModel()
+    system = example_fit_model(model, examples=examples1, iterations=5,
                                batch_size=-1, log_info='off')
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
+
+
+def test_learning4():
+    model = MyModel()
+    system = example_fit_model(model, examples=examples1, iterations=5,
+                               batch_size=-1, lr=1.0)
+    out = system.predict(stacked_examples)
+    assert out.v.flatten().tolist() == [1, 1]
+
+
+def test_learning5():
+    model = MyModel()
+    log_info: Dict[str, object] = {}
+    system = example_fit_model(model, examples=examples1, iterations=5,
+                               batch_size=-1, log_info=log_info)
+    out = system.predict(stacked_examples)
+    assert out.v.flatten().tolist() == [1, 1]
+    assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
+
+
+def test_learning6():
+    model = MyModel()
+    gets = []
+    sets = []
+
+    class MyDict(dict):
+        def __getitem__(self, k):
+            gets.append(k)
+            return super().__getitem__(k)
+
+        def __setitem__(self, k, v):
+            sets.append(k)
+            super().__setitem__(k, v)
+    log_info = MyDict()
+    num_iters = 5
+    system = example_fit_model(model, examples=examples1, iterations=num_iters,
+                               batch_size=-1, log_info=log_info)
+    out = system.predict(stacked_examples)
+    assert out.v.flatten().tolist() == [1, 1]
+    assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
+    assert sets == ['i', 'j', 'loss', 'penalty', 'combo'] * num_iters
+
+
+test_learning6()
 
 
 def test_tnested():
@@ -70,6 +125,3 @@ def test_tnested():
     # try it with log-info off
     out2 = list(tnested([3, 4, 2], 4, log_info=None))
     assert out2 == expected
-
-
-test_tnested()

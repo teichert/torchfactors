@@ -242,3 +242,18 @@ def test_linear_stereotype():
     # features * num_bin_configs + num_full_configs for bias
     expected_params = 9 * 4 + 4 * 3
     assert out_params == expected_params
+
+
+def test_linear_stereotyp_bias_only():
+    env = Environment()
+    model = Stereotype()
+    params = DummyParamNamespace()
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    factors = [f.dense for f in model.factors(env, params, a, b, input=None)]
+    assert len(factors) == 1
+
+    out_params = num_params(params.model)
+    # num_full_configs for bias
+    expected_params = 4 * 3
+    assert out_params == expected_params
