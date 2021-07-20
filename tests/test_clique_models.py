@@ -217,10 +217,23 @@ def test_prop_odds():
     assert out_params == expected_params
 
 
-test_prop_odds()
+def test_non_linear_stereotype():
+    env = Environment()
+    model = Stereotype(linear=False)
+    params = DummyParamNamespace()
+    input = torch.ones(5, 9)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    factors = [f.dense for f in model.factors(env, params, a, b, input=input)]
+    assert len(factors) == 2
+
+    out_params = num_params(params.model)
+    # features * num_bin_configs + num_full_configs for bias + scale for each config
+    expected_params = 9 * 4 + 4 * 3 + 4 * 3
+    assert out_params == expected_params
 
 
-def test_stereotype():
+def test_linear_stereotype():
     env = Environment()
     model = Stereotype()
     params = DummyParamNamespace()

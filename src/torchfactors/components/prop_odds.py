@@ -30,6 +30,7 @@ class ProportionalOdds(CliqueModel):
         binary_scores_module = BinaryScoresModule(
             params.namespace('binary-scores'), variables, input=input)
         binary_scores = binary_scores_module(input)
+        bin_config_shape = binary_scores.shape[-len(variables):]
 
         # we likewise, want to create a separate bias for each full configuration
         def bias_module_factory():
@@ -50,7 +51,7 @@ class ProportionalOdds(CliqueModel):
             # a tensor of the right shape with the given bias
             config_bias = torch.sparse_coo_tensor(
                 torch.ones((len(variables), 1)),
-                [bias[config]], binary_scores.shape).to_dense().log()[None].expand(
+                [bias[config]], bin_config_shape).to_dense().log()[None].expand(
                     Factor.shape_from_variables(config_variables)
             )
             yield TensorFactor(*config_variables, tensor=binary_scores + config_bias)

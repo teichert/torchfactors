@@ -357,7 +357,11 @@ def stereotype(scales: Tensor, binary: Tensor) -> Tensor:
     to zeros in the binary configuration and then expanding it appropriately.
     """
     num_config_dims = len(scales.shape)
+    num_batch_dims = len(binary.shape) - len(scales.shape)
     all = []
+    expanded_scores_slice = (...,) + (None,) * num_config_dims
+    expanded_coeffs_slice = (None,) * num_batch_dims
+    # out_dims = tuple(binary.shape[:num_batch_dims]) + tuple(scales.shape)
     # batch_dims = binary.shape[:-num_config_dims]
     for config in itertools.product(*itertools.repeat([0, 1], num_config_dims)):
         dims_to_sum = [i for i, ci in enumerate(config) if ci == 0]
@@ -365,8 +369,11 @@ def stereotype(scales: Tensor, binary: Tensor) -> Tensor:
             coeffs = scales.sum(dims_to_sum, keepdim=True).expand_as(scales)
         else:
             coeffs = scales
+        # if len(binary.shape) > len(coeffs.shape):
+        #     coeffs = coeffs[(None,) * (len(binary.shape) - len(coeffs.shape))].expand_as(binary)
         # .expand(batch_dims + coeffs.shape)
-        out = binary[(...,) + config] * coeffs
+        config_scores_per_batch = binary[(...,) + config]
+        out = config_scores_per_batch[expanded_scores_slice] * coeffs[expanded_coeffs_slice]
         all.append(out)
     full = torch.stack(all, -1).sum(-1)
     return full
