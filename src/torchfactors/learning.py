@@ -92,7 +92,6 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
                 loss = loss + penalty_coeff * penalty.exp()
             if isinstance(log_info, dict):
                 log_info['combo'] = float(loss)
-            print(torch.is_grad_enabled())
             if loss.requires_grad:
                 loss.backward()
             return loss
