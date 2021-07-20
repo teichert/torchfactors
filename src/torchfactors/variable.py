@@ -31,16 +31,10 @@ class VarUsage(IntEnum):
     Other thoughts: posterior regularization style constraints?
     """
 
-    PADDING = -1  # doesn't exist
+    PADDING = -1  # doesn't exist (any factor touching padding should be annihilated)
     LATENT = 0    # no-one knows
-    # is labeled (shouldn't be allowed during inference since should have been
-    # temporarily changed to either LATENT or CLAMPED);
+    # ANNOTATED means labeled (typical usage is to toggle between ANNOTATED and CLAMPED);
     ANNOTATED = 1
-    # Note that the following would make it easy to temporarily change:
-    # observe = (mode==ANNOTATED)
-    # mode[observe] = CLAMPED
-    # mode[observe] = LATENT
-    # mode[observe] = ANNOTATED
     # only current value should be used (but called clamped to make it easy to change back)
     CLAMPED = 2
     OBSERVED = 3  # should always be clamped
@@ -93,9 +87,6 @@ class Var(ABC):
        those could, in principle, be accessible via the resulting factor graph.
     """
 
-    # def __init__(self):
-    # self.version = 0
-
     @property
     def shape(self) -> Size:
         return self.tensor.shape
@@ -135,19 +126,6 @@ class Var(ABC):
     def tensor(self, value: Any) -> None:
         self.set_tensor(cast(Tensorable, value))
 
-    # # @property
-    # def get_tensor(self) -> Tensor:
-    #     return self._get_tensor()
-
-    # # @tensor.setter
-    # def set_tensor(self, value: Tensorable):
-    #     self._set_tensor(value)
-
-    # def set_tensor(self, value: Tensorable):
-    #     self._set_tensor(value)
-
-    # tensor = property(get_tensor, set_tensor)
-
     @property
     def domain(self) -> Domain:
         return self._get_domain()
@@ -173,11 +151,6 @@ class Var(ABC):
     @abstractmethod
     def _get_origin(self) -> TensorVar: ...
 
-    # def overlaps(self, other: Var) -> bool:
-    #     return (
-    #         self.origin is other.origin and
-    #         ndslices_overlap(self.ndslice, other.ndslice, self.origin.shape))
-
     @property
     def origin(self) -> TensorVar:
         return self._get_origin()
@@ -199,18 +172,6 @@ class Var(ABC):
     def usage(self, value: Any) -> None:
         self.set_usage(cast(Union[Tensor, VarUsage], value))
 
-    # @abstractmethod
-    # def _get_original_tensor(self) -> Tensor: ...
-
-    # @property
-    # def original_tensor(self) -> Tensor:
-    #     return self._get_original_tensor()
-
-    # def clear_cache(self):
-    #     self.version += 1
-    #     self.__cached_padding = None
-    #     self.__cached_possible = None
-
     @cached_property
     def _out_slice(self) -> NDSlice:
         out = ndslices_cat(self.ndslice, slice(None))
@@ -225,29 +186,6 @@ class Var(ABC):
     def is_possible(self) -> Tensor:
         possible = self.origin._is_possible()
         return at(possible, self._out_slice)
-
-    # @property
-    # def usage_mask(self) -> Tensor:
-    #     r"""
-    #     Returns a tensor of the same shape as the variable marginal would be
-    #     with (log) 1 for allowed, 0 for not-allowed, and nan for padding.
-
-    #     The idea is that any factors touch any padding variable should be as if
-    #     they were gone, so the nans are used here and then nans are replaced
-    #     with 1's after combining all variables
-    #     """
-    #     # ones, one_hots, where one and padding is nan
-    #     one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
-    #     expanded_usage = self.usage[..., None].expand_as(one_hot)
-    #     return torch.where(
-    #         (expanded_usage == VarUsage.OBSERVED).
-    #         logical_or(expanded_usage == VarUsage.CLAMPED).
-    #         logical_or(expanded_usage == VarUsage.PADDING),
-    #         torch.where(one_hot.logical_and(expanded_usage == VarUsage.PADDING),
-    #                     torch.full_like(one_hot, float('nan')),
-    #                     one_hot),
-    #         torch.ones_like(one_hot)).log()
-    #     # return self._get_original_tensor()
 
     def clone(self) -> Var:
         return TensorVar(
@@ -272,7 +210,6 @@ class Var(ABC):
     def __eq__(self, other) -> bool:
         return self.hash_key() == other.hash_key()
 
-    # TODO: make an ndrange which can be hashed and use that instead
     def hash_key(self):
         return (id(self.origin._tensor),
                 as_ndrange(self.ndslice, self.origin.tensor.shape))
@@ -324,23 +261,10 @@ def at(t: Tensor, s: NDSlice, starting=0) -> Tensor:
     if not rest:
         return transformed
     elif isinstance(first, (int, GeneralizedDimensionDrop)):
-        # the dimension just gets consumed by an int
+        # the dimension just gets consumed
         return at(transformed, rest, starting=starting)
     else:
         return at(transformed, rest, starting=starting + 1)
-    #  else:
-    #     return at(t, (s_tuple,), starting=starting)
-    # # else:
-    #     raise TypeError("don't know how to handle that kind of slice")
-    # return t[s]
-    #     if s[0] is ...:
-    #         assert False
-    #         # num_left = len(s) - 1
-    #         # num_total = len(t.shape)
-    #         # return at((slice(None),) * (num_total - num_left) + tuple(s[1:]))
-    #     else:
-    #         new_s = list(s)
-    #         new_t = t
 
 
 class VarBranch(Var):
@@ -360,7 +284,6 @@ class VarBranch(Var):
                                             self.root.tensor.shape))
 
     def _get_tensor(self) -> Tensor:
-        # out = self.at(self.root.tensor, self.ndslice)
         return at(self.root.tensor, self.ndslice)
 
     def _set_tensor(self, value: Tensorable):
@@ -376,9 +299,6 @@ class VarBranch(Var):
 
     def _get_domain(self) -> Domain:
         return self.root.domain
-
-    # def _get_original_tensor(self) -> Tensor:
-    #     return self.root.tensor
 
     def _get_ndslice(self) -> NDSlice:
         return self.__ndslice
@@ -403,15 +323,6 @@ class VarField(Var):
         self._init = init
         self._info = info
 
-    # @___init__.register
-    # def ___init_domain_shape(self,
-    #                          domain: Domain,
-    #                          shape: Union[Var, ShapeType],
-    #                          usage: Optional[VarUsage] = VarUsage.DEFAULT,
-    #                          init: Callable[[ShapeType], Tensor] = torch.zeros,
-    #                          info: typing_extensions._AnnotatedAlias = None):
-    #     self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
-
     @___init__.register
     def ___init_usage_domain(self,
                              usage: VarUsage,
@@ -421,33 +332,6 @@ class VarField(Var):
                              info: typing_extensions._AnnotatedAlias = None):
         self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
 
-    # @___init__.register
-    # def ___init_usage_shape(self,
-    #                         usage: VarUsage,
-    #                         shape: Union[Var, ShapeType],
-    #                         domain: Domain = Domain.OPEN,
-    #                         init: Callable[[ShapeType], Tensor] = torch.zeros,
-    #                         info: typing_extensions._AnnotatedAlias = None):
-    #     self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
-
-    # @___init__.register
-    # def ___init_shape_usage(self,
-    #                         shape: Union[Var, ShapeType],
-    #                         usage: Optional[VarUsage] = VarUsage.DEFAULT,
-    #                         domain: Domain = Domain.OPEN,
-    #                         init: Callable[[ShapeType], Tensor] = torch.zeros,
-    #                         info: typing_extensions._AnnotatedAlias = None):
-    #     self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
-
-    # @___init__.register
-    # def ___shape_domain(self,
-    #                     shape: Union[Var, ShapeType],
-    #                     domain: Domain,
-    #                     usage: Optional[VarUsage] = VarUsage.DEFAULT,
-    #                     init: Callable[[ShapeType], Tensor] = torch.zeros,
-    #                     info: typing_extensions._AnnotatedAlias = None):
-    #     self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
-
     @overload
     def __init__(self,
                  domain: Domain = Domain.OPEN,
@@ -456,14 +340,6 @@ class VarField(Var):
                  init: Callable[[ShapeType], Tensor] = torch.zeros,
                  info: typing_extensions._AnnotatedAlias = None): ...
 
-    # @overload
-    # def __init__(self,
-    #              domain: Domain = Domain.OPEN,
-    #              shape: Union[Var, ShapeType, None] = None,
-    #              usage: Optional[VarUsage] = VarUsage.DEFAULT,
-    #              init: Callable[[ShapeType], Tensor] = torch.zeros,
-    #              info: typing_extensions._AnnotatedAlias = None): ...
-
     @overload
     def __init__(self,
                  usage: Optional[VarUsage] = VarUsage.DEFAULT,
@@ -471,30 +347,6 @@ class VarField(Var):
                  shape: Union[Var, ShapeType, None] = None,
                  init: Callable[[ShapeType], Tensor] = torch.zeros,
                  info: typing_extensions._AnnotatedAlias = None): ...
-
-    # @overload
-    # def __init__(self,
-    #              usage: Optional[VarUsage] = VarUsage.DEFAULT,
-    #              shape: Union[Var, ShapeType, None] = None,
-    #              domain: Domain = Domain.OPEN,
-    #              init: Callable[[ShapeType], Tensor] = torch.zeros,
-    #              info: typing_extensions._AnnotatedAlias = None): ...
-
-    # @overload
-    # def __init__(self,
-    #              shape: Union[Var, ShapeType, None] = None,
-    #              usage: Optional[VarUsage] = VarUsage.DEFAULT,
-    #              domain: Domain = Domain.OPEN,
-    #              init: Callable[[ShapeType], Tensor] = torch.zeros,
-    #              info: typing_extensions._AnnotatedAlias = None): ...
-
-    # @overload
-    # def __init__(self,
-    #              shape: Union[Var, ShapeType, None] = None,
-    #              domain: Domain = Domain.OPEN,
-    #              usage: Optional[VarUsage] = VarUsage.DEFAULT,
-    #              init: Callable[[ShapeType], Tensor] = torch.zeros,
-    #              info: typing_extensions._AnnotatedAlias = None): ...
 
     def __init__(self, *args, **kwargs):
         self.___init__(*args, **kwargs)
@@ -516,9 +368,6 @@ class VarField(Var):
 
     def _get_domain(self) -> Domain:
         raise NotImplementedError("need to access _domain directly")
-
-    # def _get_original_tensor(self) -> Tensor:
-    #     raise NotImplementedError("var fields don't actually have a tensor")
 
     def _get_ndslice(self) -> NDSlice:
         raise NotImplementedError("var fields don't actually have a tensor")
@@ -698,14 +547,10 @@ class TensorVar(Var):
             (batch_size, *max_shape), fill_value=pad_value, dtype=dtype)
         stacked_usages = first_tensor.new_full(
             (batch_size, *max_shape), fill_value=VarUsage.PADDING.value, dtype=torch.int8)
-        # mask = first_tensor.new_full((batch_size, *max_shape),
-        # fill_value=False, dtype=torch.bool)
         for i, x in enumerate(batch):
             x_indexs = [slice(None, s) for s in x.tensor.shape]
             stacked_tensors[[i, *x_indexs]] = x.tensor
             stacked_usages[[i, *x_indexs]] = x.usage
-            # mask[[i, *x_indexs]] = tensor.new_ones(tensor.shape)
-        # Var(stacked, )
         return TensorVar(first.domain, tensor=stacked_tensors,
                          usage=stacked_usages, stack_shapes=stack_shapes)
 
@@ -726,9 +571,6 @@ class TensorVar(Var):
             for usage, tensor, shape
             in zip(usages, tensors, self._stack_shapes)
         ]
-
-    # def _get_original_tensor(self) -> Tensor:
-    #     return self.tensor
 
     def _get_ndslice(self) -> NDSlice:
         return (...,)

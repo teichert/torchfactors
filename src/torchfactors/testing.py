@@ -11,7 +11,6 @@ from .variable import TensorVar, VarUsage
 @dataclass
 class DummySubject(Subject):
     i: int
-    # v: Var = VarField(Range(5), VarUsage.OBSERVED)
 
 
 def DummyParamNamespace():

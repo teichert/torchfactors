@@ -83,26 +83,21 @@ def gdrop(*args, **kwargs):
 # def gslice(*args, **kwargs):
 #     return _gslice(*args, **kwargs)
 
-# I guess what we really want is:
-# which rows, do we want and for each,
-# which column/columns
-
 
 FULL_SLICE = slice(None, None, None)
 
-# MaybeRange = Union[range, int, List[int], Tuple[int, ...]]
-# MaybeRange = Union[range, int, GeneralizedSlice, GeneralizedDimensionDrop]
 RangeSlice = Union[range, int, GeneralizedDimensionDrop]
 NDRangeSlice = Tuple[Union[RangeSlice, Any], ...]
-# SliceType = Union[slice, int, List[int], Tuple[int, ...]]
-# SliceType = Union[slice, int, GeneralizedSlice, GeneralizedDimensionDrop]
 SliceType = Union[slice, int, GeneralizedDimensionDrop]
-# NDSlice = Union[None, int, slice, Tensor, List[Any], Tuple[Any, ...]]
 NDSlice = Union[SliceType, Tuple[Union[SliceType, Any], ...]]
 ShapeType = Union[Size, Tuple[int, ...]]
 
 
 class ReadOnlyView(Tensor):
+    r"""
+    A Tensor type that will raise a TypeError is any in-place operation or setitem
+    is used
+    """
 
     @classmethod
     def __torch_function__(cls, func, types, args=(), kwargs=None):

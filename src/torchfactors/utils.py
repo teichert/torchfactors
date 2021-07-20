@@ -26,13 +26,12 @@ def logsumexp(t: Tensor, dim: Union[None, int, List[int], Tuple[int, ...]] = Non
 
 
 def outer(*tensors: Tensor, num_batch_dims=0):
+    r"""Returns a generalized outer product"""
     return contract(*[arg
                       for t in tensors
                       for arg in [t, [*range(num_batch_dims), id(t)]]],
                     [*range(num_batch_dims), *list(map(id, tensors))],
                     backend='torch')
-
-    # return torch.stack(torch.meshgrid(*tensors), 0).prod(0)
 
 
 @multidispatch
@@ -58,12 +57,6 @@ def ndarange(*shape: int) -> Tensor: ...
 
 def ndarange(*args, **kwargs):
     return _ndarange(*args, **kwargs)
-
-
-# def replace_negative_infinities(t: Tensor, replacement: Number = 0.0) -> Tensor:
-#     r"""returns a version of the given tensor without any negative infinities;
-#     where any -infs had bee will be inserted the given replacement"""
-#     return t.nan_to_num(nan=float('nan'), posinf=float('inf'), neginf=replacement)
 
 
 def ndslices_cat(lhs: NDSlice, rhs: NDSlice) -> NDSlice:
@@ -95,28 +88,6 @@ def ndslices_overlap(lhs: NDSlice, rhs: NDSlice, shape: ShapeType) -> bool:
         if a.start >= b.stop or a.stop <= b.start:
             return False
     return True
-
-# TODO: instead, just get the overlap
-# def ndslices_overlap(lhs: NDSlice, rhs: NDSlice, shape: ShapeType) -> bool:
-#     r"""
-#     Returns true if the lhs slice overlaps at all with the rhs slice
-#     """
-#     def ints_to_ranges(ndrange):
-#         for a in ndrange:
-#             if isinstance(a, range):
-#                 yield a
-#             else:
-#                 yield range(a, a + 1)
-#     lhs_range = list(ints_to_ranges(as_ndrange(lhs, shape)))
-#     rhs_range = list(ints_to_ranges(as_ndrange(rhs, shape)))
-#     # doesn't overlap if any slices are empty (need to check this since one
-#     # slice might only be partial)
-#     if any(a.start == a.stop for a in chain(lhs_range, rhs_range)):
-#         return False
-#     for a, b in zip(lhs_range, rhs_range):
-#         if a.start >= b.stop or a.stop <= b.start:
-#             return False
-#     return True
 
 
 def end(last: int, step: int):
@@ -170,26 +141,6 @@ def canonical_range_slice(r: RangeSlice) -> RangeSlice:
     #             return r
     else:
         raise TypeError("don't know how to handle that kind of slice")
-
-
-# def canonical_slice(r: range) -> range:
-#     out = canonical_range(r)
-#     if out.start is None:
-#         out.start = 0
-#     if out.step is None:
-#         out.step = 1
-#     return slice(out.start, out.stop, out.step)
-
-
-# def canonical_maybe_slice(r: SliceType, length: int
-#                           ) -> range:
-
-#     out = canonical_range(r)
-#     if out.start is None:
-#         out.start = 0
-#     if out.step is None:
-#         out.step = 1
-#     return slice(out.start, out.stop, out.step)
 
 
 def slice_to_range(one_slice: SliceType, length: int) -> RangeSlice:
@@ -252,7 +203,7 @@ def as_ndrange(ndslice: NDSlice, shape: ShapeType) -> NDRangeSlice:
                     tuple(as_ndrange(ndslice[1:], shape[1:])))
     elif isinstance(ndslice, int):
         return (ndslice,)
-    else:  # if isinstance(ndslice, slice):
+    else:
         return (as_range(ndslice, shape[0]),)
 
 
@@ -266,11 +217,6 @@ def compose_single(lhs: SliceType, rhs: SliceType, length: int
     if isinstance(lhs_range, (int, GeneralizedDimensionDrop)):
         raise ValueError("cannot index into a 0-dimensional")
     elif isinstance(rhs, GeneralizedDimensionDrop):
-        # if len(lhs_range) <= max(rhs.indexPerIndex):
-        #     raise ValueError(f"not an index specified for each dimension element: "
-        #                      f"found {len(rhs.indexPerIndex)}, required {len(lhs_range)}")
-        #     # raise ValueError(f"not an index specified for each dimension element: "
-        #     #                  f"found {len(rhs.indexPerIndex)}, required {len(lhs_range)}")
         out = rhs
     # elif isinstance(rhs, GeneralizedSlice):
     #     sliced = [lhs_range[r] for r in rhs.indexes
@@ -282,49 +228,6 @@ def compose_single(lhs: SliceType, rhs: SliceType, length: int
     canonical = canonical_range_slice(out)
     to_slice = range_to_slice(canonical)
     return to_slice
-    # rhs_range = as_range(rhs)
-    # if
-    # elif isinstance(rhs, int):
-    #     if isinstance(lhs, slice):
-    #         return as_range(lhs, length)[rhs]
-    #     else:
-    #         return lhs[cast(int, rhs)]
-    # elif isinstance(lhs, slice) and isinstance(rhs, slice):
-    #     return canonical_slice(as_range(lhs, length)[rhs])
-    # else:
-    #     if isinstance(lhs, slice):
-    #         lhs_list = list(as_range(lhs, length))
-    #     else:
-    #         lhs_list = cast(list, lhs)
-    #     # left_out_length = len(lhs_list)
-    #     if isinstance(rhs, slice):
-    #         # remaining length will be based on the output of the left
-    #         rhs_list = list(as_range(rhs, len(lhs_list)))
-    #     else:
-    #         rhs_list = cast(list, rhs)
-    #     # the indexes given in the right list index into the
-    #     # left list, but we don't keep them if they go over
-    #     out = [lhs_list[r] for r in rhs_list
-    #            if r < len(lhs_list)]
-    #     if len(out) == 0:
-    #         return slice(0, 0, 1)
-    #     elif len(out) == 1:
-    #         v = out[0]
-    #         return slice(v, v+1, 1)
-    #     elif len(out) == 2:
-    #         v1, v2 = out
-    #         return slice(v1, v2 + 1, v2 - v1)
-    #     else:
-    #         v1, v2 = out[:2]
-    #         v_last = out[-1]
-    #         step = v2 - v1
-    #         cand = range(v1, end(v_last, step), step)
-    #         if list(cand) == out:
-    #             return slice(cand.start, cand.stop, cand.step)
-    #         else:
-    #             return out
-    # out = as_range(cast(slice, lhs), length)[rhs]
-    # return out if isinstance(out, int) else slice(out.start, out.stop, out.step)
 
 
 def compose(first: NDSlice, second: NDSlice, shape: ShapeType):
@@ -361,17 +264,12 @@ def stereotype(scales: Tensor, binary: Tensor) -> Tensor:
     all = []
     expanded_scores_slice = (...,) + (None,) * num_config_dims
     expanded_coeffs_slice = (None,) * num_batch_dims
-    # out_dims = tuple(binary.shape[:num_batch_dims]) + tuple(scales.shape)
-    # batch_dims = binary.shape[:-num_config_dims]
     for config in itertools.product(*itertools.repeat([0, 1], num_config_dims)):
         dims_to_sum = [i for i, ci in enumerate(config) if ci == 0]
         if dims_to_sum:
             coeffs = scales.sum(dims_to_sum, keepdim=True).expand_as(scales)
         else:
             coeffs = scales
-        # if len(binary.shape) > len(coeffs.shape):
-        #     coeffs = coeffs[(None,) * (len(binary.shape) - len(coeffs.shape))].expand_as(binary)
-        # .expand(batch_dims + coeffs.shape)
         config_scores_per_batch = binary[(...,) + config]
         out = config_scores_per_batch[expanded_scores_slice] * coeffs[expanded_coeffs_slice]
         all.append(out)
