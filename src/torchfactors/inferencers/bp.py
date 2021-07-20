@@ -15,12 +15,19 @@ from ..factor_graph import FactorGraph
 from ..inferencer import Inferencer
 from ..strategies.bethe_graph import BetheGraph
 from ..strategy import Strategy
-from ..variable import Var, at
+from ..variable import TensorVar, Var, at
 
 cache = lru_cache(maxsize=None)
 
 
 class BPInference:
+    r"""
+    Generalized belief propagation (sum-product) inference (in log space).
+
+    The strategy specifies the graph-based approximation which can be
+    exact if a junction-tree based strategy is used.
+    """
+
     def __init__(self, graph: FactorGraph, strategy: Strategy):
         self.graph = graph
         self.strategy = strategy
@@ -45,6 +52,9 @@ class BPInference:
         return out
 
     def total_amount_changed(self):
+        r"""returns the sum of the KL divergences from the most recent message
+        to the previous version.  If this value is 0, then convergence has been
+        achieved."""
         changes = torch.tensor(list(self.message_changes.values())).sum()
         return changes
 
@@ -61,16 +71,6 @@ class BPInference:
             region = self.strategy.regions[region_id]
             region_beliefs, = region.product_marginals(
                 [[variable]], other_factors=self.in_messages(region_id))
-            # TODO: this could be a lot more efficient
-            0  # t = torch.zeros(variable.origin.shape + (len(variable.domain),))
-            # full_belief = torch.zeros_like(t)
-            # for region_id, region, vs in self.strategy.get_regions_with_vars(variable):
-            #     region_beliefs = region.product_marginals([(v,) for v in vs],
-            #                                               other_factors=self.in_messages(region_id))
-            #     for v, region_belief in zip(vs, region_beliefs):
-            #         t[v.out_slice] += 1
-            #         full_belief[v.out_slice] += region_belief
-            # out = (full_belief / t)[variable.out_slice]
             return Factor.normalize(region_beliefs, len(variable.tensor.shape))
         else:
             # TODO: there is some waste here
@@ -97,17 +97,11 @@ class BPInference:
         Returns the normalized belief corresponding to
         """
         assert not isinstance(variables, Var)
+        # TODO: how to handle overaping variables?
         if len(variables) != 1:
             raise ValueError("not ready to handle multi-variable belief queries")
         variable = variables[0]
         return self.region_belief(variable)
-        # the challenge here is that the query may be for a big variables
-        # that was modeled by smaller slices of variables;
-        # joint factor between two pieces of the same variablealso,
-        # there is no
-        # - one option is to simply not allow that---to only allow
-        #   queries about variables that are touching factors in the same
-        #   region
 
     def message(self, key: Tuple[int, int]) -> TensorFactor:
         r"""
@@ -118,9 +112,6 @@ class BPInference:
             return self.messages[key]
         except KeyError:
             _, t = key
-            # uniform_denom = -math.log()
-            # tensor = (-torch.tensor(self.strategy.regions[t].num_configurations).float().log()
-            # ).expand_as
             v: Var = self.strategy.regions[t].variables[0]
             variable_shape = v.shape
 
@@ -133,7 +124,7 @@ class BPInference:
             message = Message(
                 *self.strategy.regions[t].variables,
                 init=init)
-            # message.tensor = Factor.normalize(message)
+
             return self.messages.setdefault(key, message)
 
     def in_messages(self, region_id: int) -> Sequence[TensorFactor]:
@@ -158,8 +149,6 @@ class BPInference:
         compute_numerators = source.marginals_closure([out.variables for out in out_messages],
                                                       other_factors=in_messages)
 
-        # pokes_s = self.strategy.penetrating_edges(source_id)
-        # set_pokes_s = set(pokes_s)
         # we will divide out everything but the message of interest
         messages_to_divide_out_per_target = [
             tuple([self.message(m)
@@ -168,17 +157,11 @@ class BPInference:
             for target_id in target_ids]
         compute_denominators = [
             target_region.marginals_closure([out_message.variables], other_factors=denom_messages)
-            # exclude=source)
             for target_region, denom_messages, out_message
             in zip(targets, messages_to_divide_out_per_target, out_messages)]
 
         # I want to cache the setup here, but I want it to be flexible??
         def update_messages():
-            # if 'b' in set(var_name(v) for v in source.variables):
-            #     print(source_id)
-            #     print(target_ids)
-            #     print(messages_to_divide_out_per_target)
-            # compute numerators
             numerators = compute_numerators()
             for numerator, out, compute_denominator in zip(
                     numerators, out_messages, compute_denominators):
@@ -192,60 +175,55 @@ class BPInference:
                 change = self.amount_changed(out.tensor, updated, out.num_batch_dims)
                 self.message_changes[out] = change
                 out.tensor = updated
-                # if 'b' in set(var_name(v) for v in source.variables):
-                #     print(updated.tolist())
-                #     print(out.tensor.tolist())
-                #     self.display()
-                #     print('done')
         return update_messages
 
     def run(self):
-        # for s, ts in list(self.strategy):
         for s, ts in tqdm(list(self.strategy), leave=False, delay=5):
             self.update_messages_from_regionf(s, tuple(ts))()
 
-    # def display(self):  # coverage: skip
-    #     def var_name(v: Var) -> str:
-    #         if isinstance(v, TensorVar):
-    #             return str(v._info)
-    #         else:
-    #             return str(f'v{id(v)}')
-    #     fg = self.graph
-    #     fg.variable_nodes
-    #     variables = sorted(set((var_name(v), vid, v) for v, vid in fg.varids.items()))
-    #     factors = sorted(set(
-    #         (tuple(var_name(v) for v in f.variables), fid, f)
-    #         for fid, f in enumerate(fg.factors)))
-    #     print("Variable: Node-Id")
-    #     for name, vid, v in variables:
-    #         print(f'{name}:\t{vid}, {v}')
+    def display(self):  # pragma: no cover
+        """display the variables and factors for debugging"""
+        def var_name(v: Var) -> str:
+            if isinstance(v, TensorVar):
+                return str(v._info)
+            else:
+                return str(f'v{id(v)}')
+        fg = self.graph
+        fg.variable_nodes
+        variables = sorted(set((var_name(v), vid, v) for v, vid in fg.varids.items()))
+        factors = sorted(set(
+            (tuple(var_name(v) for v in f.variables), fid, f)
+            for fid, f in enumerate(fg.factors)))
+        print("Variable: Node-Id")
+        for name, vid, v in variables:
+            print(f'{name}:\t{vid}, {v}')
 
-    #     print('Factors: Node-Id')
-    #     for vids, fid, f in factors:
-    #         name = ','.join(str(v) for v in vids)
-    #         print(f'[{name}]:\t{fid}, {f.dense.tolist()}, {f}')
+        print('Factors: Node-Id')
+        for vids, fid, f in factors:
+            name = ','.join(str(v) for v in vids)
+            print(f'[{name}]:\t{fid}, {f.dense.tolist()}, {f}')
 
-    #     print('Regions (variables; factors): Region-Id')
-    #     region_names = []
-    #     for rid, region in enumerate(self.strategy.regions):
-    #         region_vars = tuple(sorted(tuple(var_name(v) for v in region.variables))),
-    #         region_factors = tuple(tuple(var_name(v) for v in f.variables)
-    #                                for f in region.factors),
-    #         region = self.strategy.regions[rid]
-    #         var_names = ','.join(str(v) for v in region_vars)
-    #         factor_names = '],['.join(','.join(str(v) for v in vids) for vids in region_factors)
-    #         region_name = f'({var_names}; [{factor_names}]):\t{rid}'
-    #         region_names.append(region_name)
-    #         belief = Factor.normalize(region.product_marginals(
-    #             [region.variables], other_factors=self.in_messages(rid))[0])
-    #         print(f'{region_name}, {belief.tolist()}, {region}')
+        print('Regions (variables; factors): Region-Id')
+        region_names = []
+        for rid, region in enumerate(self.strategy.regions):
+            region_vars = tuple(sorted(tuple(var_name(v) for v in region.variables))),
+            region_factors = tuple(tuple(var_name(v) for v in f.variables)
+                                   for f in region.factors),
+            region = self.strategy.regions[rid]
+            var_names = ','.join(str(v) for v in region_vars)
+            factor_names = '],['.join(','.join(str(v) for v in vids) for vids in region_factors)
+            region_name = f'({var_names}; [{factor_names}]):\t{rid}'
+            region_names.append(region_name)
+            belief = Factor.normalize(region.product_marginals(
+                [region.variables], other_factors=self.in_messages(rid))[0])
+            print(f'{region_name}, {belief.tolist()}, {region}')
 
-    #     print('Messages: (source->target)')
-    #     for target, source in sorted((target, source) for source, target in self.messages.keys()):
-    #         message = self.messages[source, target]
-    #         print(
-    #             f'{region_names[source]}->{region_names[target]}, '
-    #             f'{message.dense.tolist()}, {message}')
+        print('Messages: (source->target)')
+        for target, source in sorted((target, source) for source, target in self.messages.keys()):
+            message = self.messages[source, target]
+            print(
+                f'{region_names[source]}->{region_names[target]}, '
+                f'{message.dense.tolist()}, {message}')
 
 
 class BP(Inferencer):
@@ -262,9 +240,8 @@ class BP(Inferencer):
         fg = FactorGraph(factors)
         strategy = self.strategy_factory(fg, self.passes)
         bp = BPInference(fg, strategy)
-        # bp.display()
         bp.run()
-        # bp.display()
+
         if () in queries or not normalize:
             logz = bp.logz()
         responses: List[torch.Tensor] = []
