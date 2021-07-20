@@ -120,12 +120,14 @@ class Subject:
                     setattr(self, attr_name, var_instance)
                 cls_attr_id_to_var[id(var_field)] = var_instance
                 if var_field._shape is not None:
+                    if var_instance._tensor is not None:
+                        raise ValueError("you may not specify a shape and also pass in a tensor")
                     # shape can be delegated to earlier field
-                    if isinstance(var_field._shape, VarField):
+                    elif isinstance(var_field._shape, VarField):
                         source_var = cls_attr_id_to_var[id(var_field._shape)]
                         # source should already have tensor with shape by now
                         var_instance._tensor = var_field._init(source_var.shape)
-                    elif var_field._shape is not None:
+                    else:
                         var_instance._tensor = var_field._init(cast(ShapeType, var_field._shape))
                 elif var_instance._tensor is None:
                     raise ValueError(

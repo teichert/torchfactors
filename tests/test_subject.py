@@ -265,3 +265,49 @@ def test_good_env2():
     v = tx.TensorVar(torch.tensor([1, 2, 3]), tx.Range(5))
     f = env.factor('test', lambda: TensorFactor(v, tensor=torch.ones(3, 5)))
     assert env.factor('test') is f
+
+
+def test_subject_shape1():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=LATENT)
+
+    subject = MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
+    assert subject.b.shape == (2, 7)
+
+
+def test_subject_shape2():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5), shape=(3, 5), usage=LATENT)
+
+    subject = MySubject()
+    assert subject.a.shape == (3, 5)
+
+
+def test_subject_bad_shape1():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a)
+
+    with pytest.raises(ValueError):
+        MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
+
+
+def test_subject_bad_shape2():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5), shape=(3, 5))
+
+    with pytest.raises(ValueError):
+        MySubject(vtensor([1, 2, 3]))
+
+
+# def test_subject_bad_shape3():
+#     @tx.dataclass
+#     class MySubject(tx.Subject):
+#         a: Var = VarField(Range(5), shape=(3,))
+
+#     MySubject(vtensor([1, 2, 3]))
