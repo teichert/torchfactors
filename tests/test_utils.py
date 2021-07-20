@@ -311,11 +311,3 @@ def test_gdrop_multi():
     expected = (5, slice(5, 8, 1), tx.gdrop(4, 2, 7), slice(0, 12, 1), 3)
     out = compose(a, b, shape)
     assert out == expected
-
-# # the actually problem this was trying
-# # to check only appears in compose (not compose_single)
-# def test_bad_compose2():
-#     with pytest.raises(ValueError):
-#         compose_single(slice(5, 8), tx.gdrop(4, 2, 7, 10), 10)
-#     with pytest.raises(ValueError):
-#         compose_single(slice(5, 8), tx.gdrop(4, 2), 10)

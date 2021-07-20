@@ -105,14 +105,7 @@ def test_hmm():
         [1., 2.],
         [3., 4.]
     ])
-    # t = torch.tensor([
-    #     [0.5, 1],
-    #     [1, 0.5]
-    # ])
     print(t)
-    # a b c
-    # x y z
-    # out_free = torch.einsum('ax,by,ab,cz,bc->', t, t, t, t, t)
 
     out_is_True = torch.tensor([[False, True], [False, True]])
     ax = t.masked_fill(out_is_True, float('-inf'))
@@ -173,14 +166,9 @@ def test_hmm():
     for v in variables:
         v.unclamp_annotated()
 
-    # logz_free, penalty = bp.partition_with_change(factors)
-    # print(logz_free, penalty)
     logz_free = bp.product_marginal(factors)
     print([f.dense for f in factors])
     print(out_free, out_clamped)
     print(logz_free, logz_clamped)
     assert logz_free.allclose(out_free)
     assert logz_clamped.allclose(out_clamped)
-
-
-test_hmm()

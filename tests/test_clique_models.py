@@ -132,11 +132,6 @@ def testKIsAtLeastJ():
     assert out3.shape == (5, 4, 2)
     assert out3.exp().allclose(expected3)
 
-    # a = tx.TensorVar(torch.tensor([0, 1, 2, 4]), tx.OBSERVED, tx.Range(5))
-    # a = tx.TensorVar(torch.tensor([0, 1, 2, 4]), tx.OBSERVED, tx.Range(5))
-    # env = Environment()
-    # vars = make_binary_label_variables(env, a, key='root')
-
 
 def test_binary():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))

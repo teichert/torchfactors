@@ -64,6 +64,32 @@ from torchfactors.variable import TensorVar, VarField, at
 #     ])
 #     out = at(t, s)
 #     assert out.tolist() == expected.tolist()
+#
+#
+# def test_at4():
+#     t = torch.tensor([
+#         [
+#             [1, 2, 3, 4],
+#             [5, 6, 7, 8],
+#         ],
+#         [
+#             [11, 12, 13, 14],
+#             [15, 16, 17, 18],
+#         ],
+#         [
+#             [21, 22, 23, 24],
+#             [25, 26, 27, 28],
+#         ],
+#     ])
+#     s = [tx.gslice(2, 0), 1, tx.gslice(2, 0, 3)]
+#     out = at(t, -1)
+#     expected = torch.tensor(
+#         [
+#             [21, 22, 23, 24],
+#             [25, 26, 27, 28],
+#         ],
+#     )
+#     assert out.tolist() == expected.tolist()
 
 
 def test_at3():
@@ -93,32 +119,6 @@ def test_at3():
         ],
     ])
     assert out.tolist() == expected.tolist()
-
-
-# def test_at4():
-#     t = torch.tensor([
-#         [
-#             [1, 2, 3, 4],
-#             [5, 6, 7, 8],
-#         ],
-#         [
-#             [11, 12, 13, 14],
-#             [15, 16, 17, 18],
-#         ],
-#         [
-#             [21, 22, 23, 24],
-#             [25, 26, 27, 28],
-#         ],
-#     ])
-#     s = [tx.gslice(2, 0), 1, tx.gslice(2, 0, 3)]
-#     out = at(t, -1)
-#     expected = torch.tensor(
-#         [
-#             [21, 22, 23, 24],
-#             [25, 26, 27, 28],
-#         ],
-#     )
-#     assert out.tolist() == expected.tolist()
 
 
 def test_at_jagged():
@@ -453,18 +453,18 @@ def test_grad_through_and_unstack():
     assert (vs[2].tensor.grad == 1).all()
 
 
-# # This one doesn't work
-# def test_grad_through_and_unstack2():
-#     vs = [
-#         TensorVar(LATENT, Range(4), torch.ones(3, 4, requires_grad=True)),
-#         TensorVar(LATENT, Range(4), torch.ones(2, 10, requires_grad=True)),
-#         TensorVar(LATENT, Range(4), torch.ones(4, 7, requires_grad=True)),
-#     ]
-#     v = TensorVar.pad_and_stack(vs)
-#     v_outs = v.unstack()
-#     for i, vout in enumerate(v_outs):
-#         vout.tensor.prod().backward()
-#         assert (vs[i].tensor.grad == 1).all()
+def test_grad_through_and_unstack2():
+    vs = [
+        TensorVar(LATENT, Range(4), torch.ones(3, 4, requires_grad=True)),
+        TensorVar(LATENT, Range(4), torch.ones(2, 10, requires_grad=True)),
+        TensorVar(LATENT, Range(4), torch.ones(4, 7, requires_grad=True)),
+    ]
+    v = TensorVar.pad_and_stack(vs)
+    v_outs = v.unstack()
+    for i, vout in enumerate(v_outs):
+        vout.tensor.prod().backward(retain_graph=True)
+        assert (vs[i].tensor.grad == 1).all()
+
 
 def test_var_field_order():
     v = VarField(OBSERVED, Range(10))

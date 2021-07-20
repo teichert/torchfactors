@@ -203,14 +203,6 @@ def test_stacked():
     assert x2.observations.usage.shape == (4,)
 
 
-#     assert u.observations.domain == Range(10)
-#     assert u.hidden.domain == Range(4)
-#     assert u.observations.shape == (6,)
-#     assert u.hidden.shape == (6,)
-#     assert (u.observations.usage == OBSERVED).all()
-#     assert (u.hidden.usage == LATENT).all()
-
-
 def test_variables():
     @dataclass
     class Utterance(Subject):
