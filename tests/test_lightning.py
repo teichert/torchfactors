@@ -28,3 +28,32 @@ def test_lit_learning():
     trainer = pl.Trainer(max_epochs=10)
     lit = tx.LitSystem(MyModel())
     trainer.fit(lit, data_loader)
+
+
+@pytest.mark.filterwarnings('ignore::UserWarning')
+def test_lit_learning_fit_twice():
+    trainer = pl.Trainer(max_epochs=10)
+    lit = tx.LitSystem(MyModel())
+    trainer.fit(lit, data_loader)
+    trainer.fit(lit, data_loader)
+
+
+@pytest.mark.filterwarnings('ignore::UserWarning')
+def test_lit_learning_with_no_penalty():
+    trainer = pl.Trainer(max_epochs=10)
+    lit = tx.LitSystem(MyModel(), penalty_coeff=0.0)
+    trainer.fit(lit, data_loader)
+
+
+@pytest.mark.filterwarnings('ignore::UserWarning')
+def test_lit_learning_with_inference_kwargs():
+    trainer = pl.Trainer(max_epochs=10)
+    lit = tx.LitSystem(MyModel(), inference_kwargs=dict(passes=10))
+    trainer.fit(lit, data_loader)
+
+
+@pytest.mark.filterwarnings('ignore::UserWarning')
+def test_lit_learning_with_optimizers_kwargs():
+    trainer = pl.Trainer(max_epochs=10)
+    lit = tx.LitSystem(MyModel(), optimizer_kwargs=dict(lr=0.01))
+    trainer.fit(lit, data_loader)
