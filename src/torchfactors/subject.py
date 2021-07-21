@@ -195,8 +195,9 @@ class Subject:
         out = [copy.copy(self) for _ in range(batch_size)]
         for obj in out:
             obj.is_stacked = False
-            # obj.__lists = {}
-            # obj.__vars = frozenset()
+            obj.__lists = {}
+            obj.__varset = frozenset()
+            obj.__length = 1
         for var_fieldname in self.__varset:
             joined = cast(TensorVar, getattr(self, var_fieldname))
             split = joined.unstack()

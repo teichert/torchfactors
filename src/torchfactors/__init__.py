@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from torch.nn.functional import one_hot
 
+from . import skip_some_warnings  # noqa
 from . import learning
 from .clique import CliqueModel
 from .components.linear_factor import LinearFactor
@@ -15,6 +16,7 @@ from .factor import Factor
 from .factor_graph import FactorGraph
 from .inferencer import Inferencer
 from .inferencers.bp import BP
+from .lightning import LitSystem
 from .model import Model
 from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
@@ -35,6 +37,7 @@ DEFAULT = VarUsage.DEFAULT
 OPEN = Domain.OPEN
 
 __all__ = [
+    'LitSystem',
     'gdrop', 'GeneralizedDimensionDrop', 'at', 'num_trainable',
     'dataclass', 'logsumexp',
     'one_hot',

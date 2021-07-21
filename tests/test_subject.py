@@ -194,6 +194,12 @@ def test_stacked():
     assert c.hidden.shape == (1, 1)
 
     x1, x2 = a.unstack()
+    assert len(u1) == 1
+    assert len(a) == 2
+    assert len(b) == 2
+    assert len(c) == 1
+    assert len(x1) == 1
+    assert len(x2) == 1
     assert x1.id1 == 1
     assert x1.id2 == 6
 
