@@ -252,7 +252,8 @@ def at(t: Tensor, s: NDSlice, starting=0) -> Tensor:
     # keep the previous dimensions in tact and apply the next one
     if isinstance(first, GeneralizedDimensionDrop):
         num_to_skip = starting - 1
-        this_one = torch.nn.functional.one_hot(torch.tensor(first.indexPerIndex),
+        this_one = torch.nn.functional.one_hot(torch.tensor(first.indexPerIndex,
+                                                            device=t.device),
                                                t.shape[starting]).bool()
     else:
         num_to_skip = starting
@@ -294,7 +295,7 @@ class VarBranch(Var):
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
         if isinstance(value, VarUsage):  # or not value.shape:
-            value = torch.tensor(value, dtype=torch.int8)
+            value = torch.tensor(value, dtype=torch.int8, device=self.root.usage.device)
         at(self.root.usage, self.ndslice)[(...,)] = cast(Tensor, value.expand_as(self.tensor))
 
     def _get_domain(self) -> Domain:
@@ -507,7 +508,7 @@ class TensorVar(Var):
             if isinstance(value, Tensor):
                 self._tensor = value
             else:
-                self._tensor = torch.tensor(value)
+                self._tensor = torch.tensor(value)  # device = ?
         else:
             at(cast(Tensor, self._tensor), self.ndslice)[(...,)] = value
 
@@ -523,8 +524,7 @@ class TensorVar(Var):
         return self._domain
 
     @staticmethod
-    def pad_and_stack(batch: List['TensorVar'], pad_value=0,
-                      ) -> 'TensorVar':
+    def pad_and_stack(batch: List[TensorVar], pad_value=0) -> TensorVar:
         """
         given a list of tensors with same number of dimensions but possibly
         different shapes returns: (stacked, shapes) defined as follows: stacked:
@@ -541,8 +541,8 @@ class TensorVar(Var):
         first_tensor = first.tensor
         dtype = first_tensor.dtype
         stack_shapes = [x.shape for x in batch]
-        shapes = [torch.tensor(shape) for shape in stack_shapes]
-        max_shape = torch.max(torch.vstack(shapes), 0).values
+        max_shape = list(max(d) for d in zip(*stack_shapes))
+        # max_shape = list(torch.max(torch.vstack(shapes), 0))
         stacked_tensors = first_tensor.new_full(
             (batch_size, *max_shape), fill_value=pad_value, dtype=dtype)
         stacked_usages = first_tensor.new_full(

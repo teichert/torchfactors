@@ -82,7 +82,8 @@ class Model(torch.nn.Module, Generic[SubjectType]):
 
     def domain_ids(self, domain: FlexDomain, values: Sequence[Hashable]) -> torch.Tensor:
         domain = self._domains.setdefault(domain.name, domain)
-        return torch.tensor([domain.get_id(value) for value in values])
+        ids = torch.tensor([domain.get_id(value) for value in values])
+        return ids
 
     def domain_values(self, domain: FlexDomain, ids: torch.Tensor) -> Sequence[Hashable]:
         domain = self._domains.setdefault(domain.name, domain)
