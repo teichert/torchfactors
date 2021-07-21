@@ -5,6 +5,7 @@ from dataclasses import dataclass, field, fields
 from typing import (Callable, Dict, FrozenSet, Generic, Hashable, List,
                     Optional, Sequence, Sized, TypeVar, Union, cast)
 
+import torch
 from torch.utils.data import DataLoader, Dataset
 
 from .domain import Domain
@@ -178,6 +179,12 @@ class Subject:
         out.__length = len(subjects)
         return out
 
+    def to_device(self: SubjectType, device: torch.device) -> SubjectType:
+        if self.variables and self.variables[0].tensor.device != device:
+            return self.clone(device=device)
+        else:
+            return self
+
     def unstack(self: SubjectType) -> List[SubjectType]:
         generic_fields = set(field.name for field in fields(Subject))
         my_fields = set(field.name for field in fields(self)) - self.__varset - generic_fields
@@ -242,11 +249,11 @@ class Subject:
     def __post_init__(self):
         self.init_variables()
 
-    def clone(self: SubjectType) -> SubjectType:
+    def clone(self: SubjectType, device=None) -> SubjectType:
         out = copy.copy(self)
         for attr_name in out.__varset:
             old = cast(TensorVar, getattr(out, attr_name))
-            setattr(out, attr_name, old.clone())
+            setattr(out, attr_name, old.clone(device=device))
         return out
 
     def __init__(self, *args, **kwargs):

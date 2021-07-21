@@ -187,11 +187,21 @@ class Var(ABC):
         possible = self.origin._is_possible()
         return at(possible, self._out_slice)
 
-    def clone(self) -> Var:
+    @staticmethod
+    def clone_tensor(t: Tensor, device: Optional[torch.device] = None) -> Tensor:
+        if isinstance(device, str):
+            raise TypeError("expecting actual device rather than name")
+        if device is not None and t.device != device:
+            return t.to(device)
+        else:
+            return t.clone()
+
+    def clone(self, device=None) -> Var:
         return TensorVar(
             domain=self.domain,
-            usage=self.usage.clone(),
-            tensor=self.tensor.clone().as_subclass(torch.Tensor),  # type: ignore
+            usage=self.clone_tensor(self.usage, device=device),
+            tensor=self.clone_tensor(self.tensor.as_subclass(torch.Tensor),  # type: ignore
+                                     device=device)  # torch bug expects wrong type
         )
 
     def clamp_annotated(self) -> None:

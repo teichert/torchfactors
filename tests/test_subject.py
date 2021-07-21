@@ -332,3 +332,83 @@ def test_subject_bad_shape3():
     with pytest.raises(ValueError):
         # cannot specify tensor if already specified shape (even if it matches)
         MySubject(vtensor([1, 2, 3]))
+
+
+def test_subject_clone():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=LATENT)
+
+    subject = MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
+
+    subject2 = subject.clone()
+    assert (subject2.a.tensor.tolist() ==
+            [[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]])
+    subject2.a.tensor[(...,)] = 9
+    assert (subject2.a.tensor == 9).all()
+    assert (subject.a.tensor != 9).all()
+
+
+def test_subject_clone2():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=LATENT)
+
+    subject = MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
+
+    with pytest.raises(TypeError):
+        # need to give actual device, not just name
+        subject.clone(device='cpu')
+
+    subject2 = subject.clone(torch.device('cpu'))
+    assert (subject2.a.tensor.tolist() ==
+            [[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]])
+    subject2.a.tensor[(...,)] = 9
+    assert (subject2.a.tensor == 9).all()
+    assert (subject.a.tensor != 9).all()
+    assert subject2.a.tensor.device == torch.device('cpu')
+
+
+def test_subject_clone3():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=LATENT)
+
+    subject = MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
+    subject2 = subject.clone(torch.device('meta'))
+    assert subject2.a.tensor.device == torch.device('meta')
+
+
+def test_subject_clone4():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=LATENT)
+
+    subject = MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
+
+    with pytest.raises(TypeError):
+        # need to give actual device, not just name
+        subject.to_device(device='cpu')  # type: ignore
+
+    subject2 = subject.to_device(torch.device('cpu'))
+    assert (subject2.a.tensor.tolist() ==
+            [[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]])
+    subject2.a.tensor[(...,)] = 9
+    assert (subject2.a.tensor == 9).all()
+    assert (subject.a.tensor == 9).all()
+    assert subject2.a.tensor.device == torch.device('cpu')
+
+
+def test_subject_clone5():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=LATENT)
+
+    subject = MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
+    subject2 = subject.to_device(torch.device('meta'))
+    assert subject2.a.tensor.device == torch.device('meta')

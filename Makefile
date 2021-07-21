@@ -29,10 +29,16 @@ test: pyproject.lock
 	@echo "running tests..."
 	poetry run python -m pytest --cov=src --cov-branch --cov-report term-missing:skip-covered --cov-report html --codeblocks
 
-.PHONY: test
+.PHONY: test-one
 test-one: pyproject.lock
-	@echo "running tests..."
+	@echo "running test..."
 	poetry run python -m pytest -x -s -vvv
+
+t := "."
+.PHONY: test1
+test1: pyproject.lock
+	@echo "running test..."
+	poetry run python -m pytest -x -s -vvv -k $t
 
 .PHONY: lint
 lint: pyproject.lock

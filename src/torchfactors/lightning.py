@@ -84,6 +84,9 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
 
     # def forward(self, x: SubjectType, *args, **kwargs) -> SubjectType:
     #     return self.system.predict(x)
+    def transfer_batch_to_device(self, _batch, device):
+        batch: SubjectType = cast(SubjectType, _batch)
+        return batch.to_device(device)
 
     def training_step(self, *args, **kwargs) -> Union[torch._tensor.Tensor, Dict[str, Any]]:
         batch: SubjectType = cast(SubjectType, args[0])
