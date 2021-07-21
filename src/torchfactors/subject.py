@@ -80,9 +80,13 @@ class Subject:
     # last one should be a short-hand for separate factors (hopefully for which
     # messages can be computed and sent in parallel?)
     is_stacked: bool = field(init=False, default=False)
+    __length: int = field(init=False, default=1)
     __lists: Dict[str, List[object]] = field(init=False, default_factory=dict)
     __varset: FrozenSet = field(init=False, default=frozenset())
     environment: Environment = field(init=False, default_factory=Environment)
+
+    def __len__(self) -> int:
+        return self.__length
 
     def list(self, key: str) -> List[object]:
         if self.is_stacked:
@@ -171,6 +175,7 @@ class Subject:
             out.__lists[attr_name] = [
                 getattr(subject, attr_name)
                 for subject in subjects]
+        out.__length = len(subjects)
         return out
 
     def unstack(self: SubjectType) -> List[SubjectType]:

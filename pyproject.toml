@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "torchfactors"
-version = "0.2.0"
+version = "0.2.1"
 description = "differentiable generalized belief propagation with pytorch"
 authors = ["Adam Teichert"]
 license = "MIT"
@@ -19,7 +19,7 @@ pandas = "1.2.5"
 torchmetrics = "^0.4.0"
 tqdm = "^4.61.1"
 torch-optimizer = "^0.1.0"
-# pytorch-lightning = "^1.3.8"
+pytorch-lightning = "^1.3.8"
 
 
 [tool.poetry.dev-dependencies]
