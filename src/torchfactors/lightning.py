@@ -41,6 +41,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
                  inferencer: str = 'BP',
                  optimizer_kwargs: Optional[Dict[str, Any]] = None,
                  inference_kwargs: Optional[Dict[str, Any]] = None,
+                 argparse_args: Optional[Dict[str, Any]] = None,
                  ):
         super().__init__()
         # self.model = self.configure_model()
@@ -53,13 +54,17 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             self.optimizer_kwargs = {}
         else:
             self.optimizer_kwargs = dict(optimizer_kwargs)
-        if 'lr' not in self.optimizer_kwargs:
-            self.optimizer_kwargs['lr'] = 1.0
 
         if inference_kwargs is None:
             inference_kwargs = {}
         else:
             inference_kwargs = dict(inference_kwargs)
+
+        if argparse_args is not None:
+            here
+
+        if 'lr' not in self.optimizer_kwargs:
+            self.optimizer_kwargs['lr'] = 1.0
 
         inferencer_cls = inferencers[inferencer]
         self.inferencer = inferencer_cls(**inference_kwargs)
@@ -109,6 +114,10 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
     @staticmethod
     def add_argparse_args(parser: ArgumentParser):
         parser = pl.Trainer.add_argparse_args(parser)
+        parser.add_argument('--lr', type=float, default=0.1,
+                            help="learning rate")
+        parser.add_argument('--optimizer', type=str, default="LBFGS",
+                            help=f"name of optimizer from {list(optimizers.keys())}")
         parser.add_argument('--bp_iters', type=int, default=3,
                             help="number of times each message will be sent in bp")
         parser.add_argument('--batch_size', type=int, default=-1,

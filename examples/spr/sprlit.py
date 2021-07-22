@@ -18,11 +18,11 @@ class SPRL(tx.Subject):
     # TensorType["batch": ..., "instance"]
     # features: tx.Var = tx.VarField(tx.OBSERVED)
     rating: tx.Var = tx.VarField(tx.Range(5), tx.ANNOTATED)
-    applicable: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED, shape=rating)
+    # applicable: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED, shape=rating)
     property: tx.Var = tx.VarField(property_domain, tx.OBSERVED, shape=rating)
-    annotator: tx.Var = tx.VarField(annotator_domain, tx.OBSERVED, shape=rating)
-    predicate: tx.Var = tx.VarField(predicate_domain, tx.OBSERVED, shape=rating)
-    bin_rating: tx.Var = tx.VarField(tx.Range(2), tx.LATENT, shape=rating)
+    # annotator: tx.Var = tx.VarField(annotator_domain, tx.OBSERVED, shape=rating)
+    # predicate: tx.Var = tx.VarField(predicate_domain, tx.OBSERVED, shape=rating)
+    # bin_rating: tx.Var = tx.VarField(tx.Range(2), tx.LATENT, shape=rating)
 
     @classmethod
     def from_tsv(cls, path: str, model: tx.Model['SPRL'], maxn=None) -> Iterable['SPRL']:
@@ -32,19 +32,21 @@ class SPRL(tx.Subject):
              'Arg.Tokens.End', 'Annotator.ID']))).values())
         # ['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin', 'Arg.Tokens.End']))).values())
         for pair_df in tqdm(pairs[:maxn]):
+            if pair_df['Response'].isna().any():
+                continue
             yield SPRL(
                 rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
-                applicable=tx.TensorVar(torch.tensor(pair_df['Response'].values) == 'yes'),
+                # applicable=tx.TensorVar(torch.tensor(pair_df['Response'].values) == 'yes'),
                 # the domain mapping needs to be stored in the model so that the parameters
                 # are relevent; it makes sense to declare in the varfield (if you want)
                 # that the variable domain is flexible and which domain it is;
                 # model.domain_ids(domain, )
                 property=tx.TensorVar(
                     model.domain_ids(property_domain, pair_df['Property'].values)),
-                annotator=tx.TensorVar(
-                    model.domain_ids(annotator_domain, pair_df['Annotator.ID'].values)),
-                predicate=tx.TensorVar(
-                    model.domain_ids(predicate_domain, pair_df['Pred.Lemma'].values)),
+                # annotator=tx.TensorVar(
+                #     model.domain_ids(annotator_domain, pair_df['Annotator.ID'].values)),
+                # predicate=tx.TensorVar(
+                #     model.domain_ids(predicate_domain, pair_df['Pred.Lemma'].values)),
             )
 
 # a regular factor directly specifies as score for each configuration;
@@ -62,9 +64,8 @@ class SPRLModel(tx.Model[SPRL]):
     def factors(self, x: SPRL):
         n = x.property.shape[-1]
         for i in range(n):
-            yield tx.LinearFactor(self.namespace('bin-from-5'),
-                                  x.bin_rating[..., i], x.applicable[..., i],
-                                  x.rating[..., i])
+            yield tx.LinearFactor(self.namespace('rating-property'),
+                                  x.rating[..., i], x.property[..., i])
             # yield tx.LinearFactor(self.namespace('bin-from-5'),
             #                       x.bin_rating[..., i], x.applicable[..., i],
             #                       x.rating[..., i])
@@ -76,32 +77,32 @@ class SPRLModel(tx.Model[SPRL]):
             # yield tx.LinearFactor(self.namespace('joint'),
             #                       x.property[..., i], x.applicable[..., i],
             #                       x.rating[..., i])
-            property_domain.freeze()
-            annotator_domain.freeze()
-            predicate_domain.freeze()
-            num_properties = len(x.property.domain)
-            num_predicates = len(x.predicate.domain)
-            embed_size = 5
-            for j in range(i + 1, n):
-                def embed_property_constructor():
-                    return torch.nn.Bilinear(num_properties, num_properties, embed_size)
-                embed_property = self.namespace('embed_property').module(embed_property_constructor)
-                embeded_property = embed_property(
-                    tx.one_hot(x.property[..., i].tensor.long(), num_properties).float(),
-                    tx.one_hot(x.property[..., j].tensor.long(), num_properties).float()
-                )
+            # property_domain.freeze()
+            # annotator_domain.freeze()
+            # # predicate_domain.freeze()
+            # num_properties = len(x.property.domain)
+            # # num_predicates = len(x.predicate.domain)
+            # embed_size = 5
+            # for j in range(i + 1, n):
+            #     def embed_property_constructor():
+            #         return torch.nn.Bilinear(num_properties, num_properties, embed_size)
+            #     embed_property = self.namespace('embed_property').module(embed_property_constructor)
+            #     embeded_property = embed_property(
+            #         tx.one_hot(x.property[..., i].tensor.long(), num_properties).float(),
+            #         tx.one_hot(x.property[..., j].tensor.long(), num_properties).float()
+            #     )
 
-                def embed_predicate_constructor():
-                    return torch.nn.Bilinear(num_predicates, num_predicates, embed_size)
-                embed_predicate = self.namespace(
-                    'embed_predicate').module(embed_predicate_constructor)
-                embeded_predicate = embed_predicate(
-                    tx.one_hot(x.predicate[..., i].tensor.long(), num_predicates).float(),
-                    tx.one_hot(x.predicate[..., j].tensor.long(), num_predicates).float()
-                )
-                yield tx.LinearFactor(self.namespace('property-pair'),
-                                      x.bin_rating[..., i], x.bin_rating[..., j],
-                                      input=torch.cat([embeded_property, embeded_predicate], -1))
+            #     def embed_predicate_constructor():
+            #         return torch.nn.Bilinear(num_predicates, num_predicates, embed_size)
+            #     embed_predicate = self.namespace(
+            #         'embed_predicate').module(embed_predicate_constructor)
+            #     embeded_predicate = embed_predicate(
+            #         tx.one_hot(x.predicate[..., i].tensor.long(), num_predicates).float(),
+            #         tx.one_hot(x.predicate[..., j].tensor.long(), num_predicates).float()
+            #     )
+            #     yield tx.LinearFactor(self.namespace('property-pair'),
+            #                           x.bin_rating[..., i], x.bin_rating[..., j],
+            #                           input=torch.cat([embeded_property, embeded_predicate], -1))
 
 
 # class SPRLModel2(tx.Model[SPRL]):
@@ -126,6 +127,7 @@ if __name__ == '__main__':
                         nargs="?",
                         # default='./protoroles_eng_ud1.2_11082016.tsv')
                         default='./examples/spr/protoroles_eng_ud1.2_11082016.tsv')
+    # args = pl.Trainer.parse_argparser(parser.parse_args("--batch_size 50 --max_steps 10".split()))
     args = pl.Trainer.parse_argparser(parser.parse_args())
     trainer = pl.Trainer.from_argparse_args(args)
 
@@ -148,7 +150,7 @@ if __name__ == '__main__':
     #         train.rating.flatten() > 3,
     #         num_classes=len(predicted.rating.domain)))
 
-    system = tx.LitSystem(SPRLModel(), inference_kwargs=dict(passes=args.bp_iters))
+    system = tx.LitSystem(SPRLModel(), argparse_args=args)
     trainer.fit(system, SPRL.data_loader(examples, batch_size=args.batch_size))
 
     # example_fit_model(model, examples=examples, each_step=eval,

@@ -69,9 +69,13 @@ examples/spr/protoroles_eng_ud1.2_11082016.tsv:
 eargs := 
 edeps := examples/spr/protoroles_eng_ud1.2_11082016.tsv
 e := examples/spr/sprlit.py $(eargs) examples/spr/protoroles_eng_ud1.2_11082016.tsv
-.PHONY: spr-example
+.PHONY: example
 example: $(edeps) pyproject.lock
 	poetry run python $e
+
+.PHONY: dexample
+dexample: $(edeps) pyproject.lock
+	poetry run python -m pdb $e
 
 profile_args := --full-filenames --rate 25 -n
 .PHONY: profile
