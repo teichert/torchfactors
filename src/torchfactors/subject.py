@@ -3,9 +3,10 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field, fields
 from typing import (Callable, Dict, FrozenSet, Generic, Hashable, List,
-                    Optional, Sequence, Sized, TypeVar, Union, cast)
+                    Optional, Sequence, Sized, Tuple, TypeVar, Union, cast)
 
 import torch
+from torch._C import Size
 from torch.utils.data import DataLoader, Dataset
 
 from .domain import Domain
@@ -125,8 +126,18 @@ class Subject:
                     setattr(self, attr_name, var_instance)
                 cls_attr_id_to_var[id(var_field)] = var_instance
                 if var_field._shape is not None:
-                    if var_instance._tensor is not None:
-                        raise ValueError("you may not specify a shape and also pass in a tensor")
+                    specified_shape: Union[Size, Tuple[int, ...]]
+                    if isinstance(var_field._shape, Var):
+                        source_var = cls_attr_id_to_var[id(var_field._shape)]
+                        specified_shape = source_var.shape
+                    else:
+                        specified_shape = var_field._shape
+                    if (var_instance._tensor is not None and
+                            specified_shape != var_instance._tensor.shape):
+                        raise ValueError("the shape of the tensor you provided "
+                                         "does not match the pre-specified shape: "
+                                         f"found: {var_instance._tensor.shape}, "
+                                         f"expected: {specified_shape}")
                     # shape can be delegated to earlier field
                     elif isinstance(var_field._shape, VarField):
                         source_var = cls_attr_id_to_var[id(var_field._shape)]

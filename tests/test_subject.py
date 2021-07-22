@@ -320,18 +320,17 @@ def test_subject_bad_shape2():
         a: Var = VarField(Range(5), shape=(3, 5))
 
     with pytest.raises(ValueError):
-        # cannot specify tensor if already specified shape
+        # cannot specify tensor if already specified different shape
         MySubject(vtensor([1, 2, 3]))
 
 
-def test_subject_bad_shape3():
+def test_subject_matching_shape():
     @tx.dataclass
     class MySubject(tx.Subject):
         a: Var = VarField(Range(5), shape=(3,))
 
-    with pytest.raises(ValueError):
-        # cannot specify tensor if already specified shape (even if it matches)
-        MySubject(vtensor([1, 2, 3]))
+    out = MySubject(vtensor([1, 2, 3]))
+    assert out.a.tensor.shape == (3,)
 
 
 def test_subject_clone():
