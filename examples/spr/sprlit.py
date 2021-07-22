@@ -131,7 +131,7 @@ if __name__ == '__main__':
     # file available: http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
     examples = list(SPRL.from_tsv(
         args.tsv,
-        model=model))[:50]
+        model=model))[:15]
     # system = System(model, BP())
     # train = SPRL.stack(examples)
 
@@ -143,9 +143,9 @@ if __name__ == '__main__':
     #         num_classes=len(predicted.rating.domain)))
 
     import pytorch_lightning as pl
-    trainer = pl.Trainer()
+    trainer = pl.Trainer(num_processes=1)
     system = tx.LitSystem(SPRLModel(), inference_kwargs=dict(passes=0))
-    trainer.fit(system, SPRL.data_loader(examples, batch_size=3))
+    trainer.fit(system, SPRL.data_loader(examples, batch_size=5))
 
     # example_fit_model(model, examples=examples, each_step=eval,
     #                   lr=0.01, batch_size=1, passes=10, penalty_coeff=2)

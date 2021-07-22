@@ -50,11 +50,11 @@ type: pyproject.lock
 	@echo "running type checker..."
 	poetry run python -m mypy . --check-untyped-defs
 
-.PHONY: profile
-profile: pyproject.lock
-	@echo "running profiler..."
-	# poetry run py-spy record -f speedscope --full-filenames --rate 200 -n -- python examples/unigram.py
-	cd examples; poetry run python -m scalene unigram.py --profile-all
+# .PHONY: profile
+# profile: pyproject.lock
+# 	@echo "running profiler..."
+# 	# poetry run py-spy record -f speedscope --full-filenames --rate 200 -n -- python examples/unigram.py
+# 	cd examples; poetry run python -m scalene unigram.py --profile-all
 
 .PHONY: doc
 doc: pyproject.lock
@@ -66,11 +66,31 @@ examples/spr/protoroles_eng_ud1.2_11082016.tsv:
 	cd examples/spr; wget http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
 	cd examples/spr; tar xvf protoroles_eng_udewt.tar.gz
 
+e := examples/spr/sprlit.py examples/spr/protoroles_eng_ud1.2_11082016.tsv
 .PHONY: spr-example
-spr-example: examples/spr/protoroles_eng_ud1.2_11082016.tsv pyproject.lock
-	poetry run python examples/spr/spr.py examples/spr/protoroles_eng_ud1.2_11082016.tsv
+example: $e pyproject.lock
+	poetry run python $e
 
-# .PHONY: profile-spr
-# profile-spr: examples/spr/protoroles_eng_ud1.2_11082016.tsv pyproject.lock
-# 	poetry run python examples/spr/spr.py examples/spr/protoroles_eng_ud1.2_11082016.tsv &; pid=`top | head -n 10 | grep python | head -n 1 | cut -d" " -f2`; poetry run py-spy
-# 	poetry run python examples/spr/spr.py examples/spr/protoroles_eng_ud1.2_11082016.tsv
+profile_args := --full-filenames --rate 25 -n
+.PHONY: profile
+.ONESHELL:
+profile: $e pyproject.lock
+	tmux new-session -d -s torchfactors_profile_example
+	# remap prefix from 'C-b' to 'C-a'
+	tmux unbind C-b
+	tmux set-option -g prefix \`
+	tmux bind \` send-prefix
+	# tmux bind \`\` \`
+	tmux send -t torchfactors_profile_example:0 '# Starting profiling...' ENTER
+	tmux send -t torchfactors_profile_example:0 '# ` is the prefix key' ENTER
+	tmux send -t torchfactors_profile_example:0 '# Ctrl-C Ctrl-D Ctrl-D Ctrl-D to exit' ENTER
+	tmux send -t torchfactors_profile_example:0 "poetry run python $e" ENTER
+	sleep 0.5
+	pid=`top | head -n 10 | grep python | head -n 1 | cut -d" " -f1 | grep -oE "[0-9]+$$"`
+	echo $${pid}
+	tmux new-window
+	tmux send -t torchfactors_profile_example:1 "poetry run py-spy record $(profile_args) -o torchfactors_profile_example.speedscope --pid $${pid}" ENTER
+	tmux new-window
+	tmux send -t torchfactors_profile_example:2 "poetry run py-spy top $(profile_args) --pid $${pid}" ENTER
+	tmux select-window -t torchfactors_profile_example:0
+	tmux a
