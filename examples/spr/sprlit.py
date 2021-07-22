@@ -2,6 +2,7 @@ import argparse
 from typing import Iterable
 
 import pandas as pd  # type: ignore
+import pytorch_lightning as pl
 import torch
 import torchfactors as tx
 from tqdm import tqdm  # type: ignore
@@ -24,13 +25,13 @@ class SPRL(tx.Subject):
     bin_rating: tx.Var = tx.VarField(tx.Range(2), tx.LATENT, shape=rating)
 
     @classmethod
-    def from_tsv(cls, path: str, model: tx.Model['SPRL']) -> Iterable['SPRL']:
+    def from_tsv(cls, path: str, model: tx.Model['SPRL'], maxn=None) -> Iterable['SPRL']:
         df = pd.read_csv(path, sep='\t')
         pairs = list(dict(list(df[df['Split'] == 'train'].groupby(
             ['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin',
              'Arg.Tokens.End', 'Annotator.ID']))).values())
         # ['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin', 'Arg.Tokens.End']))).values())
-        for pair_df in tqdm(pairs):
+        for pair_df in tqdm(pairs[:maxn]):
             yield SPRL(
                 rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
                 applicable=tx.TensorVar(torch.tensor(pair_df['Response'].values) == 'yes'),
@@ -117,13 +118,17 @@ class SPRLModel(tx.Model[SPRL]):
 #                 yield from self.grouper(self.namespace('property-pair'),
 #                                         x.property[..., i], x.property[..., j],
 #                                         x.rating[..., i], x.rating[..., j])
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(add_help=False)
+    parser = tx.LitSystem.add_argparse_args(parser)
     parser.add_argument('tsv',
                         nargs="?",
                         # default='./protoroles_eng_ud1.2_11082016.tsv')
                         default='./examples/spr/protoroles_eng_ud1.2_11082016.tsv')
-    args = parser.parse_args()
+    args = pl.Trainer.parse_argparser(parser.parse_args())
+    trainer = pl.Trainer.from_argparse_args(args)
+
     # torch.set_anomaly_enabled(True)
     # print(os.cpu_count())
     torch.set_num_threads(1)
@@ -131,7 +136,8 @@ if __name__ == '__main__':
     # file available: http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
     examples = list(SPRL.from_tsv(
         args.tsv,
-        model=model))[:15]
+        model=model,
+        maxn=args.maxn))
     # system = System(model, BP())
     # train = SPRL.stack(examples)
 
@@ -142,10 +148,8 @@ if __name__ == '__main__':
     #         train.rating.flatten() > 3,
     #         num_classes=len(predicted.rating.domain)))
 
-    import pytorch_lightning as pl
-    trainer = pl.Trainer(num_processes=1)
-    system = tx.LitSystem(SPRLModel(), inference_kwargs=dict(passes=0))
-    trainer.fit(system, SPRL.data_loader(examples, batch_size=5))
+    system = tx.LitSystem(SPRLModel(), inference_kwargs=dict(passes=args.bp_iters))
+    trainer.fit(system, SPRL.data_loader(examples, batch_size=args.batch_size))
 
     # example_fit_model(model, examples=examples, each_step=eval,
     #                   lr=0.01, batch_size=1, passes=10, penalty_coeff=2)

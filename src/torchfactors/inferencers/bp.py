@@ -178,7 +178,7 @@ class BPInference:
         return update_messages
 
     def run(self):
-        for s, ts in tqdm(list(self.strategy), leave=False, delay=5):
+        for s, ts in tqdm(list(self.strategy), leave=False, delay=1):
             self.update_messages_from_regionf(s, tuple(ts))()
 
     def display(self):  # pragma: no cover

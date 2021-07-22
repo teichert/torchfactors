@@ -1,5 +1,7 @@
 
 
+import argparse
+
 import pytest
 import pytorch_lightning as pl
 import torchfactors as tx
@@ -57,3 +59,12 @@ def test_lit_learning_with_optimizers_kwargs():
     trainer = pl.Trainer(max_epochs=10)
     lit = tx.LitSystem(MyModel(), optimizer_kwargs=dict(lr=0.01))
     trainer.fit(lit, data_loader)
+
+
+def test_lightning_args():
+    parser = argparse.ArgumentParser(add_help=False)
+    parser = tx.LitSystem.add_argparse_args(parser)
+    args = parser.parse_args("")
+    assert args.bp_iters == 3
+    assert args.batch_size == -1
+    assert args.maxn is None

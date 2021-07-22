@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from typing import Any, Dict, Generic, Optional, Union, cast
 
 import pytorch_lightning as pl
@@ -104,3 +105,14 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             loss = loss + self.penalty_coeff * penalty.exp()
         self.log('combo', loss)
         return loss
+
+    @staticmethod
+    def add_argparse_args(parser: ArgumentParser):
+        parser = pl.Trainer.add_argparse_args(parser)
+        parser.add_argument('--bp_iters', type=int, default=3,
+                            help="number of times each message will be sent in bp")
+        parser.add_argument('--batch_size', type=int, default=-1,
+                            help="size of each batch (-1 for all in single batch)")
+        parser.add_argument('--maxn', type=int, default=None,
+                            help="the maximum number of examples that will be included")
+        return parser

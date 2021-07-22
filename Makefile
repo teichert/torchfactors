@@ -66,15 +66,17 @@ examples/spr/protoroles_eng_ud1.2_11082016.tsv:
 	cd examples/spr; wget http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
 	cd examples/spr; tar xvf protoroles_eng_udewt.tar.gz
 
-e := examples/spr/sprlit.py examples/spr/protoroles_eng_ud1.2_11082016.tsv
+eargs := 
+edeps := examples/spr/protoroles_eng_ud1.2_11082016.tsv
+e := examples/spr/sprlit.py $(eargs) examples/spr/protoroles_eng_ud1.2_11082016.tsv
 .PHONY: spr-example
-example: $e pyproject.lock
+example: $(edeps) pyproject.lock
 	poetry run python $e
 
 profile_args := --full-filenames --rate 25 -n
 .PHONY: profile
 .ONESHELL:
-profile: $e pyproject.lock
+profile: $(edeps) pyproject.lock
 	tmux new-session -d -s torchfactors_profile_example
 	# remap prefix from 'C-b' to 'C-a'
 	tmux unbind C-b
@@ -85,8 +87,8 @@ profile: $e pyproject.lock
 	tmux send -t torchfactors_profile_example:0 '# ` is the prefix key' ENTER
 	tmux send -t torchfactors_profile_example:0 '# Ctrl-C Ctrl-D Ctrl-D Ctrl-D to exit' ENTER
 	tmux send -t torchfactors_profile_example:0 "poetry run python $e" ENTER
-	sleep 0.5
-	pid=`top | head -n 10 | grep python | head -n 1 | cut -d" " -f1 | grep -oE "[0-9]+$$"`
+	sleep 1
+	pid=`top -bn1 | head -n 10 | grep python | grep -oE "[0-9]+" | head -n 1`
 	echo $${pid}
 	tmux new-window
 	tmux send -t torchfactors_profile_example:1 "poetry run py-spy record $(profile_args) -o torchfactors_profile_example.speedscope --pid $${pid}" ENTER
