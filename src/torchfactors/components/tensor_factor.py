@@ -25,6 +25,7 @@ class TensorFactor(Factor):
                  tensor: Optional[torch.Tensor] = None,
                  init: Callable[[ShapeType], torch.Tensor] = float_zeros):
         super().__init__(variables)
+        exemplar = self.variables[0].origin.tensor
         if tensor is None:
             tensor = init(self.shape)
 
@@ -33,7 +34,7 @@ class TensorFactor(Factor):
                 tensor = tensor[None].expand(self.shape)
             except RuntimeError:
                 raise ValueError("you didn't provide a tensor with the correct shape")
-        self.tensor = tensor
+        self.tensor = tensor.to(exemplar.device)
 
     def dense_(self):
         return self.tensor
