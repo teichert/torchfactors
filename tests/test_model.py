@@ -11,8 +11,9 @@ from torch.nn import functional as F
 from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
                           Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
+from torchfactors.domain import FlexDomain
 from torchfactors.model import ParamNamespace
-from torchfactors.testing import DummyParamNamespace
+from torchfactors.testing import DummyParamNamespace, DummySubject
 
 
 @dataclass
@@ -220,3 +221,25 @@ def test_custom_init():
     assert out.allclose(torch.ones(3, 4) * constant)
     out2 = params.parameter()
     assert out2 is out
+
+
+def test_model_domain_state_dict():
+    model = Model[DummySubject]()
+    domain = FlexDomain('test')
+    values1 = ['this', 'test', 'is', 'a', 'test', 'of', 'this']
+    values2 = ['test', 'a', 'test', 'of', 'this', 'is', 'this']
+    ids1 = model.domain_ids(domain, values1).tolist()
+    assert ids1 == [1, 2, 3, 4, 2, 5, 1]
+    ids2 = model.domain_ids(domain, values2).tolist()
+    assert ids2 == [2, 4, 2, 5, 1, 3, 1]
+    state = model.state_dict()
+    torch.save(state, 'test_model.pt')
+    loaded_state = torch.load('test_model.pt')
+    model2 = Model[DummySubject]()
+    model2.load_state_dict(loaded_state)
+
+    domain2 = FlexDomain('test')
+    out2 = model2.domain_ids(domain2, values2).tolist()
+    assert out2 == ids2
+    out1 = model2.domain_ids(domain2, values1).tolist()
+    assert out1 == ids1

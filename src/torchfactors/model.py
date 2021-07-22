@@ -77,8 +77,19 @@ class Model(torch.nn.Module, Generic[SubjectType]):
         super(Model, self).__init__()
         self._model_parameters = ParameterDict()
         self._model_modules = ModuleDict()
-        # TODO: these domains are not actually saved anywhere to file
         self._domains: Dict[str, FlexDomain] = {}
+
+    def _save_to_state_dict(self, destination, prefix, keep_vars):
+        super()._save_to_state_dict(destination, prefix, keep_vars)
+        destination[prefix + '_domains'] = [d.to_list() for _, d in self._domains.items()]
+        return destination
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+        domains = state_dict.pop(prefix + '_domains')
+        self._domains = {name: FlexDomain.from_list((name, values)) for name, values in domains}
+        return super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
+                                             missing_keys, unexpected_keys, error_msgs)
 
     def domain_ids(self, domain: FlexDomain, values: Sequence[Hashable]) -> torch.Tensor:
         domain = self._domains.setdefault(domain.name, domain)

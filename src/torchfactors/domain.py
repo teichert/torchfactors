@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import ClassVar, Hashable, Sequence, TypeVar, overload
+from typing import ClassVar, Hashable, Sequence, Tuple, TypeVar, overload
 
 from multimethod import multimethod
 
@@ -76,6 +76,18 @@ class FlexDomain(Domain):
 
     def __len__(self):
         return len(self.values)
+
+    def to_list(self) -> Tuple[str, Sequence[Hashable]]:
+        return self.name, self.values[1:]
+
+    @staticmethod
+    def from_list(input: Tuple[str, Sequence[Hashable]]) -> FlexDomain:
+        name, values = input
+        domain = FlexDomain(name)
+        for value in values:
+            domain.get_id(value)
+        domain.freeze()
+        return domain
 
 
 @dataclass(frozen=True)

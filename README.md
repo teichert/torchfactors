@@ -131,3 +131,10 @@ We recommend that the paramters to your factor initialization adhere to the foll
 - have the last positional argument be a varargs for the variables that will be involved in the factore
 - have additional information be specified by name listed after the varargs
 
+
+# Running on a GPU
+
+<!-- source /home/gqin2/scripts/acquire-gpu
+echo $CUDA_VISIBLE_DEVICES
+poetry run python /home/adamteichert/projects/torchfactors/examples/bits_lightning_gpu.py
+# poetry run python -m pdb /home/adamteichert/projects/torchfactors/examples/mini_gpu.py -->
