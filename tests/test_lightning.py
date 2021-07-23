@@ -6,6 +6,7 @@ import pytest
 import pytorch_lightning as pl
 import torchfactors as tx
 from torchfactors.components.linear_factor import LinearFactor
+from torchfactors.lightning import DataModule
 
 
 @tx.dataclass
@@ -68,3 +69,15 @@ def test_lightning_args():
     assert args.bp_iters == 3
     assert args.batch_size == -1
     assert args.maxn is None
+
+
+def test_datamodule():
+    class TestData_v1_0(DataModule):
+        def setup(self, stage=None):
+            self.train = examples
+
+    data = TestData_v1_0()
+    data.setup()
+    assert len(data.train_dataloader()) == 2
+    assert len(data.val_dataloader()) == 0
+    assert len(data.test_dataloader()) == 0

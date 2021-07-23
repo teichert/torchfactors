@@ -22,7 +22,7 @@ ExampleType = TypeVar('ExampleType')
 
 @ dataclass
 class ListDataset(Dataset, Generic[ExampleType]):
-    examples: List[ExampleType]
+    examples: Sequence[ExampleType]
 
     def __len__(self):
         return len(self.examples)
@@ -64,6 +64,14 @@ class Environment(object):
                 return self.factors.setdefault(key, out)
 
 
+# class Domains(Mapping[str, FlexDomain]):
+#     def __getitem__(self, k: str) -> FlexDomain:
+#         try:
+#             return super().__getitem__(k)
+#         except KeyError:
+#             return super().setdefault(k, FlexDomain(k))
+
+
 @ dataclass
 class Subject:
     r"""
@@ -74,6 +82,12 @@ class Subject:
     have to be repeated for each instance.
 
     """
+    # @classmethod
+    # def domain(cls, name: str):
+    #     if not hasattr(cls, 'domains'):
+    #         cls.domains = Domains()
+    #     return cls.domains[name]
+
     # TODO: [ ] a model should be agnostic whether (and how many times) this
     # subject has been stacked the idea is that a model should be a model of a
     # single one of these; [ ] there should be a canonical way to slice with
@@ -228,7 +242,7 @@ class Subject:
         return out
 
     @staticmethod
-    def data_loader(data: Union[List[ExampleType], Dataset[ExampleType]],
+    def data_loader(data: Union[Sequence[ExampleType], Dataset[ExampleType]],
                     batch_size: int = -1,
                     **kwargs) -> DataLoader[ExampleType]:
         """
