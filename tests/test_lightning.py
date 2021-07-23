@@ -1,6 +1,7 @@
 
 
 import argparse
+from typing import cast
 
 import pytest
 import pytorch_lightning as pl
@@ -71,13 +72,134 @@ def test_lightning_args():
     assert args.maxn is None
 
 
-def test_datamodule():
-    class TestData_v1_0(DataModule):
-        def setup(self, stage=None):
-            self.train = examples
+class MyData_v1_0(DataModule):
 
-    data = TestData_v1_0()
+    def setup(self, stage=None):
+        max_counts = self.split_max_counts(stage)
+        for split, count in max_counts.items():
+            self.set_split(split, examples[:count])
+
+
+def test_datamodule():
+    data = MyData_v1_0()
     data.setup()
     assert len(data.train_dataloader()) == 2
-    assert len(data.val_dataloader()) == 0
+    assert len(data.val_dataloader()) == 2
+    assert len(data.test_dataloader()) == 2
+
+
+def test_datamodule2():
+    data = MyData_v1_0(train_batch_size=2)
+    data.setup()
+    assert len(data.train_dataloader()) == 1
+    assert len(data.val_dataloader()) == 2
+    assert len(data.test_dataloader()) == 2
+
+
+def test_datamodule3():
+    data = MyData_v1_0(batch_size=2)
+    data.setup()
+    assert len(data.train_dataloader()) == 1
+    assert len(data.val_dataloader()) == 1
+    assert len(data.test_dataloader()) == 1
+
+
+def test_datamodule4():
+    data = MyData_v1_0(train_max_count=1)
+    data.setup()
+    assert len(data.train_dataloader()) == 1
+    assert len(data.val_dataloader()) == 2
+    assert len(data.test_dataloader()) == 2
+
+
+def test_datamodule5():
+    data = MyData_v1_0(split_max_count=1)
+    data.setup()
+    assert len(data.train_dataloader()) == 1
+    assert len(data.val_dataloader()) == 1
+    assert len(data.test_dataloader()) == 1
+
+
+def test_datamodule7():
+    data = MyData_v1_0()
+    data.setup('fit')
+    assert len(data.train_dataloader()) == 2
+    assert len(data.val_dataloader()) == 2
     assert len(data.test_dataloader()) == 0
+
+
+def test_datamodule8():
+    data = MyData_v1_0()
+    data.setup('test')
+    assert len(data.train_dataloader()) == 0
+    assert len(data.val_dataloader()) == 0
+    assert len(data.test_dataloader()) == 2
+
+
+# class MyLit(tx.lightning.LitSystem):
+
+
+def test_args():
+    model = MyModel()
+    sys = tx.lightning.LitSystem.from_args(
+        model=model, data=MyData_v1_0())
+    assert len(sys.train_dataloader()) == 2
+    assert len(sys.val_dataloader()) == 2
+    assert len(sys.test_dataloader()) == 2
+
+
+def test_args2():
+    model = MyModel()
+    sys = tx.lightning.LitSystem.from_args(
+        model=model, data=MyData_v1_0(),
+        defaults=dict(lr=5.0, optimizer='LBFGS',
+                      path="hello!",
+                      val_batch_size=2,
+                      train_max_count=0,
+                      passes=10,
+                      fast_dev_run=True,
+                      ))
+    assert len(sys.train_dataloader()) == 0
+    assert len(sys.val_dataloader()) == 1
+    assert len(sys.test_dataloader()) == 2
+    assert sys.optimizer_kwargs['lr'] == 5.0
+    assert sys.optimizer_name == 'LBFGS'
+    assert sys.inferencer.passes == 10
+    assert cast(DataModule, sys.data).path == "hello!"
+
+
+def test_args3():
+    model = MyModel()
+    namespace = argparse.Namespace()
+    d = vars(namespace)
+    d.update(dict(lr=5.0, optimizer='LBFGS',
+                  path="hello!",
+                  val_batch_size=2,
+                  train_max_count=0,
+                  passes=10,
+                  fast_dev_run=True
+                  ))
+    sys = tx.lightning.LitSystem.from_args(
+        model=model, data=MyData_v1_0(),
+        args=namespace)
+    assert len(sys.train_dataloader()) == 0
+    assert len(sys.val_dataloader()) == 1
+    assert len(sys.test_dataloader()) == 2
+    assert sys.optimizer_kwargs['lr'] == 5.0
+    assert sys.optimizer_name == 'LBFGS'
+    assert sys.inferencer.passes == 10
+    assert cast(DataModule, sys.data).path == "hello!"
+
+
+def test_nodata():
+    model = MyModel()
+    sys = tx.lightning.LitSystem(model=model)
+
+    with pytest.raises(TypeError):
+        sys.train_dataloader()
+
+    with pytest.raises(TypeError):
+        sys.val_dataloader()
+
+    with pytest.raises(TypeError):
+        sys.test_dataloader()

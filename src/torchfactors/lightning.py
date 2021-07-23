@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import dataclasses
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
@@ -78,14 +79,13 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
             self.train = dataset
         if split == 'val':
             self.val = dataset
-        if split == 'val':
-            self.val = dataset
+        if split == 'test':
+            self.test = dataset
 
     def split_max_counts(self, stage: Optional[str]) -> Dict[str, int]:
         split_max_sizes = {}
-        if stage in (None, 'train'):
+        if stage in (None, 'fit'):
             split_max_sizes['train'] = self.compute_max_count(self.train_max_count)
-        if stage in (None, 'val'):
             split_max_sizes['val'] = self.compute_max_count(self.val_max_count)
         if stage in (None, 'test'):
             split_max_sizes['test'] = self.compute_max_count(self.test_max_count)
@@ -131,23 +131,28 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
 
     """
     @classmethod
-    def get_arg(cls, key: str, args: Namespace, defaults: Dict[str, Any]):
+    def get_arg(cls, key: str, args: Dict[str, Any], defaults: Dict[str, Any]):
         if key in args:
-            return getattr(args, key)
+            return args[key]
         else:
             return defaults[key]
 
     @classmethod
-    def set_arg(cls, dest: Dict[str, Any], key: str, args: Namespace, defaults: Dict[str, Any]):
+    def set_arg(cls, dest: Dict[str, Any], key: str, args: Dict[str, Any],
+                defaults: Dict[str, Any]):
         dest[key] = cls.get_arg(key, args, defaults)
 
     @classmethod
-    def from_argparse_args(cls, args: Namespace,
-                           model: Model[SubjectType],
-                           data: DataModule[SubjectType],
-                           defaults: Dict[str, Any] | None = None,
-                           **kwargs
-                           ) -> LitSystem[SubjectType]:
+    def from_args(cls,
+                  model: Model[SubjectType],
+                  data: DataModule[SubjectType],
+                  args: Optional[Namespace] = None,
+                  defaults: Dict[str, Any] | None = None,
+                  **kwargs
+                  ) -> LitSystem[SubjectType]:
+        if args is None:
+            args = argparse.Namespace()
+        args_dict = vars(args)
         base_kwargs: Dict[str, Any] = {}
         optimizer_kwargs = {k: v for k, v in default_optimizer_kwargs.items() if v is not None}
         inference_kwargs = {k: v for k, v in default_inference_kwargs.items() if v is not None}
@@ -157,16 +162,16 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             defaults = {}
         # NOTE: TODO: could check some prefix like _optimizer or _inference
         # to handle cases where the params are not predeclared or have conflicts
-        for key in set(args.keys()).union(defaults.keys()):
+        for key in set(args_dict.keys()).union(defaults.keys()):
             if key in default_optimizer_kwargs:
-                cls.set_arg(optimizer_kwargs, key, args, defaults)
+                cls.set_arg(optimizer_kwargs, key, args_dict, defaults)
             elif key in default_inference_kwargs:
-                cls.set_arg(default_inference_kwargs, key, args, defaults)
+                cls.set_arg(inference_kwargs, key, args_dict, defaults)
             elif key in field_names:
-                v = cls.get_arg(key, args, defaults)
+                v = cls.get_arg(key, args_dict, defaults)
                 setattr(data, key, v)
             elif key in init_names:
-                cls.set_arg(base_kwargs, key, args, defaults)
+                cls.set_arg(base_kwargs, key, args_dict, defaults)
         return cls(model=model, data=data,
                    optimizer_kwargs=optimizer_kwargs,
                    inference_kwargs=inference_kwargs,
@@ -202,6 +207,8 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             self.model, self.inferencer)
 
         self.primed = False
+        if self.data is not None:
+            self.data.setup()
 
     # @abstractmethod
     # def configure_model(self) -> Model[SubjectType]: ...
