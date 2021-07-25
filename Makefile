@@ -68,7 +68,7 @@ examples/spr/protoroles_eng_ud1.2_11082016.tsv:
 
 eargs := 
 edeps := examples/spr/protoroles_eng_ud1.2_11082016.tsv
-e := examples/spr/sprlit.py $(eargs) --path examples/spr/protoroles_eng_ud1.2_11082016.tsv
+e := examples/sprlit.py $(eargs) --path examples/spr/protoroles_eng_ud1.2_11082016.tsv
 .PHONY: example
 example: $(edeps) pyproject.lock
 	poetry run python $e

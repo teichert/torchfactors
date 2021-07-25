@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import itertools
+import re
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
 from typing import Any, Dict, Generic, List, Optional, Sequence, Union, cast
@@ -27,13 +29,45 @@ inferencers = dict(
     BP=BP,
 )
 
+typename_to_type = dict(
+    str=str,
+    int=int,
+    float=float,
+    bool=bool,
+)
+
+
+def get_type(typename: str) -> type | None:
+    pieces = re.split('[^a-z]+', typename)
+    for piece in pieces:
+        try:
+            return typename_to_type[piece]
+        except KeyError:
+            pass
+    return None
+
+
+@dataclass
+class ArgParseArg:
+    type: Any = str
+    default: Any = None
+    help: str = ""
+
+
 default_optimizer_kwargs = dict(
-    lr=1.0,
+    lr=ArgParseArg(float, 1.0, 'learning rate')
 )
 
 default_inference_kwargs = dict(
-    passes=None,
+    passes=ArgParseArg(int, None, 'number of times each bp message will be sent')
 )
+
+
+lit_init_names = dict(
+    optimizer=ArgParseArg(str, default='Adam'),
+    inferencer=ArgParseArg(str, default='BP'),
+    penalty_coeff=ArgParseArg(float, 1.0,
+                              'multiplied by the exponentiated total KL from previous message'))
 
 
 @dataclass
@@ -62,7 +96,7 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
     def __post_init__(self):
         super().__init__()
 
-    @staticmethod
+    @ staticmethod
     def negative_to_none(value: int) -> Optional[int]:
         return None if value < 0 else value
 
@@ -130,19 +164,19 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
     up into it.
 
     """
-    @classmethod
+    @ classmethod
     def get_arg(cls, key: str, args: Dict[str, Any], defaults: Dict[str, Any]):
         if key in args:
             return args[key]
         else:
             return defaults[key]
 
-    @classmethod
+    @ classmethod
     def set_arg(cls, dest: Dict[str, Any], key: str, args: Dict[str, Any],
                 defaults: Dict[str, Any]):
         dest[key] = cls.get_arg(key, args, defaults)
 
-    @classmethod
+    @ classmethod
     def from_args(cls,
                   model: Model[SubjectType],
                   data: DataModule[SubjectType],
@@ -152,12 +186,13 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
                   ) -> LitSystem[SubjectType]:
         if args is None:
             args = argparse.Namespace()
-        args_dict = vars(args)
+        args_dict = {k: v for k, v in vars(args).items() if v is not None}
         base_kwargs: Dict[str, Any] = {}
-        optimizer_kwargs = {k: v for k, v in default_optimizer_kwargs.items() if v is not None}
-        inference_kwargs = {k: v for k, v in default_inference_kwargs.items() if v is not None}
+        optimizer_kwargs = {k: v.default for k, v in default_optimizer_kwargs.items()
+                            if v.default is not None}
+        inference_kwargs = {k: v.default for k, v in default_inference_kwargs.items()
+                            if v.default is not None}
         field_names = set(f.name for f in dataclasses.fields(data))
-        init_names = {'optimizer', 'inferencer', 'penalty_coeff'}
         if defaults is None:
             defaults = {}
         # NOTE: TODO: could check some prefix like _optimizer or _inference
@@ -170,7 +205,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             elif key in field_names:
                 v = cls.get_arg(key, args_dict, defaults)
                 setattr(data, key, v)
-            elif key in init_names:
+            elif key in lit_init_names:
                 cls.set_arg(base_kwargs, key, args_dict, defaults)
         return cls(model=model, data=data,
                    optimizer_kwargs=optimizer_kwargs,
@@ -195,11 +230,13 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
         self.penalty_coeff = penalty_coeff
 
         if optimizer_kwargs is None:
-            optimizer_kwargs = {k: v for k, v in default_optimizer_kwargs.items() if v is not None}
+            optimizer_kwargs = {k: v.default for k, v in default_optimizer_kwargs.items()
+                                if v.default is not None}
         self.optimizer_kwargs = optimizer_kwargs
 
         if inference_kwargs is None:
-            inference_kwargs = {k: v for k, v in default_inference_kwargs.items() if v is not None}
+            inference_kwargs = {k: v.default for k, v in default_inference_kwargs.items()
+                                if v.default is not None}
         inferencer_cls = inferencers[inferencer]
         self.inferencer = inferencer_cls(**inference_kwargs)
 
@@ -263,17 +300,17 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             raise TypeError("did not specify data")
         return self.data.test_dataloader()
 
-    @staticmethod
-    def add_argparse_args(parser: ArgumentParser):
+    @ classmethod
+    def add_argparse_args(cls, parser: ArgumentParser):
         parser = pl.Trainer.add_argparse_args(parser)
-        parser.add_argument('--lr', type=float, default=0.1,
-                            help="learning rate")
-        parser.add_argument('--optimizer', type=str, default="LBFGS",
-                            help=f"name of optimizer from {list(optimizers.keys())}")
-        parser.add_argument('--bp_iters', type=int, default=3,
-                            help="number of times each message will be sent in bp")
-        parser.add_argument('--batch_size', type=int, default=-1,
-                            help="size of each batch (-1 for all in single batch)")
-        parser.add_argument('--maxn', type=int, default=None,
-                            help="the maximum number of examples that will be included")
+        for key, value in itertools.chain(
+                default_optimizer_kwargs.items(),
+                default_inference_kwargs.items(),
+                lit_init_names.items()):
+            parser.add_argument(f'--{key}', type=value.type, help=value.help,
+                                default=value.default)
+        for field in dataclasses.fields(DataModule):
+            field_type = get_type(field.type)  # type: ignore
+            if field_type is not None:
+                parser.add_argument(f'--{field.name}', type=field_type)
         return parser

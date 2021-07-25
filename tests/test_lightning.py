@@ -7,7 +7,7 @@ import pytest
 import pytorch_lightning as pl
 import torchfactors as tx
 from torchfactors.components.linear_factor import LinearFactor
-from torchfactors.lightning import DataModule
+from torchfactors.lightning import DataModule, get_type
 
 
 @tx.dataclass
@@ -66,10 +66,21 @@ def test_lit_learning_with_optimizers_kwargs():
 def test_lightning_args():
     parser = argparse.ArgumentParser(add_help=False)
     parser = tx.LitSystem.add_argparse_args(parser)
-    args = parser.parse_args("")
-    assert args.bp_iters == 3
-    assert args.batch_size == -1
-    assert args.maxn is None
+    args = parser.parse_args(
+        "--passes 5 --lr 10 --val_max_count 0 "
+        "--batch_size 2 --test_batch_size 1".split())
+    assert args.passes == 5
+    assert args.lr == 10
+    assert args.val_max_count == 0
+    assert args.batch_size == 2
+    assert args.test_batch_size == 1
+    sys = tx.LitSystem.from_args(MyModel(), MyData_v1_0(),
+                                 args)
+    assert sys.inferencer.passes == 5
+    assert sys.optimizer_kwargs['lr'] == 10
+    assert len(sys.train_dataloader()) == 1
+    assert len(sys.val_dataloader()) == 0
+    assert len(sys.test_dataloader()) == 2
 
 
 class MyData_v1_0(DataModule):
@@ -203,3 +214,16 @@ def test_nodata():
 
     with pytest.raises(TypeError):
         sys.test_dataloader()
+
+
+def test_get_type():
+    assert get_type("Optinoal[str]") is str
+    assert get_type("str | int") is str
+    assert get_type("str") is str
+    assert get_type("int | str") is int
+    assert get_type("blah") is None
+    assert get_type("bool") is bool
+    assert get_type("float") is float
+
+
+test_lightning_args()
