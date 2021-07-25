@@ -6,7 +6,8 @@ import itertools
 import re
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, List, Optional, Sequence, Union, cast
+from typing import (Any, Dict, Generic, List, Optional, Sequence, Sized, Union,
+                    cast)
 
 import pytorch_lightning as pl
 import torch
@@ -89,6 +90,7 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
     val_batch_size: Optional[int] = None
     test_batch_size: Optional[int] = None
 
+    test_mode: bool = False
     train: Dataset[SubjectType] | Sequence[SubjectType] = cast(Sequence[SubjectType], ())
     val: Dataset[SubjectType] | Sequence[SubjectType] = cast(Sequence[SubjectType], ())
     test: Dataset[SubjectType] | Sequence[SubjectType] = cast(Sequence[SubjectType], ())
@@ -130,18 +132,20 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
 
     def make_data_loader(self, examples: Dataset[SubjectType] | Sequence[SubjectType],
                          batch_size: int | None):
-        computed_batch_size = self.computed_batch_size(batch_size)
+        computed_batch_size = self.computed_batch_size(examples, batch_size)
         if examples:
             return examples[0].data_loader(examples, batch_size=computed_batch_size)
         else:
             return DataLoader[SubjectType](cast(Dataset[SubjectType], examples),
                                            batch_size=computed_batch_size)
 
-    def computed_batch_size(self, split_batch_size: int | None):
+    def computed_batch_size(self, examples: Dataset[SubjectType] | Sequence[SubjectType],
+                            split_batch_size: int | None):
         if split_batch_size is None:
-            return self.negative_to_none(self.batch_size)
+            out = self.negative_to_none(self.batch_size)
         else:
-            return self.negative_to_none(split_batch_size)
+            out = self.negative_to_none(split_batch_size)
+        return len(cast(Sized, examples)) if out is None else out
 
     def train_dataloader(self) -> DataLoader | List[DataLoader]:
         return self.make_data_loader(self.train, batch_size=self.train_batch_size)
