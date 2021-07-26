@@ -27,7 +27,7 @@ if __name__ == '__main__':
     trainer = pl.Trainer.from_argparse_args(args)
     model = SPRLModel()
     system = tx.LitSystem.from_args(
-        model, data=SPRLData_v1_0(model=model),
+        model=model, data=SPRLData_v1_0(model=model),
         args=args,
         defaults=dict(path='./examples/spr/protoroles_eng_ud1.2_11082016.tsv'))
 
@@ -38,4 +38,4 @@ if __name__ == '__main__':
     #         train.rating.flatten() > 3,
     #         num_classes=len(predicted.rating.domain)))
 
-    trainer.fit(system)
+    # trainer.fit(system)

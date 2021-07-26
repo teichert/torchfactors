@@ -2,6 +2,7 @@ import pytest
 import torch
 import torchfactors as tx
 from torch import arange
+from torchfactors.subject import ListDataset
 from torchfactors.types import gdrop
 from torchfactors.utils import (as_ndrange, canonical_ndslice,
                                 canonical_range_slice, compose, compose_single,
@@ -311,3 +312,8 @@ def test_gdrop_multi():
     expected = (5, slice(5, 8, 1), tx.gdrop(4, 2, 7), slice(0, 12, 1), 3)
     out = compose(a, b, shape)
     assert out == expected
+
+
+def test_data_len():
+    data = ListDataset([tx.testing.DummySubject()] * 5)
+    assert tx.data_len(data) == 5

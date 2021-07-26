@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Optional, cast
+from itertools import islice
+from typing import Optional
 
 import pandas as pd
 import torch
 import torchfactors as tx
-from torch.utils.data import random_split
-from torch.utils.data.dataset import Dataset
+from pandas import DataFrame
 from torchfactors.model import Model
-from torchfactors.subject import ListDataset, SubjectType
+from torchfactors.subject import ListDataset
 from tqdm import tqdm  # type: ignore
 
 
@@ -29,39 +29,17 @@ class SPRL(tx.Subject):
     # bin_rating: tx.Var = tx.VarField(tx.Range(2), tx.LATENT, shape=rating)
 
     @staticmethod
-    def from_tsv(path: str, model: tx.Model[SPRL], split_max_sizes: Mapping[str, Optional[int]],
-                 test_mode=False) -> Mapping[str, Dataset[SPRL]]:
-        df = pd.read_csv(path, sep='\t')
-        splits = dict(list(df.groupby('Split')))
-        outs: Mapping[str, Dataset[SPRL]] = {}
-        for split, max_size in split_max_sizes.items():
-            if test_mode and split == 'test':
-                split = 'dev'
-            if split not in splits:
-                continue
-            pairs = list(dict(list(splits[split].groupby(
-                ['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin',
-                 'Arg.Tokens.End', 'Annotator.ID']))).values())
-            outs[split] = ListDataset([
-                SPRL(
-                    rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
-                    # applicable=tx.TensorVar(torch.tensor(pair_df['Response'].values) == 'yes'),
-                    # the domain mapping needs to be stored in the model so that the parameters
-                    # are relevent; it makes sense to declare in the varfield (if you want)
-                    # that the variable domain is flexible and which domain it is;
-                    # model.domain_ids(domain, )
-                    property=tx.TensorVar(model.domain_ids(
-                        SPRL.property_domain, pair_df['Property'].values)),
-                    # annotator=tx.TensorVar(
-                    #     model.domain_ids(annotator_domain, pair_df['Annotator.ID'].values)),
-                    # predicate=tx.TensorVar(
-                    #     model.domain_ids(predicate_domain, pair_df['Pred.Lemma'].values)),
-                )
-                for pair_df in tqdm(pairs[:max_size])
+    def from_data_frame(data: DataFrame, model: tx.Model[SPRL], max_count: Optional[int] = None
+                        ) -> ListDataset:
+        iter = (SPRL(
+            rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
+            property=tx.TensorVar(model.domain_ids(
+                SPRL.property_domain, pair_df['Property'].values)))
+                for pair_df in data.groupby(['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin',
+                                             'Arg.Tokens.End', 'Annotator.ID'])
                 if not pair_df['Response'].isna().any()
-            ])
-        return outs
-
+                )
+        return ListDataset(list(tqdm(islice(iter, max_count))))
 
 # a regular factor directly specifies as score for each configuration;
 # the point of a factor group reduces the number of parameters;
@@ -71,22 +49,21 @@ class SPRL(tx.Subject):
 
 
 @dataclass
-class SPRLData_v1_0(tx.lightning.DataModule[SubjectType]):
+class SPRLData_v1_0(tx.lightning.DataModule[SPRL]):
     model: Optional[Model[SPRL]] = None
+    _data_splits: dict[str, DataFrame] | None = None
 
     def setup(self, stage: Optional[str] = None) -> None:
         if self.model is None:
-            raise TypeError("need a model in order to use flex domains")
-        else:
-            split_counts = self.split_max_counts(stage)
-            del split_counts['val']
-            loaded_splits: Mapping[str, Dataset[SPRL]] = SPRL.from_tsv(
-                self.path, self.model, split_counts, test_mode=self.test_mode)
-            # TODO: fix this to make more sense
-            train = loaded_splits['train']
-            num_train = int(len(train) * 0.8)
-            loaded_splits['train'], loaded_splits['val'] = random_split(
-                cast(Dataset[SubjectType], train), [num_train, len(train) - num_train],
-                generator=torch.Generator().manual_seed(42))
-            for split, data in loaded_splits.items():
-                self.set_split(split, data)
+            raise ValueError("need a model to make sprl data (to hold the domain)")
+        if self._data_splits is None:
+            data = pd.read_csv(self.path, sep='\t')
+            self._data_splits = dict(list(data.groupby('Split')))
+        if stage in (None, 'fit'):
+            self.train = SPRL.from_data_frame(self._data_splits['Train'],
+                                              self.model, self.train_limit)
+            super().setup_val()
+        if stage in (None, 'test'):
+            test_split = 'Test' if self.test_mode else 'Dev'
+            self.train = SPRL.from_data_frame(self._data_splits[test_split],
+                                              self.model, self.test_limit)

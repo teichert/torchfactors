@@ -6,8 +6,7 @@ import itertools
 import re
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
-from typing import (Any, Dict, Generic, List, Optional, Sequence, Sized, Union,
-                    cast)
+from typing import Any, Dict, Generic, List, Optional, Sized, Union, cast
 
 import pytorch_lightning as pl
 import torch
@@ -19,7 +18,8 @@ from torchfactors.inferencers.bp import BP
 
 from .model import Model
 from .model_inferencer import System
-from .subject import SubjectType
+from .subject import ListDataset, SubjectType
+from .utils import split_data
 
 optimizers = dict(
     Adam=torch.optim.Adam,
@@ -71,29 +71,101 @@ lit_init_names = dict(
                               'multiplied by the exponentiated total KL from previous message'))
 
 
+# class DataConsumer(Generic[SubjectType]):
+
+#     def maybe_add(self, split: str, item: Callable[[], SubjectType]):
+#         """
+#         This should be overriden in every sub-class"""
+#         raise NotImplementedError("data consumer not implemented")
+
+#     def accept_item(self, split: str, item: SubjectType) -> bool:
+#         return self.accept(split, split, lambda: item)
+
+#     def accept(self, split: str, item: Callable[[], SubjectType]) -> bool:
+#         try:
+#             self.maybe_add(split, item)
+#             return True
+#         except StopIteration:
+#             return False
+
+
 @dataclass
 class DataModule(pl.LightningDataModule, Generic[SubjectType]):
     r"""
     batch_size and max_count are general settings for all stages and
     will be overriden by more specific settings:
-    -1 means no limit; None means not set
+    -1 means no limit; None means not set;
+
+
+    train data will be potentially limited and then split
+    into train according to the smaller of ceil(len(filtered train) * val_portion))
+    and val_max_count
     """
     path: str = ""
     split_max_count: int = -1
-    batch_size: int = -1
+    batch_size: int = 1
 
     train_max_count: Optional[int] = None
     val_max_count: Optional[int] = None
     test_max_count: Optional[int] = None
+    val_portion: Optional[float] = None
 
     train_batch_size: Optional[int] = None
     val_batch_size: Optional[int] = None
     test_batch_size: Optional[int] = None
 
     test_mode: bool = False
-    train: Dataset[SubjectType] | Sequence[SubjectType] = cast(Sequence[SubjectType], ())
-    val: Dataset[SubjectType] | Sequence[SubjectType] = cast(Sequence[SubjectType], ())
-    test: Dataset[SubjectType] | Sequence[SubjectType] = cast(Sequence[SubjectType], ())
+    train: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset)
+    val: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset)
+    test: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset)
+
+    # def maybe_add(self, split: str, get: Callable[[], SubjectType]):
+    #     if split == 'train':
+    #         train = cast(ListDataset, self.train)
+    #         if len(train.examples) < self.compute_max_count(self.train_max_count,
+    #                                                         self.split_max_count):
+    #             train.examples.append(get)
+    #         else:
+    #             raise StopIteration
+    #     else:
+    #         if split == 'dev' and self.test_mode:
+
+    #         self.test_length < self.max_test_count and (
+    #             self.test_mode and split == 'test' or
+    #                 not self.test_mode and split == 'dev'):
+
+    #     if split == 'train' and self.train_length < self.max_train_count:
+    #         cast(ListDataset, self.train).examples.append(get())
+    #     elif self.test_length < self.max_test_count and (
+    #             self.test_mode and split == 'test' or
+    #             not self.test_mode and split == 'dev'):
+    #         cast(ListDataset, self.test).examples.append(get())
+    #     else:
+    #         raise StopIteration()
+
+    @property
+    def train_length(self) -> int:
+        return len(cast(Sized, self.train))
+
+    @property
+    def val_length(self) -> int:
+        return len(cast(Sized, self.val))
+
+    @property
+    def test_length(self) -> int:
+        return len(cast(Sized, self.test))
+
+    @property
+    def train_limit(self) -> int:
+        return self.compute_max_count(self.train_max_count)
+
+    @property
+    def val_limit(self) -> int:
+        return self.compute_max_count(self.val_max_count)
+
+    @property
+    def test_limit(self) -> int:
+        return self.compute_max_count(self.test_max_count)
 
     def __post_init__(self):
         super().__init__()
@@ -108,38 +180,40 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
         else:
             return self.negative_to_none(split_max_count)
 
-    def set_split(self, split: str, examples: Dataset[SubjectType] | Sequence[SubjectType]
-                  ) -> None:
-        dataset = cast(torch.utils.data.Dataset, examples)
-        if split == 'train':
-            self.train = dataset
-        if split == 'val':
-            self.val = dataset
-        if split == 'test':
-            self.test = dataset
+    # def set_split(self, split: str, examples: Dataset[SubjectType]
+    #               ) -> None:
+    #     dataset = cast(torch.utils.data.Dataset, examples)
+    #     if split == 'train':
+    #         self.train = dataset
+    #     if split == 'val':
+    #         self.val = dataset
+    #     if split == 'test':
+    #         self.test = dataset
 
-    def split_max_counts(self, stage: Optional[str]) -> Dict[str, int]:
-        split_max_sizes = {}
-        if stage in (None, 'fit'):
-            split_max_sizes['train'] = self.compute_max_count(self.train_max_count)
-            split_max_sizes['val'] = self.compute_max_count(self.val_max_count)
-        if stage in (None, 'test'):
-            split_max_sizes['test'] = self.compute_max_count(self.test_max_count)
-        return split_max_sizes
+    # def split_max_counts(self, stage: Optional[str]) -> Dict[str, int]:
+    #     split_max_sizes = {}
+    #     if stage in (None, 'fit'):
+    #         split_max_sizes['train'] = self.compute_max_count(self.train_max_count)
+    #     if stage in (None, 'test'):
+    #         max_count = self.compute_max_count(self.test_max_count)
+    #         if self.test_mode:
+    #             split_max_sizes['test'] = max_count
+    #         else:
+    #             split_max_sizes['dev'] = max_count
+    #     return split_max_sizes
 
     # def train(self) -> Sequence[SubjectType]:
     #     raise ValueError("no train data specified")
 
-    def make_data_loader(self, examples: Dataset[SubjectType] | Sequence[SubjectType],
+    def make_data_loader(self, examples: Dataset[SubjectType],
                          batch_size: int | None):
         computed_batch_size = self.computed_batch_size(examples, batch_size)
         if examples:
             return examples[0].data_loader(examples, batch_size=computed_batch_size)
         else:
-            return DataLoader[SubjectType](cast(Dataset[SubjectType], examples),
-                                           batch_size=computed_batch_size)
+            return DataLoader[SubjectType](examples, batch_size=computed_batch_size)
 
-    def computed_batch_size(self, examples: Dataset[SubjectType] | Sequence[SubjectType],
+    def computed_batch_size(self, examples: Dataset[SubjectType],
                             split_batch_size: int | None):
         if split_batch_size is None:
             out = self.negative_to_none(self.batch_size)
@@ -155,6 +229,13 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
 
     def test_dataloader(self) -> DataLoader | List[DataLoader]:
         return self.make_data_loader(self.test, batch_size=self.test_batch_size)
+
+    def setup_val(self):
+        if self.val_portion is not None or self.val_max_count is not None:
+            self.val, self.train = split_data(self.train,
+                                              portion=self.val_portion,
+                                              count=self.val_limit,
+                                              generator=torch.Generator().manual_seed(42))
 
 
 class LitSystem(pl.LightningModule, Generic[SubjectType]):

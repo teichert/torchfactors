@@ -1,6 +1,10 @@
 .PHONY: check
 check:
-	make test type lint --keep-going
+	make lint type test
+
+.PHONY: check-all
+check-all:
+	make lint type test --keep-going
 
 .PHONY: install
 install: pyproject.lock

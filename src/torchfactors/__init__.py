@@ -22,7 +22,7 @@ from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
 from .types import GeneralizedDimensionDrop, gdrop
-from .utils import logsumexp, ndarange, num_trainable
+from .utils import data_len, logsumexp, ndarange, num_trainable
 from .variable import TensorVar, Var, VarField, VarUsage, at, vtensor
 
 logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
@@ -37,6 +37,7 @@ DEFAULT = VarUsage.DEFAULT
 OPEN = Domain.OPEN
 
 __all__ = [
+    'data_len',
     'LitSystem',
     'gdrop', 'GeneralizedDimensionDrop', 'at', 'num_trainable',
     'dataclass', 'logsumexp',

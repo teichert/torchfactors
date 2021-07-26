@@ -22,7 +22,7 @@ ExampleType = TypeVar('ExampleType')
 
 @ dataclass
 class ListDataset(Dataset, Generic[ExampleType]):
-    examples: Sequence[ExampleType]
+    examples: Sequence[ExampleType] = ()  # field(default_factory=list)
 
     def __len__(self):
         return len(self.examples)

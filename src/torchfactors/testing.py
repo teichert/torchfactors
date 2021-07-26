@@ -10,7 +10,7 @@ from .variable import TensorVar, VarUsage
 
 @dataclass
 class DummySubject(Subject):
-    i: int
+    i: int = 5
 
 
 def DummyParamNamespace():
