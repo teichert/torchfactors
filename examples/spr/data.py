@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import islice
-from typing import Optional
+from typing import Any, Optional
 
 import pandas as pd
 import torch
@@ -24,6 +24,7 @@ class SPRL(tx.Subject):
     rating: tx.Var = tx.VarField(tx.Range(5), tx.ANNOTATED)
     # applicable: tx.Var = tx.VarField(tx.Range(2), tx.ANNOTATED, shape=rating)
     property: tx.Var = tx.VarField(property_domain, tx.OBSERVED, shape=rating)
+    info: Any = None
     # annotator: tx.Var = tx.VarField(annotator_domain, tx.OBSERVED, shape=rating)
     # predicate: tx.Var = tx.VarField(predicate_domain, tx.OBSERVED, shape=rating)
     # bin_rating: tx.Var = tx.VarField(tx.Range(2), tx.LATENT, shape=rating)
@@ -34,11 +35,12 @@ class SPRL(tx.Subject):
         iter = (SPRL(
             rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
             property=tx.TensorVar(model.domain_ids(
-                SPRL.property_domain, pair_df['Property'].values)))
-                for pair_df in data.groupby(['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin',
-                                             'Arg.Tokens.End', 'Annotator.ID'])
-                if not pair_df['Response'].isna().any()
-                )
+                SPRL.property_domain, pair_df['Property'].values)),
+            info=info)
+            for info, pair_df in data.groupby(['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin',
+                                               'Arg.Tokens.End', 'Annotator.ID'])
+            if not pair_df['Response'].isna().any()
+        )
         return ListDataset(list(tqdm(islice(iter, max_count))))
 
 # a regular factor directly specifies as score for each configuration;
@@ -60,10 +62,10 @@ class SPRLData_v1_0(tx.lightning.DataModule[SPRL]):
             data = pd.read_csv(self.path, sep='\t')
             self._data_splits = dict(list(data.groupby('Split')))
         if stage in (None, 'fit'):
-            self.train = SPRL.from_data_frame(self._data_splits['Train'],
+            self.train = SPRL.from_data_frame(self._data_splits['train'],
                                               self.model, self.train_limit)
             super().setup_val()
         if stage in (None, 'test'):
-            test_split = 'Test' if self.test_mode else 'Dev'
+            test_split = 'test' if self.test_mode else 'dev'
             self.train = SPRL.from_data_frame(self._data_splits[test_split],
                                               self.model, self.test_limit)

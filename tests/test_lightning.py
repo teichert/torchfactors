@@ -119,6 +119,9 @@ def test_datamodule3():
     assert len(data.train_dataloader()) == 2
     assert len(data.val_dataloader()) == 0
     assert len(data.test_dataloader()) == 2
+    assert data.train_length == 4
+    assert data.val_length == 0
+    assert data.test_length == 4
 
 
 def test_datamodule4():
@@ -143,6 +146,9 @@ def test_datamodule7():
     assert len(data.train_dataloader()) == 3
     assert len(data.val_dataloader()) == 1
     assert len(data.test_dataloader()) == 0
+    assert data.train_length == 3
+    assert data.val_length == 1
+    assert data.test_length == 0
 
 
 def test_datamodule8():
@@ -151,6 +157,9 @@ def test_datamodule8():
     assert len(data.train_dataloader()) == 0
     assert len(data.val_dataloader()) == 0
     assert len(data.test_dataloader()) == 4
+    assert data.train_length == 0
+    assert data.val_length == 0
+    assert data.test_length == 4
 
 
 # class MyLit(tx.lightning.LitSystem):

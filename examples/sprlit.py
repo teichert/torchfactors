@@ -38,4 +38,4 @@ if __name__ == '__main__':
     #         train.rating.flatten() > 3,
     #         num_classes=len(predicted.rating.domain)))
 
-    # trainer.fit(system)
+    trainer.fit(system)
