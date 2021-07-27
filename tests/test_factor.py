@@ -102,7 +102,15 @@ def test_normalize():
     expected = torch.full((2, 3, 4, 5), fill_value=-math.log(20))
     assert out.isclose(expected).all()
 
-# TODO: test where they vary accross batch dims
+# import torchfactors as tx
+# # TODO: test where they vary accross batch dims
+# def test_multiple_graph_dims():
+#     v = TensorVar(torch.ones(5), domain=Range(2), usage=tx.ANNOTATED)
+#     f = TensorFactor(v[...,:-1,:], v[...,1:,:], tensor=torch.tensor([
+#         [1, 0],
+#         [0, 1],
+#     ]).log())
+#     log_z = f.
 
 
 def test_bad_variables():
