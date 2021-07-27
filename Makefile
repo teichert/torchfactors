@@ -70,7 +70,7 @@ examples/spr/protoroles_eng_ud1.2_11082016.tsv:
 	cd examples/spr; wget http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
 	cd examples/spr; tar xvf protoroles_eng_udewt.tar.gz
 
-eargs := 
+eargs := --batch_size 100
 edeps := examples/spr/protoroles_eng_ud1.2_11082016.tsv
 e := examples/sprlit.py $(eargs) --path examples/spr/protoroles_eng_ud1.2_11082016.tsv
 .PHONY: example

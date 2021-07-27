@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import itertools
+import logging
 import re
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass
@@ -313,7 +314,11 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
         self.data = data
         self.log_info: Dict[str, Any] = {}
         self.penalty_coeff = penalty_coeff
-
+        self.self_kwargs = dict(
+            penalty_coeff=penalty_coeff,
+            optimizer=optimizer,
+            inferencer=inferencer,
+        )
         if optimizer_kwargs is None:
             optimizer_kwargs = {k: v.default for k, v in default_optimizer_kwargs.items()
                                 if v.default is not None}
@@ -323,6 +328,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             inference_kwargs = {k: v.default for k, v in default_inference_kwargs.items()
                                 if v.default is not None}
         inferencer_cls = inferencers[inferencer]
+        self.inference_kwargs = inference_kwargs
         self.inferencer = inferencer_cls(**inference_kwargs)
 
         self.system: System[SubjectType] = System(
@@ -336,8 +342,12 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
     # def configure_model(self) -> Model[SubjectType]: ...
 
     def setup(self, stage=None) -> None:
+        logging.info(self.optimizer_kwargs)
+        logging.info(self.inference_kwargs)
+        logging.info(self.self_kwargs)
         if not self.primed:
             with torch.set_grad_enabled(False):
+                logging.info("priming")
                 self.system.prime(cast(DataLoader[SubjectType], self.train_dataloader()))
             self.primed = True
 
@@ -349,14 +359,14 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
 
     # def forward(self, x: SubjectType, *args, **kwargs) -> SubjectType:
     #     return self.system.predict(x)
-    def transfer_batch_to_device(self, _batch, device):
+    def transfer_batch_to_device(self, _batch, device, dataloader_idx):
         batch: SubjectType = cast(SubjectType, _batch)
         return batch.to_device(device)
 
     def training_step(self, *args, **kwargs) -> Union[torch._tensor.Tensor, Dict[str, Any]]:
         batch: SubjectType = cast(SubjectType, args[0])
-        batch_idx: int = cast(int, args[1])
-        self.log('batch_idx', batch_idx)
+        # batch_idx: int = cast(int, args[1])
+        # self.log('batch_idx', batch_idx)
         clamped = batch.clamp_annotated()
         free = batch.unclamp_annotated()
         logz_clamped = self.system.product_marginal(clamped)

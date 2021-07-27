@@ -3,4 +3,4 @@ import warnings
 # silence TensorBoard internal warnings
 warnings.filterwarnings(action="ignore",
                         category=DeprecationWarning,
-                        module='tensorboard')
+                        module='(tensorboard)|(pytorch_lightning)')
