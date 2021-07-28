@@ -7,7 +7,7 @@ from typing import Any, List, Optional, Sized, Tuple, Union, cast, overload
 
 import torch
 from multimethod import multidispatch
-from opt_einsum import contract  # type: ignore
+# from opt_einsum import contract  # type: ignore
 from torch import Tensor, arange
 from torch._C import Generator
 from torch.utils.data.dataset import Dataset, random_split
@@ -30,12 +30,62 @@ def logsumexp(t: Tensor, dim: Union[None, int, List[int], Tuple[int, ...]] = Non
 
 
 def outer(*tensors: Tensor, num_batch_dims=0):
-    r"""Returns a generalized outer product"""
-    return contract(*[arg
-                      for t in tensors
-                      for arg in [t, [*range(num_batch_dims), id(t)]]],
-                    [*range(num_batch_dims), *list(map(id, tensors))],
-                    backend='torch')
+    return outer2(tensors, num_batch_dims)
+
+
+# def outer(*tensors: Tensor, num_batch_dims=0):
+#     r"""Returns a generalized outer product"""
+#     return contract(*[arg
+#                       for t in tensors
+#                       for arg in [t, [*range(num_batch_dims), id(t)]]],
+#                     [*range(num_batch_dims), *list(map(id, tensors))],
+#                     backend='torch')
+
+
+@torch.jit.script
+def expand(t: Tensor, num_batch_dims: int, index_of_t: int, target_shape: List[int]
+           ):  # pragma: no cover
+    # unsqueeze
+    for i in range(len(target_shape) - num_batch_dims):
+        if i < index_of_t:
+            t = t.unsqueeze(num_batch_dims)
+        elif i > index_of_t:
+            t = t.unsqueeze(-1)
+    out = t.expand(target_shape)
+    return out
+
+
+@torch.jit.script
+def outer2(tensors: List[Tensor], num_batch_dims: int):  # pragma: no cover
+    batch_shape = list(tensors[0].shape[:num_batch_dims])
+    out_shape = batch_shape + [t.shape[-1] for t in tensors]
+    tensors = [expand(t, num_batch_dims, i, out_shape) for i, t in enumerate(tensors)]
+    out = tensors[0]
+    for t in tensors[1:]:
+        out = out * t
+    return out
+
+
+@torch.jit.script
+def outer_or(tensors: List[Tensor], num_batch_dims: int):  # pragma: no cover
+    batch_shape = list(tensors[0].shape[:num_batch_dims])
+    out_shape = batch_shape + [t.shape[-1] for t in tensors]
+    tensors = [expand(t, num_batch_dims, i, out_shape) for i, t in enumerate(tensors)]
+    out = tensors[0]
+    for t in tensors[1:]:
+        out = out.logical_or(t)
+    return out
+
+
+@torch.jit.script
+def outer_and(tensors: List[Tensor], num_batch_dims: int):  # pragma: no cover
+    batch_shape = list(tensors[0].shape[:num_batch_dims])
+    out_shape = batch_shape + [t.shape[-1] for t in tensors]
+    tensors = [expand(t, num_batch_dims, i, out_shape) for i, t in enumerate(tensors)]
+    out = tensors[0]
+    for t in tensors[1:]:
+        out = out.logical_and(t)
+    return out
 
 
 @multidispatch

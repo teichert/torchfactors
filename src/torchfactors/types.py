@@ -109,3 +109,6 @@ class ReadOnlyView(Tensor):
         if kwargs is None:
             kwargs = {}
         return super().__torch_function__(func, types, args, kwargs)
+
+    # def type_as(self, other: Tensor) -> Tensor:
+    #     return self

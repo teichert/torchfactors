@@ -70,7 +70,7 @@ examples/spr/protoroles_eng_ud1.2_11082016.tsv:
 	cd examples/spr; wget http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
 	cd examples/spr; tar xvf protoroles_eng_udewt.tar.gz
 
-eargs := --batch_size 100
+eargs := --batch_size 50 --split_max_count 10
 edeps := examples/spr/protoroles_eng_ud1.2_11082016.tsv
 e := examples/sprlit.py $(eargs) --path examples/spr/protoroles_eng_ud1.2_11082016.tsv
 .PHONY: example
@@ -104,3 +104,7 @@ profile: $(edeps) pyproject.lock
 	tmux send -t torchfactors_profile_example:2 "poetry run py-spy top $(profile_args) --pid $${pid}" ENTER
 	tmux select-window -t torchfactors_profile_example:0
 	tmux a
+
+.PHONY: profile2
+profile2: $(edeps) pyproject.lock
+	poetry run python -m scalene --profile-all --profile-interval 30 --profile-only torchfactors/src/torchfactors --reduced-profile --outfile scalene.report $e

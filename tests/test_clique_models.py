@@ -168,9 +168,6 @@ def test_binary():
     assert out_params == expected_params
 
 
-test_binary()
-
-
 def test_nominal():
     env = Environment()
     model = Nominal()

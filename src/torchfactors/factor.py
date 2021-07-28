@@ -10,7 +10,7 @@ from torch import Tensor
 
 from .einsum import compile_obj_equation, log_einsum
 from .types import ShapeType
-from .utils import logsumexp, outer
+from .utils import logsumexp, outer_and, outer_or
 from .variable import Var
 
 
@@ -177,12 +177,13 @@ class Factor:
 
     @property
     def _is_possible(self) -> Tensor:
-        return outer(*[v.is_possible for v in self.variables], num_batch_dims=self.num_batch_dims)
+        return outer_and([v.is_possible for v in self.variables],
+                         num_batch_dims=self.num_batch_dims)
 
     @property
     def _is_not_padding(self) -> Tensor:
-        return outer(*[v.is_padding.logical_not() for v in self.variables],
-                     num_batch_dims=self.num_batch_dims)
+        return outer_or([v.is_padding for v in self.variables],
+                        num_batch_dims=self.num_batch_dims).logical_not()
 
     @property
     def dense(self) -> Tensor:
