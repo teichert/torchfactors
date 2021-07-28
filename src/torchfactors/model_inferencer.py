@@ -27,7 +27,7 @@ class System(Generic[SubjectType]):
         an optimizer.
         """
         if isinstance(x, Subject):
-            for f in self.model(cast(SubjectType, x)):
+            for f in tqdm(self.model(cast(SubjectType, x)), delay=1.0):
                 f.dense
                 f.clear_cache()
         else:
