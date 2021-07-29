@@ -8,7 +8,7 @@ from typing import Callable, Iterator, Optional, Sequence, Union
 import torch
 from torch import Tensor
 
-from .einsum import compile_obj_equation, log_einsum
+from .einsum import compile_obj_equation, ids, log_dot
 from .types import ShapeType
 from .utils import logsumexp, outer_and, outer_or
 from .variable import Var
@@ -220,18 +220,20 @@ class Factor:
 
         """
         check_queries(queries)
-        equation = self.__vars_equation(
-            [self.variables, *[other.variables for other in other_factors]],
-            queries, force_multi=True)
+        # equation = self.__vars_equation(
+        #     [self.variables, *[other.variables for other in other_factors]],
+        #     queries, force_multi=True)
+        input_tensors = [(self.dense, ids(self.variables))] + [(f.dense, ids(f.variables))
+                                                               for f in other_factors]
+        labeled_queries = [ids(q) for q in queries]
 
         def f() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make
             # sure that changes in e.g. usage are reflected
             # any nans in any factor should be treated as a log(1)
             # meaning that it doesn't impact the product
-            input_tensors = [self.dense] + [f.dense
-                                            for f in other_factors]
-            out = log_einsum(equation, *input_tensors)
+            # out = log_einsum(equation, *input_tensors)
+            out = log_dot(input_tensors, labeled_queries)
             return out
         return f
 

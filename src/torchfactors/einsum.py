@@ -1,5 +1,4 @@
 
-import warnings
 from functools import singledispatch
 from typing import Dict, Hashable, Iterable, List, Sequence, Tuple, Union
 
@@ -105,19 +104,89 @@ def ids(values: Iterable[object]) -> List[int]:
     return list(map(id, values))
 
 
+def map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[int, Tuple[int, int]],
+                         names: List[int]) -> List[int]:
+    # store mapping from name to id and size
+    current_order = [name_to_id_and_size.setdefault(name, (len(name_to_id_and_size),
+                                                           size))
+                     for name, size in zip(names, t.shape)]
+    sorted_names = sorted((name, i) for i, (name, _) in enumerate(current_order))
+    permutation = [i for _, i in sorted_names]
+    out_names = [name for name, _ in sorted_names]
+    return t.permute(permutation), out_names
+
+
+def map_and_order_names(name_to_id_and_size: Dict[int, Tuple[int, int]], names: List[int]
+                        ) -> List[int]:
+    r"""
+    Returns the mapped names from the query in order, as well as the order that will
+    permute a tensor with those dimensions back to the original order
+    """
+    current_order = [name_to_id_and_size[name] for name in names]
+    sorted_names = sorted((name, i) for i, (name, _) in enumerate(current_order))
+    permutation = [i for _, i in sorted_names]
+    out_names = [name for name, _ in sorted_names]
+    unsorted_indexes = sorted((sorted_index, i) for i, sorted_index in enumerate(permutation))
+    unpermutation = [i for _, i in unsorted_indexes]
+    return unpermutation, out_names
+
+
+def map_order_and_invert_query(name_to_ix: Dict[int, int], names: List[int]):
+    unpermutation, ordered_query = map_and_order_names(name_to_ix, names)
+    out_query = []
+    for num_skipped, name in enumerate(ordered_query):
+        while True:
+            next_id = len(out_query) + num_skipped
+            if next_id == name:
+                break
+            else:
+                out_query.append(next_id)
+    return unpermutation, out_query
+
+
 def log_dot(tensors: List[Tuple[Tensor, List[int]]],
             queries: List[List[int]]) -> List[Tensor]:
     """
     Carries out a generalized tensor dot product across multiple named
     tensors.
     """
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore')
-        return _log_dot(tensors, queries)
+    # make sure that the ints are all in range and in order
+    name_to_ix = dict()
+    out_tensors = [map_and_order_tensor(t, name_to_ix, names) for t, names in tensors]
+    shape = [size for _, size in name_to_ix.values()]
+    out_inverse_queries = [map_order_and_invert_query(name_to_ix, names) for names in queries]
+    return _log_dot(out_tensors, out_inverse_queries, shape)
+
+
+def expand_to(t: Tensor, names: List[int], shape: List[int]):
+    """
+    returns an expanded view of t with shape matching that given
+    (the names say which of the dimensions are already used)
+    """
+    names_consumed = 0
+    for i in range(len(shape)):
+        if names[names_consumed] > i:
+            t = t.unsqueeze(i)
+    t = t.expand(shape)
+    return t
 
 
 def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
-             queries: List[List[int]]) -> List[Tensor]:
+             inverse_queries: List[Tuple[List[int], List[int]]],
+             full_shape: List[int]) -> List[Tensor]:
+    r"""
+    Assumes ids are all intermediate indexes and that
+    they are in order
+    """
+    aligned = [expand_to(t, names, full_shape) for t, names in tensors]
+    product = sum(aligned)
+    answers = [product.logsumexp(dim=iq).permute(unpermute) if iq else product
+               for unpermute, iq in inverse_queries]
+    return answers
+
+
+def _log_dot2(tensors: List[Tuple[Tensor, List[int]]],
+              queries: List[List[int]]) -> List[Tensor]:
     """
     see log_dot which squelches warning about named tensors
     """
@@ -133,9 +202,15 @@ def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
     product = torch.sum(stacked, dim=0).nan_to_num().rename(*all_names)
 
     names_set = set(all_names)
+
+    def logsumexp_to(t: Tensor, q: List[str]):
+        name_diff = names_set.difference(q)
+        if name_diff:
+            return product.logsumexp(dim=list(name_diff)).align_to(*q).rename(None)
+        else:
+            return product.align_to(*q).rename(None)
+
     named_queries = list(map(make_names, queries))
     # "sum" over dimensions not in the query
-    answers = [
-        product.logsumexp(dim=list(names_set.difference(q))).align_to(*q).rename(None)
-        for q in named_queries]
+    answers = [logsumexp_to(product, q) for q in named_queries]
     return answers

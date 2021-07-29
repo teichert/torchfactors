@@ -4,7 +4,8 @@ import torch
 import torch_semiring_einsum as tse  # type: ignore
 import torchfactors as tx
 from torchfactors.einsum import (MultiEquation, compile_equation,
-                                 compile_obj_equation, log_einsum)
+                                 compile_obj_equation, log_einsum,
+                                 map_and_order_names, map_and_order_tensor)
 
 
 def test_compile_obj_equation():
@@ -172,3 +173,47 @@ def test_hmm():
     print(logz_free, logz_clamped)
     assert logz_free.allclose(out_free)
     assert logz_clamped.allclose(out_clamped)
+
+
+def test_map_and_order_tensor():
+    t1 = torch.ones(3, 4, 5, 2)
+    t2 = torch.ones(2, 7, 3)
+    t3 = torch.ones(3)
+    vocab = dict()
+    out_t1, out_names1 = map_and_order_tensor(t1, vocab, [19, 10, 11, 13])
+    assert out_t1.shape == (3, 4, 5, 2)
+    assert out_names1 == [0, 1, 2, 3]
+
+    out_t2, out_names2 = map_and_order_tensor(t2, vocab, [13, 40, 19])
+    assert out_t2.shape == (3, 2, 7)
+    assert out_names2 == [0, 3, 4]
+
+    out_t3, out_names3 = map_and_order_tensor(t3, vocab, [-1])
+    assert out_t3.shape == (3,)
+    assert out_names3 == [5]
+
+    assert vocab == {
+        19: (0, 3),
+        10: (1, 4),
+        11: (2, 5),
+        13: (3, 2),
+        40: (4, 7),
+        -1: (5, 3),
+    }
+
+    # q1 = [13, 19, -1, 11]
+    # permutation_q1, out_q1 = map_and_order_names(vocab, q1)
+    # assert out_q1 == [0, 2, 3, 5]  # sorted([3, 0, 5, 2])
+    # assert permutation_q1 == [2, 0, 3, 1]
+
+    q2 = [-1, 10, 13, 11]
+    permutation_q2, out_q2 = map_and_order_names(vocab, q2)
+    assert out_q2 == [1, 2, 3, 5]  # sorted([5, 1, 3, 2])
+    # 0 1 2 3 # indexes
+    # 5 1 3 2 # orig ids
+    # so in order of smallest orig id, the indexes become:
+    # 1 3 2 0 # indexes in orig list to get sorted ids (sorted indexes)
+    # 1 2 3 5 # sorted ids
+    # so in order of sorted index, the index become
+    # 3 0 2 1
+    assert permutation_q2 == [3, 0, 2, 1]
