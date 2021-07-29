@@ -223,9 +223,15 @@ class Factor:
         # equation = self.__vars_equation(
         #     [self.variables, *[other.variables for other in other_factors]],
         #     queries, force_multi=True)
-        input_tensors = [(self.dense, ids(self.variables))] + [(f.dense, ids(f.variables))
-                                                               for f in other_factors]
-        labeled_queries = [ids(q) for q in queries]
+        batch_ids = ids(range(self.num_batch_dims))
+
+        def with_batch_ids(vs: Sequence[Var]):
+            out = [*batch_ids, *[str(v.hash_key()) for v in vs]]
+            return out
+
+        input_tensors = [(self.dense, with_batch_ids(self.variables)), *[
+            (f.dense, with_batch_ids(f.variables)) for f in other_factors]]
+        labeled_queries = [with_batch_ids(q) for q in queries]
 
         def f() -> Sequence[Tensor]:
             # might be able to pull this out, but I want to make

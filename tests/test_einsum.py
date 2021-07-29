@@ -1,4 +1,4 @@
-from typing import List, cast
+from typing import Dict, List, Tuple, cast
 
 import torch
 import torch_semiring_einsum as tse  # type: ignore
@@ -6,7 +6,7 @@ import torchfactors as tx
 from torchfactors.einsum import (MultiEquation, compile_equation,
                                  compile_obj_equation, log_einsum,
                                  map_and_order_names, map_and_order_tensor,
-                                 map_order_and_invert_query)
+                                 map_order_and_invert_query, nonan_logsumexp)
 
 
 def test_compile_obj_equation():
@@ -79,34 +79,34 @@ def test_map_and_order_tensor():
     t1 = torch.ones(3, 4, 5, 2)
     t2 = torch.ones(2, 7, 3)
     t3 = torch.ones(3)
-    vocab = dict()
-    out_t1, out_names1 = map_and_order_tensor(t1, vocab, [19, 10, 11, 13])
+    vocab: Dict[str, Tuple[int, int]] = {}
+    out_t1, out_names1 = map_and_order_tensor(t1, vocab, ['19', '10', '11', '13'])
     assert out_t1.shape == (3, 4, 5, 2)
     assert out_names1 == [0, 1, 2, 3]
 
-    out_t2, out_names2 = map_and_order_tensor(t2, vocab, [13, 40, 19])
+    out_t2, out_names2 = map_and_order_tensor(t2, vocab, ['13', '40', '19'])
     assert out_t2.shape == (3, 2, 7)
     assert out_names2 == [0, 3, 4]
 
-    out_t3, out_names3 = map_and_order_tensor(t3, vocab, [-1])
+    out_t3, out_names3 = map_and_order_tensor(t3, vocab, ['00'])
     assert out_t3.shape == (3,)
     assert out_names3 == [5]
 
     assert vocab == {
-        19: (0, 3),
-        10: (1, 4),
-        11: (2, 5),
-        13: (3, 2),
-        40: (4, 7),
-        -1: (5, 3),
+        '19': (0, 3),
+        '10': (1, 4),
+        '11': (2, 5),
+        '13': (3, 2),
+        '40': (4, 7),
+        '00': (5, 3),
     }
 
-    q1 = [13, 19, -1, 11]
+    q1 = ['13', '19', '00', '11']
     out_q1, permutation_q1 = map_and_order_names(vocab, q1)
     assert out_q1 == [0, 2, 3, 5]  # sorted([3, 0, 5, 2])
     assert permutation_q1 == [2, 0, 3, 1]
 
-    q2 = [-1, 10, 13, 11]
+    q2 = ['00', '10', '13', '11']
     out_q2, permutation_q2 = map_and_order_names(vocab, q2)
     assert out_q2 == [1, 2, 3, 5]  # sorted([5, 1, 3, 2])
     # 0 1 2 3 # indexes
@@ -138,17 +138,28 @@ def test_log_dot():
         [2+8+5, 4+16+20, 6+20+25, 16+12+15]
     ]).float()
     log_out, = tx.log_dot(
-        [(ab.log(), tx.ids('ab')),
-         (bc.log(), tx.ids('bc'))],
-        [tx.ids('ac')])
+        [(ab.log(), list('ab')),
+         (bc.log(), list('bc'))],
+        [list('ac')])
     out = log_out.exp()
     assert out.allclose(ac_expected)
+
+
+test_log_dot()
+
+# def test_log_dot1_5():
+#     t1 = torch.eye(2).log()
+#     t2 = torch.tensor([0, 1])
+#     out, = tx.log_dot([
+#         (t1, [57536, 57248]),
+#         (t2, [65424]),
+#     ], [[65424], [57248]])
 
 
 def test_log_dot2():
     t = torch.tensor([[1, 2], [0.5, 3]]).float().log()
     out, = tx.log_dot([
-        (t, tx.ids('ab'))
+        (t, list('ab'))
     ], [[]])
     assert out == t.logsumexp(dim=[0, 1])
 
@@ -177,19 +188,19 @@ def test_hmm():
     print(f'gold free: {gold_free}')
 
     free_factors = [
-        (t, tx.ids('ax')),
-        (t, tx.ids('by')),
-        (t, tx.ids('cz')),
-        (t, tx.ids('ab')),
-        (t, tx.ids('bc'))]
+        (t, list('ax')),
+        (t, list('by')),
+        (t, list('cz')),
+        (t, list('ab')),
+        (t, list('bc'))]
     out_free, = tx.log_dot(free_factors, [[]])
 
     clamped_factors = [
-        (ax, tx.ids('ax')),
-        (by, tx.ids('by')),
-        (cz, tx.ids('cz')),
-        (t, tx.ids('ab')),
-        (t, tx.ids('bc')),
+        (ax, list('ax')),
+        (by, list('by')),
+        (cz, list('cz')),
+        (t, list('ab')),
+        (t, list('bc')),
     ]
     out_clamped, = tx.log_dot(clamped_factors, [[]])
 
@@ -231,4 +242,6 @@ def test_hmm():
     assert logz_clamped.allclose(out_clamped)
 
 
-test_log_dot2()
+def test_nonan_logsumexp():
+    out = nonan_logsumexp(torch.ones(3, 4), dims=[])
+    assert out.allclose(torch.ones(3, 4))

@@ -117,7 +117,7 @@ def test_model_inferencer():
 
     @dataclass
     class MySubject(Subject):
-        items: Var = VarField(Range(5), LATENT, shape=(10,))
+        items: Var = VarField(Range(5), LATENT, shape=(2,))
 
     class MyModel(Model[MySubject]):
         def factors(self, s: MySubject):
@@ -135,7 +135,8 @@ def test_model_inferencer():
                 yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
 
     system = System(model=MyModel(), inferencer=BP())
-    out = system.predict(MySubject())
+    subject = MySubject()
+    out = system.predict(subject)
     assert (out.items.tensor == 3).all()
 
     # there is only one valid assignment which has a score of 0.0
@@ -143,6 +144,9 @@ def test_model_inferencer():
     x = MySubject()
     marg, = system.product_marginals(x, [x.items[..., 2]])
     assert (marg.exp() == torch.tensor([0, 0, 0, 1, 0])).all()
+
+
+test_model_inferencer()
 
 
 def test_model_inferencer2():

@@ -104,8 +104,8 @@ def ids(values: Iterable[object]) -> List[int]:
     return list(map(id, values))
 
 
-def map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[int, Tuple[int, int]],
-                         names: List[int]) -> List[int]:
+def map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[str, Tuple[int, int]],
+                         names: List[str]) -> Tuple[Tensor, List[int]]:
     # store mapping from name to id and size
     current_order = [name_to_id_and_size.setdefault(name, (len(name_to_id_and_size),
                                                            size))
@@ -116,8 +116,8 @@ def map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[int, Tuple[int, in
     return t.permute(permutation), out_names
 
 
-def map_and_order_names(name_to_id_and_size: Dict[int, Tuple[int, int]], names: List[int]
-                        ) -> List[int]:
+def map_and_order_names(name_to_id_and_size: Dict[str, Tuple[int, int]], names: List[str]
+                        ) -> Tuple[List[int], List[int]]:
     r"""
     Returns the mapped names from the query in order, as well as the order that will
     permute a tensor with those dimensions back to the original order
@@ -131,7 +131,7 @@ def map_and_order_names(name_to_id_and_size: Dict[int, Tuple[int, int]], names: 
     return out_names, unpermutation
 
 
-def map_order_and_invert_query(name_to_ix: Dict[int, int], names: List[int]):
+def map_order_and_invert_query(name_to_ix: Dict[str, Tuple[int, int]], names: List[str]):
     r"""
     given a dictionary from orig id to compact id and an unordered list of original ids,
     returns the ordered list of indexs not listed as well as a permutation on the
@@ -149,14 +149,14 @@ def map_order_and_invert_query(name_to_ix: Dict[int, int], names: List[int]):
     return out_query, unpermutation
 
 
-def log_dot(tensors: List[Tuple[Tensor, List[int]]],
-            queries: List[List[int]]) -> List[Tensor]:
+def log_dot(tensors: List[Tuple[Tensor, List[str]]],
+            queries: List[List[str]]) -> List[Tensor]:
     """
     Carries out a generalized tensor dot product across multiple named
     tensors.
     """
     # make sure that the ints are all in range and in order
-    name_to_ix = dict()
+    name_to_ix: Dict[str, Tuple[int, int]] = {}
     out_tensors = [map_and_order_tensor(t, name_to_ix, names) for t, names in tensors]
     shape = [size for _, size in name_to_ix.values()]
     out_inverse_queries = [map_order_and_invert_query(name_to_ix, names) for names in queries]
@@ -180,46 +180,53 @@ def expand_to(t: Tensor, names: List[int], shape: List[int]):
     return t
 
 
+def sum_tensors(tensors: List[Tensor]) -> Tensor:
+    out = tensors[0]
+    for t in tensors[1:]:
+        out = out + t
+    return out
+
+
 def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
              inverse_queries: List[Tuple[List[int], List[int]]],
              full_shape: List[int]) -> List[Tensor]:
     r"""
-    Assumes ids are all intermediate indexes and that
-    they are in order
+    This version assumes that all ids are integers between 0 and len(full_shape),
+    and that all tensors and queries are in increasing order of those ids
     """
     aligned = [expand_to(t, names, full_shape) for t, names in tensors]
-    product = sum(aligned)
+    product = sum_tensors(aligned)
     answers = [product.logsumexp(dim=iq).permute(unpermute) if iq else product
                for iq, unpermute in inverse_queries]
     return answers
 
 
-def _log_dot2(tensors: List[Tuple[Tensor, List[int]]],
-              queries: List[List[int]]) -> List[Tensor]:
-    """
-    see log_dot which squelches warning about named tensors
-    """
-    def make_names(ids: List[int]) -> List[str]:
-        return [f'v{i}' for i in ids]
-    named = [t.rename(*make_names(names)) for t, names in tensors]
-    all_names, all_shapes = list(zip(*set((name, shape) for t in named
-                                          for name, shape in zip(t.names, t.shape))))
+# def _log_dot2(tensors: List[Tuple[Tensor, List[int]]],
+#               queries: List[List[int]]) -> List[Tensor]:
+#     """
+#     see log_dot which squelches warning about named tensors
+#     """
+#     def make_names(ids: List[int]) -> List[str]:
+#         return [f'v{i}' for i in ids]
+#     named = [t.rename(*make_names(names)) for t, names in tensors]
+#     all_names, all_shapes = list(zip(*set((name, shape) for t in named
+#                                           for name, shape in zip(t.names, t.shape))))
 
-    aligned = [t.align_to(*all_names).expand(*all_shapes).rename(None) for t in named]
-    stacked = torch.stack(aligned, dim=0)
-    # "multiply" across tensors
-    product = torch.sum(stacked, dim=0).nan_to_num().rename(*all_names)
+#     aligned = [t.align_to(*all_names).expand(*all_shapes).rename(None) for t in named]
+#     stacked = torch.stack(aligned, dim=0)
+#     # "multiply" across tensors
+#     product = torch.sum(stacked, dim=0).nan_to_num().rename(*all_names)
 
-    names_set = set(all_names)
+#     names_set = set(all_names)
 
-    def logsumexp_to(t: Tensor, q: List[str]):
-        name_diff = names_set.difference(q)
-        if name_diff:
-            return product.logsumexp(dim=list(name_diff)).align_to(*q).rename(None)
-        else:
-            return product.align_to(*q).rename(None)
+#     def logsumexp_to(t: Tensor, q: List[str]):
+#         name_diff = names_set.difference(q)
+#         if name_diff:
+#             return product.logsumexp(dim=list(name_diff)).align_to(*q).rename(None)
+#         else:
+#             return product.align_to(*q).rename(None)
 
-    named_queries = list(map(make_names, queries))
-    # "sum" over dimensions not in the query
-    answers = [logsumexp_to(product, q) for q in named_queries]
-    return answers
+#     named_queries = list(map(make_names, queries))
+#     # "sum" over dimensions not in the query
+#     answers = [logsumexp_to(product, q) for q in named_queries]
+#     return answers
