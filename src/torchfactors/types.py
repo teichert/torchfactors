@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any, List, Tuple, Union, overload
 
 from multimethod import multidispatch
-from torch import Size, Tensor
+from torch import Size
 
 
 @dataclass(frozen=True)
@@ -93,22 +93,22 @@ NDSlice = Union[SliceType, Tuple[Union[SliceType, Any], ...]]
 ShapeType = Union[Size, Tuple[int, ...]]
 
 
-class ReadOnlyView(Tensor):
-    r"""
-    A Tensor type that will raise a TypeError is any in-place operation or setitem
-    is used
-    """
+# class ReadOnlyView(Tensor):
+#     r"""
+#     A Tensor type that will raise a TypeError is any in-place operation or setitem
+#     is used
+#     """
 
-    @classmethod
-    def __torch_function__(cls, func, types, args=(), kwargs=None):
-        if (func.__name__ == '__setitem__' or
-            func.__name__.endswith('_') and
-                not func.__name__.endswith('__')):
-            raise TypeError("you are not allowed to do in-place operations on ReadOnlyViews "
-                            "did you mean to use a .clone() of a variable instead?")
-        if kwargs is None:
-            kwargs = {}
-        return super().__torch_function__(func, types, args, kwargs)
+#     @classmethod
+#     def __torch_function__(cls, func, types, args=(), kwargs=None):
+#         if (func.__name__ == '__setitem__' or
+#             func.__name__.endswith('_') and
+#                 not func.__name__.endswith('__')):
+#             raise TypeError("you are not allowed to do in-place operations on ReadOnlyViews "
+#                             "did you mean to use a .clone() of a variable instead?")
+#         if kwargs is None:
+#             kwargs = {}
+#         return super().__torch_function__(func, types, args, kwargs)
 
-    # def type_as(self, other: Tensor) -> Tensor:
-    #     return self
+#     # def type_as(self, other: Tensor) -> Tensor:
+#     #     return self

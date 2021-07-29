@@ -4,8 +4,8 @@ import pytest
 import torch
 import torchfactors
 import torchfactors as tx
-from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED,
-                          PADDING, Var, VarUsage)
+from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED, Var,
+                          VarUsage)
 from torchfactors.domain import Range
 from torchfactors.factor import Factor
 from torchfactors.subject import Environment
@@ -41,6 +41,11 @@ from torchfactors.variable import TensorVar, VarField, at
 #     out = at(t, s)
 #     assert out.tolist() == expected.tolist()
 
+
+def test_at1():
+    t = torch.ones(3, 4, 5)
+    out = at(t, (..., 1, slice(None)))
+    assert out.allclose(torch.ones(3, 5))
 
 # def test_at2():
 #     t = torch.tensor([
@@ -495,52 +500,52 @@ def test_var_field_order():
     assert v._domain == Range(10)
 
 
-def test_as_used():
-    v = TensorVar(Range(5),
-                  tensor=torch.tensor([
-                      3,   # 0
-                      2,   # 1
-                      0,   # 0
-                      1,   # 1
-                      1,   # 2
-                      2,   # 3
-                      0,   # 4
-                      3,   # 5
-                      2,   # 6
-                      0]),  # 7
-                  usage=torch.tensor([
-                      OBSERVED, OBSERVED,
-                      ANNOTATED, ANNOTATED,
-                      CLAMPED, CLAMPED,
-                      PADDING, PADDING,
-                      LATENT, LATENT,
-                  ]))
-    expected_possible = torch.tensor([
-        [0, 0, 0, 1, 0],
-        [0, 0, 1, 0, 0],
-        [1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1],
-        [0, 1, 0, 0, 0],
-        [0, 0, 1, 0, 0],
-        [1, 0, 0, 0, 0],
-        [0, 0, 0, 1, 0],
-        [1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1]
-    ]).bool()
-    assert (v.is_possible == expected_possible).all()
-    expected_padding = torch.tensor([
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-    ]).bool()
-    assert (v.is_padding == expected_padding).all()
+# def test_as_used():
+#     v = TensorVar(Range(5),
+#                   tensor=torch.tensor([
+#                       3,   # 0
+#                       2,   # 1
+#                       0,   # 0
+#                       1,   # 1
+#                       1,   # 2
+#                       2,   # 3
+#                       0,   # 4
+#                       3,   # 5
+#                       2,   # 6
+#                       0]),  # 7
+#                   usage=torch.tensor([
+#                       OBSERVED, OBSERVED,
+#                       ANNOTATED, ANNOTATED,
+#                       CLAMPED, CLAMPED,
+#                       PADDING, PADDING,
+#                       LATENT, LATENT,
+#                   ]))
+    # expected_possible = torch.tensor([
+    #     [0, 0, 0, 1, 0],
+    #     [0, 0, 1, 0, 0],
+    #     [1, 1, 1, 1, 1],
+    #     [1, 1, 1, 1, 1],
+    #     [0, 1, 0, 0, 0],
+    #     [0, 0, 1, 0, 0],
+    #     [1, 0, 0, 0, 0],
+    #     [0, 0, 0, 1, 0],
+    #     [1, 1, 1, 1, 1],
+    #     [1, 1, 1, 1, 1]
+    # ]).bool()
+    # assert (v.is_possible == expected_possible).all()
+    # expected_padding = torch.tensor([
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    #     [1, 1, 1, 1, 1],
+    #     [1, 1, 1, 1, 1],
+    #     [0, 0, 0, 0, 0],
+    #     [0, 0, 0, 0, 0],
+    # ]).bool()
+    # assert (v.is_padding == expected_padding).all()
 
 
 def test_broken_usage():
@@ -559,9 +564,9 @@ def test_broken_usage():
                         for ch in x]))
     data = BitLanguageSubject.from_string('t')
     assert (data.bits.usage == tx.ANNOTATED).all()
-    data = data.clamp_annotated()
+    data.clamp_annotated()
     assert (data.bits.usage == tx.CLAMPED).all()
-    data = data.unclamp_annotated()
+    data.unclamp_annotated()
     assert (data.bits.usage == tx.ANNOTATED).all()
 
 

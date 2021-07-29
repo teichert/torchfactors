@@ -255,21 +255,18 @@ class Subject:
         return DataLoader(cast(Dataset, data), collate_fn=Subject.stack, batch_size=batch_size,
                           **kwargs)
 
-    def clamp_annotated(self: SubjectType) -> SubjectType:
+    def clamp_annotated(self: SubjectType):
         r"""Returns a clone of the input example with annotated variable cells
         being marked as clamped"""
-        out = self.clone()
-        for attr_name in out.__varset:
-            cast(TensorVar, getattr(out, attr_name)).clamp_annotated()
-        return out
+        # out = self.clone()
+        for attr_name in self.__varset:
+            cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
 
-    def unclamp_annotated(self: SubjectType) -> SubjectType:
+    def unclamp_annotated(self: SubjectType):
         r"""Returns a clone of the input example with clamped variable cells
         being marked as annotated"""
-        out = self.clone()
-        for attr_name in out.__varset:
-            cast(TensorVar, getattr(out, attr_name)).unclamp_annotated()
-        return out
+        for attr_name in self.__varset:
+            cast(TensorVar, getattr(self, attr_name)).unclamp_annotated()
 
     def __post_init__(self):
         self.init_variables()
