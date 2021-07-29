@@ -128,20 +128,25 @@ def map_and_order_names(name_to_id_and_size: Dict[int, Tuple[int, int]], names: 
     out_names = [name for name, _ in sorted_names]
     unsorted_indexes = sorted((sorted_index, i) for i, sorted_index in enumerate(permutation))
     unpermutation = [i for _, i in unsorted_indexes]
-    return unpermutation, out_names
+    return out_names, unpermutation
 
 
 def map_order_and_invert_query(name_to_ix: Dict[int, int], names: List[int]):
-    unpermutation, ordered_query = map_and_order_names(name_to_ix, names)
+    r"""
+    given a dictionary from orig id to compact id and an unordered list of original ids,
+    returns the ordered list of indexs not listed as well as a permutation on the
+    indexes that would remain after summing out those dimensions
+
+    """
+    ordered_query, unpermutation = map_and_order_names(name_to_ix, names)
+    num_consumed = 0
     out_query = []
-    for num_skipped, name in enumerate(ordered_query):
-        while True:
-            next_id = len(out_query) + num_skipped
-            if next_id == name:
-                break
-            else:
-                out_query.append(next_id)
-    return unpermutation, out_query
+    for name, _ in enumerate(name_to_ix.values()):
+        if num_consumed < len(names) and ordered_query[num_consumed] == name:
+            num_consumed += 1
+        else:
+            out_query.append(name)
+    return out_query, unpermutation
 
 
 def log_dot(tensors: List[Tuple[Tensor, List[int]]],
@@ -164,9 +169,13 @@ def expand_to(t: Tensor, names: List[int], shape: List[int]):
     (the names say which of the dimensions are already used)
     """
     names_consumed = 0
+    # for each dimension, if we have that dimension, then skip it
     for i in range(len(shape)):
-        if names[names_consumed] > i:
+        if names_consumed < len(names) and names[names_consumed] == i:
+            names_consumed += 1
+        else:
             t = t.unsqueeze(i)
+
     t = t.expand(shape)
     return t
 
@@ -181,7 +190,7 @@ def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
     aligned = [expand_to(t, names, full_shape) for t, names in tensors]
     product = sum(aligned)
     answers = [product.logsumexp(dim=iq).permute(unpermute) if iq else product
-               for unpermute, iq in inverse_queries]
+               for iq, unpermute in inverse_queries]
     return answers
 
 
