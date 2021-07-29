@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from itertools import islice
 from typing import Any, Optional
@@ -29,8 +30,8 @@ class SPRL(tx.Subject):
     # predicate: tx.Var = tx.VarField(predicate_domain, tx.OBSERVED, shape=rating)
     # bin_rating: tx.Var = tx.VarField(tx.Range(2), tx.LATENT, shape=rating)
 
-    @staticmethod
-    def from_data_frame(data: DataFrame, model: tx.Model[SPRL], max_count: Optional[int] = None
+    @classmethod
+    def from_data_frame(cls, data: DataFrame, model: tx.Model[SPRL], max_count: Optional[int] = None
                         ) -> ListDataset:
         iter = (SPRL(
             rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
@@ -41,7 +42,13 @@ class SPRL(tx.Subject):
                                                'Arg.Tokens.End', 'Annotator.ID'])
             if not pair_df['Response'].isna().any()
         )
-        return ListDataset(list(tqdm(islice(iter, max_count))))
+        out = ListDataset[SPRL](list(tqdm(islice(iter, max_count), desc="Loading data...")))
+        logging.info(f"Loaded: {len(out)} examples covering {len(cls.property_domain)} properties: "
+                     f"{cls.property_domain.values}")
+        first = out.examples[0]
+        logging.info(f"First example shapes: rating: {first.rating.marginal_shape}; "
+                     f"property: {first.property.marginal_shape}")
+        return out
 
 # a regular factor directly specifies as score for each configuration;
 # the point of a factor group reduces the number of parameters;

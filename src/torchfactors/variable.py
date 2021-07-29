@@ -91,8 +91,8 @@ class Var(ABC):
         return self.tensor.shape
 
     @property
-    def marginal_shape(self) -> Size:
-        return Size([*self.tensor.shape, len(self.domain)])
+    def marginal_shape(self) -> List[int]:
+        return [*self.tensor.shape, len(self.domain)]
 
     @property
     def read_only(self) -> bool:

@@ -1,4 +1,5 @@
 
+from .utils import sum_tensors
 from functools import singledispatch
 from typing import Dict, Hashable, List, Sequence, Tuple, Union
 
@@ -151,14 +152,6 @@ def _map_order_and_invert_query(name_to_ix: Dict[str, Tuple[int, int]], names: L
         else:
             out_query.append(name)
     return out_query, unpermutation
-
-
-@torch.jit.script
-def sum_tensors(tensors: List[Tensor]) -> Tensor:  # pragma: no cover
-    out = tensors[0]
-    for t in tensors[1:]:
-        out = out + t
-    return out
 
 
 @torch.jit.script

@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import math
 from abc import abstractmethod
-from functools import cached_property
-from typing import Iterator, Optional, Sequence, Union
+from typing import Iterator, List, Optional, Sequence, Tuple, Union
 
+import torch
 from torch import Tensor
 
 from .einsum import log_dot
 from .types import ShapeType
-from .utils import logsumexp, outer_and, outer_or
-from .variable import Var
+from .utils import logsumexp, outer_or
+from .variable import Var, VarUsage, possibility
 
 
 def check_queries(queries: Sequence[Union[Var, Sequence[Var]]]):
@@ -27,7 +27,26 @@ def uncache(factors: Sequence[Factor]):
     #     f.clear_cache()
     # return factors
 
-# def adjust(tensor: Tensor, List[Tuple[Tensor, Tensor, ]])
+
+@torch.jit.script
+def adjust(tensor: Tensor, var_infos: List[Tuple[Tensor, Tensor, List[int]]],
+           ANNOTATED: int,
+           LATENT: int,
+           PADDING: int,
+           num_batch_dims: int):  # pragma: no cover
+    padding = outer_or([
+        (usage == PADDING).unsqueeze(-1).expand(shape)
+        for usage, _, shape in var_infos], num_batch_dims)
+    not_possible = outer_or([
+        possibility(usage, values, shape, LATENT, ANNOTATED).logical_not()
+        for usage, values, shape in var_infos], num_batch_dims)
+    return tensor.masked_fill(
+        padding,
+        0.0
+    ).masked_fill(
+        not_possible,
+        float('-inf')
+    )
 
 
 class Factor:
@@ -59,10 +78,10 @@ class Factor:
         #     [(v,) for v in self.variables],
         #     [self.variables])
 
-    def clear_cache(self):
-        self.cached = None
-        for v in self.variables:
-            v.clear_cache()
+    # def clear_cache(self):
+    #     self.cached = None
+    #     for v in self.variables:
+    #         v.clear_cache()
 
     def __iter__(self) -> Iterator[Var]:
         return iter(self.variables)
@@ -122,7 +141,7 @@ class Factor:
         return tuple([*Factor.batch_shape_from_variables(variables),
                       *Factor.out_shape_from_variables(variables)])
 
-    @cached_property
+    @property
     def out_shape(self):
         r"""
         The shape of the output configuration scores (the joint sizes from the
@@ -130,14 +149,14 @@ class Factor:
         """
         return Factor.out_shape_from_variables(self.variables)
 
-    @cached_property
+    @property
     def shape(self):
         r"""
         Returns the shape of the (possibly implicit) tensor that would represent this tensor
         """
         return tuple([*self.batch_shape, *self.out_shape])
 
-    @cached_property
+    @property
     def cells(self):
         r"""
         The number of cells in the (possibly implicit) tensor that would
@@ -145,7 +164,7 @@ class Factor:
         """
         return math.prod(self.shape)
 
-    @cached_property
+    @property
     def batch_cells(self):
         r"""
         The number of elements in a single batch (in contrast to the number of
@@ -153,7 +172,7 @@ class Factor:
         """
         return math.prod(self.batch_shape)
 
-    @cached_property
+    @property
     def batch_shape(self):
         r"""
         The shape of the dimensions of the implicit tensor corresponding to
@@ -178,25 +197,25 @@ class Factor:
     @abstractmethod
     def dense_(self) -> Tensor: ...  # pragma: no cover
 
-    @property
-    def _is_possible(self) -> Tensor:
-        return outer_and([v.is_possible for v in self.variables],
-                         num_batch_dims=self.num_batch_dims)
+    # @property
+    # def _is_possible(self) -> Tensor:
+    #     return outer_and([v.is_possible for v in self.variables],
+    #                      num_batch_dims=self.num_batch_dims)
 
-    @property
-    def _is_not_possible(self) -> Tensor:
-        return outer_or([v.is_possible.logical_not() for v in self.variables],
-                        num_batch_dims=self.num_batch_dims)
+    # @property
+    # def _is_not_possible(self) -> Tensor:
+    #     return outer_or([v.is_possible.logical_not() for v in self.variables],
+    #                     num_batch_dims=self.num_batch_dims)
 
-    @property
-    def _is_not_padding(self) -> Tensor:
-        return outer_or([v.is_padding for v in self.variables],
-                        num_batch_dims=self.num_batch_dims).logical_not()
+    # @property
+    # def _is_not_padding(self) -> Tensor:
+    #     return outer_or([v.is_padding for v in self.variables],
+    #                     num_batch_dims=self.num_batch_dims).logical_not()
 
-    @property
-    def _is_padding(self) -> Tensor:
-        return outer_or([v.is_padding for v in self.variables],
-                        num_batch_dims=self.num_batch_dims)
+    # @property
+    # def _is_padding(self) -> Tensor:
+    #     return outer_or([v.is_padding for v in self.variables],
+    #                     num_batch_dims=self.num_batch_dims)
 
     def prime(self):
         """ensures that all parameters are loaded for this factor"""
@@ -218,7 +237,13 @@ class Factor:
         d = self.dense_()
         if d.shape != self.shape:
             d = d[None].expand(self.shape)
-
+        # return d
+        var_infos = [(v.usage, v.tensor, v.marginal_shape) for v in self.variables]
+        return adjust(d, var_infos,
+                      VarUsage.ANNOTATED,
+                      VarUsage.LATENT,
+                      VarUsage.PADDING,
+                      self.num_batch_dims)
         # self.cached =
         # return d.where(
         #     self._is_not_padding,
@@ -227,13 +252,13 @@ class Factor:
         #     self._is_possible,
         #     torch.full_like(d, float('-inf'))
         # )
-        return d.masked_fill(
-            self._is_padding,
-            0.0
-        ).masked_fill(
-            self._is_not_possible,
-            float('-inf')
-        )
+        # return d.masked_fill(
+        #     self._is_padding,
+        #     0.0
+        # ).masked_fill(
+        #     self._is_not_possible,
+        #     float('-inf')
+        # )
 
         # return self.cached
 

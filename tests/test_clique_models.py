@@ -135,9 +135,9 @@ def testKIsAtLeastJ():
 
 def test_binary():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
-    assert a.marginal_shape == (5, 4)
+    assert tuple(a.marginal_shape) == (5, 4)
     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
-    assert b.marginal_shape == (5, 3)
+    assert tuple(b.marginal_shape) == (5, 3)
 
     env = Environment()
     params = DummyParamNamespace()
@@ -153,8 +153,8 @@ def test_binary():
     assert len(factors[0]) == 2
     bin_a, bin_b = factors[0].variables
     assert len(bin_a.domain) == 2
-    assert bin_a.marginal_shape == (5, 2)
-    assert bin_b.marginal_shape == (5, 2)
+    assert tuple(bin_a.marginal_shape) == (5, 2)
+    assert tuple(bin_b.marginal_shape) == (5, 2)
     vars1 = factors[1].variables
     assert tuple(vars1) == (a, bin_a)
     vars2 = factors[2].variables

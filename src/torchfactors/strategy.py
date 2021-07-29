@@ -142,7 +142,6 @@ class Strategy(object):
         self.var_to_region: Dict[Var, int] = {v: region_id for v,
                                               (_, region_id) in var_to_size_and_region.items()}
         for s, t in self.edges:
-            # TODO: ensure that t is a strict subset of s
             self.into[t].append(s)
             self.outfrom[s].append(t)
 

@@ -27,10 +27,11 @@ class System(Generic[SubjectType]):
         an optimizer.
         """
         if isinstance(x, Subject):
-            for f in tqdm(self.model(cast(SubjectType, x)), delay=1.0, leave=False):
+            for f in tqdm(self.model(cast(SubjectType, x)), delay=1.0, leave=False,
+                          desc='Factors...'):
                 f.prime()
         else:
-            for subject in tqdm(cast(Iterable[SubjectType], x)):
+            for subject in tqdm(cast(Iterable[SubjectType], x), desc='Subjects...'):
                 self.prime(subject)
 
     def predict(self, x: SubjectType) -> SubjectType:

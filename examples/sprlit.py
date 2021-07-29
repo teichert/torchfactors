@@ -16,14 +16,14 @@ class SPRLModel(tx.Model[SPRL]):
         for i in range(n):
             yield tx.LinearFactor(self.namespace('rating-property'),
                                   x.rating[..., i], x.property[..., i])
-            # if i > 1:
-            #     yield tx.LinearFactor(self.namespace('rating-pair'),
-            #                           x.rating[..., i - 1], x.rating[..., i],
-            #                           x.property[..., i - 1], x.property[..., i])
-            for j in range(0, i):
+            if i > 1:
                 yield tx.LinearFactor(self.namespace('rating-pair'),
-                                      x.rating[..., j], x.rating[..., i],
-                                      x.property[..., j], x.property[..., i])
+                                      x.rating[..., i - 1], x.rating[..., i],
+                                      x.property[..., i - 1], x.property[..., i])
+            # for j in range(0, i):
+            #     yield tx.LinearFactor(self.namespace('rating-pair'),
+            #                           x.rating[..., j], x.rating[..., i],
+            #                           x.property[..., j], x.property[..., i])
 
 
 if __name__ == '__main__':

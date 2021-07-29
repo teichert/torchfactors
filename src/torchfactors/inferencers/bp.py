@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 from functools import lru_cache
 from typing import Callable, Dict, List, Sequence, Tuple, Union
@@ -15,6 +16,7 @@ from ..factor_graph import FactorGraph
 from ..inferencer import Inferencer
 from ..strategies.bethe_graph import BetheGraph
 from ..strategy import Strategy
+from ..utils import sum_tensors
 from ..variable import TensorVar, Var, at
 
 cache = lru_cache(maxsize=None)
@@ -63,7 +65,7 @@ class BPInference:
         for rid, r in enumerate(self.strategy.regions):
             this_free_energy = r.free_energy(self.in_messages(rid))
             region_free_energies.append(r.counting_number * this_free_energy)
-        return -torch.stack(region_free_energies, -1).sum(dim=-1)
+        return -sum_tensors(region_free_energies)
 
     def region_belief(self, variable: Var) -> Tensor:
         if variable in self.strategy.var_to_region:
@@ -178,7 +180,8 @@ class BPInference:
         # return update_messages
 
     def run(self):
-        for s, ts in tqdm(list(self.strategy), leave=False, delay=1):
+        logging.info(str(list(self.strategy)))
+        for s, ts in tqdm(list(self.strategy), leave=False, delay=1, desc='Passing messages...'):
             self.update_messages_from_region(s, tuple(ts))
 
     def display(self):  # pragma: no cover

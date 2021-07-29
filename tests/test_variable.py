@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple, cast
+from typing import Any, Dict, Tuple
 
 import pytest
 import torch
@@ -605,47 +605,47 @@ def test_flatten():
     assert v.flatten(usage=tx.LATENT).tolist() == [5, 1, 4, 2]
 
 
-def test_no_late_change():
-    v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
-    v2 = v[1]
-    v.is_padding
-    with pytest.raises(TypeError):
-        v.usage[1] = VarUsage.CLAMPED
-    with pytest.raises(TypeError):
-        v2.tensor[1] = 2
+# def test_no_late_change():
+#     v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
+#     v2 = v[1]
+#     v.is_padding
+#     with pytest.raises(TypeError):
+#         v.usage[1] = VarUsage.CLAMPED
+#     with pytest.raises(TypeError):
+#         v2.tensor[1] = 2
 
 
-def test_no_late_change2():
-    v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
-    v2 = v[1]
-    v2.is_possible
-    with pytest.raises(TypeError):
-        # can't change tensor after getting is_possible
-        v.tensor[1] = 2
-    with pytest.raises(TypeError):
-        # can't change usage after getting is_possible
-        v2.usage[1] = VarUsage.CLAMPED
+# def test_no_late_change2():
+#     v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
+#     v2 = v[1]
+#     v2.is_possible
+#     with pytest.raises(TypeError):
+#         # can't change tensor after getting is_possible
+#         v.tensor[1] = 2
+#     with pytest.raises(TypeError):
+#         # can't change usage after getting is_possible
+#         v2.usage[1] = VarUsage.CLAMPED
 
 
-def test_clone():
-    v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
-    v2 = v.clone()
-    v.usage[(...,)] = tx.LATENT
-    assert cast(torch.Tensor, (v.usage == tx.LATENT)).all()
-    assert cast(torch.Tensor, (v2.usage == tx.ANNOTATED)).all()
-    v2.tensor[(...,)] = 0
-    assert v2.tensor.sum() == 0
-    assert v.tensor.sum() > 0
-    # make sure I can still clamp
-    v.is_possible
-    with pytest.raises(TypeError):
-        # can't change usage after getting is_possible
-        v.clamp_annotated()
-    with pytest.raises(TypeError):
-        # can't change tensor after getting is_possible
-        v.set_tensor(3.0)
-    v2.clamp_annotated()
-    assert cast(torch.Tensor, (v2.usage == tx.CLAMPED)).all()
+# def test_clone():
+#     v = tx.TensorVar(torch.tensor([[4, 5, 1], [4, 2, 3]]), Range(6), tx.ANNOTATED)
+#     v2 = v.clone()
+#     v.usage[(...,)] = tx.LATENT
+#     assert cast(torch.Tensor, (v.usage == tx.LATENT)).all()
+#     assert cast(torch.Tensor, (v2.usage == tx.ANNOTATED)).all()
+#     v2.tensor[(...,)] = 0
+#     assert v2.tensor.sum() == 0
+#     assert v.tensor.sum() > 0
+#     # make sure I can still clamp
+#     v.is_possible
+#     with pytest.raises(TypeError):
+#         # can't change usage after getting is_possible
+#         v.clamp_annotated()
+#     with pytest.raises(TypeError):
+#         # can't change tensor after getting is_possible
+#         v.set_tensor(3.0)
+#     v2.clamp_annotated()
+#     assert cast(torch.Tensor, (v2.usage == tx.CLAMPED)).all()
 
 
 def test_environment_vars():

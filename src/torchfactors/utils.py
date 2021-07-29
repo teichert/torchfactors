@@ -16,6 +16,14 @@ from .types import (GeneralizedDimensionDrop, NDRangeSlice, NDSlice,
                     RangeSlice, ShapeType, SliceType)
 
 
+@torch.jit.script
+def sum_tensors(tensors: List[Tensor]) -> Tensor:  # pragma: no cover
+    out = tensors[0]
+    for t in tensors[1:]:
+        out = out + t
+    return out
+
+
 def logsumexp(t: Tensor, dim: Union[None, int, List[int], Tuple[int, ...]] = None,
               keepdim=False, *, out=None):
     if dim is None:
@@ -327,7 +335,7 @@ def stereotype(scales: Tensor, binary: Tensor) -> Tensor:
         config_scores_per_batch = binary[(...,) + config]
         out = config_scores_per_batch[expanded_scores_slice] * coeffs[expanded_coeffs_slice]
         all.append(out)
-    full = torch.stack(all, -1).sum(-1)
+    full = sum_tensors(all)
     return full
 
 
