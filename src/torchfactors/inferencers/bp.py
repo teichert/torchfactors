@@ -135,9 +135,9 @@ class BPInference:
         pokes_s = self.strategy.penetrating_edges(region_id)
         return [self.message(m) for m in pokes_s]
 
-    @ cache
-    def update_messages_from_regionf(self, source_id: int, target_ids: Tuple[int, ...]
-                                     ) -> Callable[[], None]:
+    # @ cache
+    def update_messages_from_region(self, source_id: int, target_ids: Tuple[int, ...]
+                                    ):  # -> Callable[[], None]:
         r"""
         returns a method that will update all of the messages from the specified
         source to each each of the specified targets
@@ -146,8 +146,8 @@ class BPInference:
         targets = [self.strategy.regions[target_id] for target_id in target_ids]
         out_messages = [self.message((source_id, target_id)) for target_id in target_ids]
         in_messages = self.in_messages(source_id)
-        compute_numerators = source.marginals_closure([out.variables for out in out_messages],
-                                                      other_factors=in_messages)
+        numerators = source.product_marginals([out.variables for out in out_messages],
+                                              other_factors=in_messages)
 
         # we will divide out everything but the message of interest
         messages_to_divide_out_per_target = [
@@ -155,31 +155,31 @@ class BPInference:
                    for m in self.strategy.penetrating_edges(target_id)
                    if m != (source_id, target_id)])
             for target_id in target_ids]
-        compute_denominators = [
-            target_region.marginals_closure([out_message.variables], other_factors=denom_messages)
+        denominators = [
+            target_region.product_marginals([out_message.variables], other_factors=denom_messages)
             for target_region, denom_messages, out_message
             in zip(targets, messages_to_divide_out_per_target, out_messages)]
 
         # I want to cache the setup here, but I want it to be flexible??
-        def update_messages():
-            numerators = compute_numerators()
-            for numerator, out, compute_denominator in zip(
-                    numerators, out_messages, compute_denominators):
-                # keep the nans, but the negative infs can be ignored
-                denominator = compute_denominator()[0].nan_to_num(
-                    nan=float('nan'), posinf=float('inf'), neginf=0)
-                # - and + rather than / and * since this is in log space
-                updated = Factor.normalize(numerator - denominator,
-                                           num_batch_dims=out.num_batch_dims)
-                # keep track of how far from convergence we were before this message
-                change = self.amount_changed(out.tensor, updated, out.num_batch_dims)
-                self.message_changes[out] = change
-                out.tensor = updated
-        return update_messages
+        # def update_messages():
+        # numerators = compute_numerators()
+        for numerator, out, denominator in zip(
+                numerators, out_messages, denominators):
+            # keep the nans, but the negative infs can be ignored
+            denominator = denominator[0].nan_to_num(
+                nan=float('nan'), posinf=float('inf'), neginf=0)
+            # - and + rather than / and * since this is in log space
+            updated = Factor.normalize(numerator - denominator,
+                                       num_batch_dims=out.num_batch_dims)
+            # keep track of how far from convergence we were before this message
+            change = self.amount_changed(out.tensor, updated, out.num_batch_dims)
+            self.message_changes[out] = change
+            out.tensor = updated
+        # return update_messages
 
     def run(self):
         for s, ts in tqdm(list(self.strategy), leave=False, delay=1):
-            self.update_messages_from_regionf(s, tuple(ts))()
+            self.update_messages_from_region(s, tuple(ts))
 
     def display(self):  # pragma: no cover
         """display the variables and factors for debugging"""

@@ -10,7 +10,6 @@ import torch
 import typing_extensions
 from multimethod import multimethod
 from torch import Size, Tensor
-from torch.nn import functional as F
 
 from .domain import Domain
 from .types import GeneralizedDimensionDrop, NDSlice, ReadOnlyView, ShapeType
@@ -120,7 +119,8 @@ class Var(ABC):
     @property
     def tensor(self) -> Tensor:
         t = self._get_tensor()
-        return self.maybe_read_only(t)
+        return t
+        # return self.maybe_read_only(t)
 
     @tensor.setter
     def tensor(self, value: Any) -> None:
@@ -165,8 +165,9 @@ class Var(ABC):
         if isinstance(usage, VarUsage):
             usage = torch.full_like(self.tensor, usage, dtype=torch.int8)
             self.usage = usage
-        out = self.maybe_read_only(usage)
-        return out
+        # out = self.maybe_read_only(usage)
+        # return out
+        return usage
 
     @usage.setter
     def usage(self, value: Any) -> None:
@@ -394,6 +395,26 @@ def as_ndslice(shape: ShapeType) -> NDSlice:
         for dim_size in shape)
 
 
+@torch.jit.script
+def expand_left(t: Tensor, shape: List[int]) -> Tensor:
+    for _ in range(len(shape) - len(t.shape)):
+        t = t.unsqueeze(0)
+    return t.expand(shape)
+
+
+@torch.jit.script
+def possibility(usage: Tensor, values: Tensor, shape: List[int],
+                latent: int, annotated: int) -> Tensor:
+    unsqueezed = values.unsqueeze(-1).expand(shape)
+    dom_size = shape[-1]
+    all_values = expand_left(torch.arange(dom_size, device=values.device), shape)
+    one_hot = unsqueezed == all_values
+    free = (usage == latent).logical_or(usage == annotated)
+    unsqueezed_free = free.unsqueeze(-1).expand(shape)
+    # take one_hot where it is fixed, or 1 otherwise
+    return one_hot.logical_or(unsqueezed_free)
+
+
 class TensorVar(Var):
     """
     Represents a tensor wrapped with domain and usage information.
@@ -496,20 +517,30 @@ class TensorVar(Var):
         return VarBranch(root=self, ndslice=ndslice)
 
     def _is_padding(self):
-        if self.__cached_padding is None:
-            self.__cached_padding = (
-                self.usage == VarUsage.PADDING)[..., None].expand(self.marginal_shape)
-        return self.__cached_padding
+        # if self.__cached_padding is None:
+        #     self.__cached_padding = (
+        #         self.usage == VarUsage.PADDING)[..., None].expand(self.marginal_shape)
+        # return self.__cached_padding
+        return (self.usage == VarUsage.PADDING)[..., None].expand(self.marginal_shape)
 
     def _is_possible(self):
-        if self.__cached_possible is None:
-            one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
-            is_fixed = (
-                (self.usage == VarUsage.PADDING).logical_or
-                (self.usage == VarUsage.OBSERVED).logical_or
-                (self.usage == VarUsage.CLAMPED))[..., None].expand_as(one_hot)
-            self.__cached_possible = one_hot.where(is_fixed, torch.ones_like(one_hot)) != 0
-        return self.__cached_possible
+        # if self.__cached_possible is None:
+        #     one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).float()
+        #     is_fixed = (
+        #         (self.usage == VarUsage.PADDING).logical_or
+        #         (self.usage == VarUsage.OBSERVED).logical_or
+        #         (self.usage == VarUsage.CLAMPED))[..., None].expand_as(one_hot)
+        #     self.__cached_possible = one_hot.where(is_fixed, torch.ones_like(one_hot)) != 0
+        # one_hot: Tensor = F.one_hot(self.tensor.long(), len(self.domain)).bool()
+        # is_fixed = (
+        #     (self.usage == VarUsage.PADDING).logical_or
+        #     (self.usage == VarUsage.OBSERVED).logical_or
+        #     (self.usage == VarUsage.CLAMPED))[..., None].expand_as(one_hot)
+        # # take one_hot where it is fixed, or 1 otherwise
+        # return one_hot.masked_fill(is_fixed.logical_not(), True)
+        out = possibility(self.usage, self.tensor, list(self.marginal_shape),
+                          VarUsage.LATENT, VarUsage.ANNOTATED)
+        return out
 
     def _get_tensor(self) -> Tensor:
         return cast(Tensor, self._tensor)

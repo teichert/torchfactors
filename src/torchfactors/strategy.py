@@ -5,8 +5,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property, lru_cache
 from itertools import chain
-from typing import (Callable, DefaultDict, Dict, FrozenSet, Iterable, Iterator,
-                    List, Sequence, Set, Tuple)
+from typing import (DefaultDict, Dict, FrozenSet, Iterable, Iterator, List,
+                    Sequence, Set, Tuple)
 
 import torch
 from torch import Tensor
@@ -57,21 +57,21 @@ class Region(object):
         different interface (to avoid needing to special-case or risk errors) and with the
         ability to exclude the factors from a particular region
         """
-        return self.marginals_closure(queries, other_factors=other_factors)()
+        #     return self.marginals_closure(queries, other_factors=other_factors)()
 
-    def marginals_closure(self,
-                          queries: Sequence[Sequence[Var]] = (()),
-                          other_factors: Sequence[Factor] = (()),
-                          ) -> Callable[[], Sequence[Tensor]]:
-        r"""
-        returns the function that will compute the product_marginals given the
-        current values of the input factors; What is the product of zero things?
-        Must be 1.
+        # def marginals_closure(self,
+        #                       queries: Sequence[Sequence[Var]] = (()),
+        #                       other_factors: Sequence[Factor] = (()),
+        #                       ) -> Callable[[], Sequence[Tensor]]:
+        #     r"""
+        #     returns the function that will compute the product_marginals given the
+        #     current values of the input factors; What is the product of zero things?
+        #     Must be 1.
 
-        The queries determine how many variables will be summed out. The product
-        will include all factors in the current region (except those in the
-        excluded region) and all other_factors specified.
-        """
+        #     The queries determine how many variables will be summed out. The product
+        #     will include all factors in the current region (except those in the
+        #     excluded region) and all other_factors specified.
+        #     """
         # factors appearing in the excluded region are excluded; note that the
         # first factor (in the region) touching the most variables determines
         # how the inference is done (if this needs to be modified, then have
@@ -79,11 +79,12 @@ class Region(object):
         # surviving_factors = list((self.factor_set - exclude.factor_set)
         #                          if exclude is not None else self.factor_set)
         if not self.factors and not other_factors:
-            def return_uniforms():
-                return [TensorFactor(*query).dense for query in queries]
-            return return_uniforms
+            # def return_uniforms():
+            return [TensorFactor(*query).dense for query in queries]
+            # return return_uniforms
         controller, others = pick_controller(chain(self.factors, other_factors))
-        return controller.marginals_closure(*queries, other_factors=others)
+        # return controller.marginals_closure(*queries, other_factors=others)
+        return controller.marginals(*queries, other_factors=others)
 
     def free_energy(self, messages: Sequence[Factor]) -> Tensor:
         """
