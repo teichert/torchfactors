@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import math
 from functools import lru_cache
 from typing import Callable, Dict, List, Sequence, Tuple, Union
@@ -180,7 +179,6 @@ class BPInference:
         # return update_messages
 
     def run(self):
-        logging.info(str(list(self.strategy)))
         for s, ts in tqdm(list(self.strategy), leave=False, delay=1, desc='Passing messages...'):
             self.update_messages_from_region(s, tuple(ts))
 
