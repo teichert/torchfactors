@@ -113,19 +113,13 @@ class Factor:
         out, = self.product_marginals(query, other_factors=other_factors)
         return out
 
-    def product_marginals(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
-                          ) -> Sequence[Tensor]:
-        r"""
-        For each set of query variables, returns the marginal score for each
-        configuration of those variables, with scores being computed as the product
-        of this factor with the other `other_factors`.
-
-        The partition function can be queried via an empty tuple of variables.
-        If no queries are specified, then the partition function is queried.
-        """
-        check_queries(queries)
-        # return self.marginals_closure(*queries, other_factors=other_factors)()
-        return self.marginals(*queries, other_factors=other_factors)
+    # def product_marginals(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
+    #                       ) -> Sequence[Tensor]:
+    #     r"""
+    #     """
+    #     check_queries(queries)
+    #     # return self.marginals_closure(*queries, other_factors=other_factors)()
+    #     return self.marginals(*queries, other_factors=other_factors)
 
     @staticmethod
     def out_shape_from_variables(variables: Sequence[Var]) -> ShapeType:
@@ -262,13 +256,15 @@ class Factor:
 
         # return self.cached
 
-    def marginals(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
-                  ) -> Sequence[Tensor]:
+    def product_marginals(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
+                          ) -> Sequence[Tensor]:
         r"""
-        Given a set of other factors and a set of product_marginal queries,
-        returns a function that recomputes the corresponding marginals for each
-        query given the current values of the factors.
+        For each set of query variables, returns the marginal score for each
+        configuration of those variables, with scores being computed as the product
+        of this factor with the other `other_factors`.
 
+        The partition function can be queried via an empty tuple of variables.
+        If no queries are specified, then the partition function is queried.
         """
         check_queries(queries)
         # equation = self.__vars_equation(

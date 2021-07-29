@@ -84,7 +84,7 @@ class Region(object):
             # return return_uniforms
         controller, others = pick_controller(chain(self.factors, other_factors))
         # return controller.marginals_closure(*queries, other_factors=others)
-        return controller.marginals(*queries, other_factors=others)
+        return controller.product_marginals(*queries, other_factors=others)
 
     def free_energy(self, messages: Sequence[Factor]) -> Tensor:
         """
