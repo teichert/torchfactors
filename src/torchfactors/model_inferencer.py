@@ -28,8 +28,7 @@ class System(Generic[SubjectType]):
         """
         if isinstance(x, Subject):
             for f in tqdm(self.model(cast(SubjectType, x)), delay=1.0, leave=False):
-                f.dense
-                f.clear_cache()
+                f.prime()
         else:
             for subject in tqdm(cast(Iterable[SubjectType], x)):
                 self.prime(subject)

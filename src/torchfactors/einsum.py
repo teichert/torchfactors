@@ -1,6 +1,6 @@
 
 from functools import singledispatch
-from typing import Dict, Hashable, Iterable, List, Sequence, Tuple, Union
+from typing import Dict, Hashable, List, Sequence, Tuple, Union
 
 import torch
 import torch_semiring_einsum as tse  # type: ignore
@@ -100,13 +100,13 @@ def log_einsum2(
     return out
 
 
-def ids(values: Iterable[object]) -> List[int]:
-    return list(map(id, values))
+# def ids(values: Iterable[object]) -> List[int]:
+#     return list(map(id, values))
 
 
 @torch.jit.script
 def _map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[str, Tuple[int, int]],
-                          names: List[str]) -> Tuple[Tensor, List[int]]:
+                          names: List[str]) -> Tuple[Tensor, List[int]]:  # pragma: no cover
     # store mapping from name to id and size
     current_order = [name_to_id_and_size.setdefault(name, (len(name_to_id_and_size),
                                                            size))
@@ -119,7 +119,7 @@ def _map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[str, Tuple[int, i
 
 @torch.jit.script
 def _map_and_order_names(name_to_id_and_size: Dict[str, Tuple[int, int]], names: List[str]
-                         ) -> Tuple[List[int], List[int]]:
+                         ) -> Tuple[List[int], List[int]]:  # pragma: no cover
     r"""
     Returns the mapped names from the query in order, as well as the order that will
     permute a tensor with those dimensions back to the original order
@@ -135,7 +135,7 @@ def _map_and_order_names(name_to_id_and_size: Dict[str, Tuple[int, int]], names:
 
 @torch.jit.script
 def _map_order_and_invert_query(name_to_ix: Dict[str, Tuple[int, int]], names: List[str]
-                                ) -> Tuple[List[int], List[int]]:
+                                ) -> Tuple[List[int], List[int]]:  # pragma: no cover
     r"""
     given a dictionary from orig id to compact id and an unordered list of original ids,
     returns the ordered list of indexs not listed as well as a permutation on the
@@ -154,7 +154,7 @@ def _map_order_and_invert_query(name_to_ix: Dict[str, Tuple[int, int]], names: L
 
 
 @torch.jit.script
-def sum_tensors(tensors: List[Tensor]) -> Tensor:
+def sum_tensors(tensors: List[Tensor]) -> Tensor:  # pragma: no cover
     out = tensors[0]
     for t in tensors[1:]:
         out = out + t
@@ -162,7 +162,7 @@ def sum_tensors(tensors: List[Tensor]) -> Tensor:
 
 
 @torch.jit.script
-def expand_to(t: Tensor, names: List[int], shape: List[int]):
+def expand_to(t: Tensor, names: List[int], shape: List[int]):  # pragma: no cover
     """
     returns an expanded view of t with shape matching that given
     (the names say which of the dimensions are already used)
@@ -182,7 +182,7 @@ def expand_to(t: Tensor, names: List[int], shape: List[int]):
 @torch.jit.script
 def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
              inverse_queries: List[Tuple[List[int], List[int]]],
-             full_shape: List[int]) -> List[Tensor]:
+             full_shape: List[int]) -> List[Tensor]:  # pragma: no cover
     r"""
     This version assumes that all ids are integers between 0 and len(full_shape),
     and that all tensors and queries are in increasing order of those ids
@@ -196,7 +196,7 @@ def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
 
 @torch.jit.script
 def log_dot(tensors: List[Tuple[Tensor, List[str]]],
-            queries: List[List[str]]) -> List[Tensor]:
+            queries: List[List[str]]) -> List[Tensor]:  # pragma: no cover
     """
     Carries out a generalized tensor dot product across multiple named
     tensors.

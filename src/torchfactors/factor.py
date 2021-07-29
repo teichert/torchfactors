@@ -185,6 +185,10 @@ class Factor:
         return outer_or([v.is_padding for v in self.variables],
                         num_batch_dims=self.num_batch_dims).logical_not()
 
+    def prime(self):
+        """ensures that all parameters are loaded for this factor"""
+        self.dense_()
+
     @property
     def dense(self) -> Tensor:
         r"""

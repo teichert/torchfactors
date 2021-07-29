@@ -20,10 +20,10 @@ class SPRLModel(tx.Model[SPRL]):
             #     yield tx.LinearFactor(self.namespace('rating-pair'),
             #                           x.rating[..., i - 1], x.rating[..., i],
             #                           x.property[..., i - 1], x.property[..., i])
-            # for j in range(0, i):
-            #     yield tx.LinearFactor(self.namespace('rating-pair'),
-            #                           x.rating[..., j], x.rating[..., i],
-            #                           x.property[..., j], x.property[..., i])
+            for j in range(0, i):
+                yield tx.LinearFactor(self.namespace('rating-pair'),
+                                      x.rating[..., j], x.rating[..., i],
+                                      x.property[..., j], x.property[..., i])
 
 
 if __name__ == '__main__':
