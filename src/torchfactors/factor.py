@@ -8,7 +8,7 @@ from typing import Callable, Iterator, Optional, Sequence, Union
 import torch
 from torch import Tensor
 
-from .einsum import compile_obj_equation, ids, log_dot
+from .einsum import compile_obj_equation, log_dot
 from .types import ShapeType
 from .utils import logsumexp, outer_and, outer_or
 from .variable import Var
@@ -223,7 +223,7 @@ class Factor:
         # equation = self.__vars_equation(
         #     [self.variables, *[other.variables for other in other_factors]],
         #     queries, force_multi=True)
-        batch_ids = ids(range(self.num_batch_dims))
+        batch_ids = [str(d) for d in range(self.num_batch_dims)]
 
         def with_batch_ids(vs: Sequence[Var]):
             out = [*batch_ids, *[str(v.hash_key()) for v in vs]]

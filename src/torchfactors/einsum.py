@@ -104,43 +104,47 @@ def ids(values: Iterable[object]) -> List[int]:
     return list(map(id, values))
 
 
-def map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[str, Tuple[int, int]],
-                         names: List[str]) -> Tuple[Tensor, List[int]]:
+@torch.jit.script
+def _map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[str, Tuple[int, int]],
+                          names: List[str]) -> Tuple[Tensor, List[int]]:
     # store mapping from name to id and size
     current_order = [name_to_id_and_size.setdefault(name, (len(name_to_id_and_size),
                                                            size))
                      for name, size in zip(names, t.shape)]
-    sorted_names = sorted((name, i) for i, (name, _) in enumerate(current_order))
+    sorted_names = sorted([(name, i) for i, (name, _) in enumerate(current_order)])
     permutation = [i for _, i in sorted_names]
     out_names = [name for name, _ in sorted_names]
     return t.permute(permutation), out_names
 
 
-def map_and_order_names(name_to_id_and_size: Dict[str, Tuple[int, int]], names: List[str]
-                        ) -> Tuple[List[int], List[int]]:
+@torch.jit.script
+def _map_and_order_names(name_to_id_and_size: Dict[str, Tuple[int, int]], names: List[str]
+                         ) -> Tuple[List[int], List[int]]:
     r"""
     Returns the mapped names from the query in order, as well as the order that will
     permute a tensor with those dimensions back to the original order
     """
     current_order = [name_to_id_and_size[name] for name in names]
-    sorted_names = sorted((name, i) for i, (name, _) in enumerate(current_order))
+    sorted_names = sorted([(name, i) for i, (name, _) in enumerate(current_order)])
     permutation = [i for _, i in sorted_names]
     out_names = [name for name, _ in sorted_names]
-    unsorted_indexes = sorted((sorted_index, i) for i, sorted_index in enumerate(permutation))
+    unsorted_indexes = sorted([(sorted_index, i) for i, sorted_index in enumerate(permutation)])
     unpermutation = [i for _, i in unsorted_indexes]
     return out_names, unpermutation
 
 
-def map_order_and_invert_query(name_to_ix: Dict[str, Tuple[int, int]], names: List[str]):
+@torch.jit.script
+def _map_order_and_invert_query(name_to_ix: Dict[str, Tuple[int, int]], names: List[str]
+                                ) -> Tuple[List[int], List[int]]:
     r"""
     given a dictionary from orig id to compact id and an unordered list of original ids,
     returns the ordered list of indexs not listed as well as a permutation on the
     indexes that would remain after summing out those dimensions
 
     """
-    ordered_query, unpermutation = map_and_order_names(name_to_ix, names)
+    ordered_query, unpermutation = _map_and_order_names(name_to_ix, names)
     num_consumed = 0
-    out_query = []
+    out_query: List[int] = []
     for name, _ in enumerate(name_to_ix.values()):
         if num_consumed < len(names) and ordered_query[num_consumed] == name:
             num_consumed += 1
@@ -149,20 +153,15 @@ def map_order_and_invert_query(name_to_ix: Dict[str, Tuple[int, int]], names: Li
     return out_query, unpermutation
 
 
-def log_dot(tensors: List[Tuple[Tensor, List[str]]],
-            queries: List[List[str]]) -> List[Tensor]:
-    """
-    Carries out a generalized tensor dot product across multiple named
-    tensors.
-    """
-    # make sure that the ints are all in range and in order
-    name_to_ix: Dict[str, Tuple[int, int]] = {}
-    out_tensors = [map_and_order_tensor(t, name_to_ix, names) for t, names in tensors]
-    shape = [size for _, size in name_to_ix.values()]
-    out_inverse_queries = [map_order_and_invert_query(name_to_ix, names) for names in queries]
-    return _log_dot(out_tensors, out_inverse_queries, shape)
+@torch.jit.script
+def sum_tensors(tensors: List[Tensor]) -> Tensor:
+    out = tensors[0]
+    for t in tensors[1:]:
+        out = out + t
+    return out
 
 
+@torch.jit.script
 def expand_to(t: Tensor, names: List[int], shape: List[int]):
     """
     returns an expanded view of t with shape matching that given
@@ -180,13 +179,7 @@ def expand_to(t: Tensor, names: List[int], shape: List[int]):
     return t
 
 
-def sum_tensors(tensors: List[Tensor]) -> Tensor:
-    out = tensors[0]
-    for t in tensors[1:]:
-        out = out + t
-    return out
-
-
+@torch.jit.script
 def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
              inverse_queries: List[Tuple[List[int], List[int]]],
              full_shape: List[int]) -> List[Tensor]:
@@ -196,9 +189,24 @@ def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
     """
     aligned = [expand_to(t, names, full_shape) for t, names in tensors]
     product = sum_tensors(aligned)
-    answers = [product.logsumexp(dim=iq).permute(unpermute) if iq else product
+    answers = [product.logsumexp(dim=iq).permute(unpermute) if len(iq) > 0 else product
                for iq, unpermute in inverse_queries]
     return answers
+
+
+@torch.jit.script
+def log_dot(tensors: List[Tuple[Tensor, List[str]]],
+            queries: List[List[str]]) -> List[Tensor]:
+    """
+    Carries out a generalized tensor dot product across multiple named
+    tensors.
+    """
+    # make sure that the ints are all in range and in order
+    name_to_ix: Dict[str, Tuple[int, int]] = {}
+    out_tensors = [_map_and_order_tensor(t, name_to_ix, names) for t, names in tensors]
+    shape = [size for _, size in name_to_ix.values()]
+    out_inverse_queries = [_map_order_and_invert_query(name_to_ix, names) for names in queries]
+    return _log_dot(out_tensors, out_inverse_queries, shape)
 
 
 # def _log_dot2(tensors: List[Tuple[Tensor, List[int]]],
