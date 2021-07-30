@@ -74,7 +74,7 @@ def outer2(tensors: List[Tensor], num_batch_dims: int):  # pragma: no cover
     return out
 
 
-# @torch.jit.script
+@torch.jit.script
 def outer_or(tensors: List[Tensor], num_batch_dims: int):  # pragma: no cover
     batch_shape = list(tensors[0].shape[:num_batch_dims])
     out_shape = batch_shape + [t.shape[-1] for t in tensors]

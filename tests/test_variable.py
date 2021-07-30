@@ -721,3 +721,41 @@ def test_clone_variable():
     assert v4.tensor.device == torch.device('meta')
     v4.tensor[(...,)] = 9
     assert (v.tensor != 9).all()
+
+
+def test_more_variable_usage():
+    v = tx.TensorVar(VarUsage.ANNOTATED)
+    v.set_usage(VarUsage.ANNOTATED)
+    assert v._usage == VarUsage.ANNOTATED
+
+
+def test_more_variable_usage2():
+    v = tx.TensorVar(VarUsage.ANNOTATED)
+    v.set_usage(VarUsage.CLAMPED)
+    assert v._usage == VarUsage.CLAMPED
+
+
+def test_more_variable_usage3():
+    v = tx.TensorVar(usage=torch.tensor(VarUsage.ANNOTATED))
+    v.set_usage(VarUsage.CLAMPED)
+    assert v._usage == VarUsage.CLAMPED
+
+
+def test_more_variable_usage4():
+    v = tx.TensorVar(torch.ones(3, 4), VarUsage.ANNOTATED)[(...,)]
+    v.set_usage(VarUsage.ANNOTATED)
+    assert v.origin._usage == VarUsage.ANNOTATED
+
+
+def test_more_variable_usage5():
+    v = tx.TensorVar(torch.ones(3, 4), VarUsage.ANNOTATED)[(...,)]
+    v.set_usage(VarUsage.CLAMPED)
+    assert (v.origin.usage == VarUsage.CLAMPED).all()
+
+
+def test_more_variable_usage6():
+    v0 = tx.TensorVar(torch.ones(3, 4))
+    v = v0[(...,)]
+    v0.set_usage(torch.full((3, 4), VarUsage.ANNOTATED))
+    v.set_usage(VarUsage.CLAMPED)
+    assert (v.origin.usage == VarUsage.CLAMPED).all()
