@@ -4,7 +4,6 @@ import math
 from abc import abstractmethod
 from typing import Iterator, List, Sequence, Tuple, Union
 
-import torch
 from torch import Tensor
 
 from .einsum import log_dot
@@ -21,14 +20,14 @@ def check_queries(queries: Sequence[Union[Var, Sequence[Var]]]):
                          "or if you want to just get the partition function.")
 
 
-def uncache(factors: Sequence[Factor]):
-    pass
-    # for f in factors:
-    #     f.clear_cache()
-    # return factors
+# def uncache(factors: Sequence[Factor]):
+#     pass
+#     # for f in factors:
+#     #     f.clear_cache()
+#     # return factors
 
 
-@torch.jit.script
+# @torch.jit.script
 def adjust(tensor: Tensor, var_infos: List[Tuple[Tensor, Tensor, List[int]]],
            ANNOTATED: int,
            LATENT: int,
@@ -153,7 +152,7 @@ class Factor:
         r"""
         Returns the shape of the (possibly implicit) tensor that would represent this tensor
         """
-        return tuple([*self.batch_shape, *self.out_shape])
+        return tuple([*self.input_shape, *self.out_shape])
 
     @property
     def cells(self):
@@ -170,6 +169,13 @@ class Factor:
         variable configurations per element).
         """
         return math.prod(self.batch_shape)
+
+    @property
+    def input_shape(self):
+        r"""
+        includes batch and graph dims
+        """
+        return Factor.batch_shape_from_variables(self.variables)
 
     @property
     def batch_shape(self):
@@ -243,7 +249,7 @@ class Factor:
                       VarUsage.ANNOTATED,
                       VarUsage.LATENT,
                       VarUsage.PADDING,
-                      self.num_batch_dims)
+                      self.num_batch_dims + self.graph_dims)
         # self.cached =
         # return d.where(
         #     self._is_not_padding,
@@ -276,7 +282,7 @@ class Factor:
         # equation = self.__vars_equation(
         #     [self.variables, *[other.variables for other in other_factors]],
         #     queries, force_multi=True)
-        batch_ids = [str(d) for d in range(self.num_batch_dims)]
+        batch_ids = [str(d) for d in range(self.num_batch_dims + self.graph_dims)]
 
         def with_batch_ids(vs: Sequence[Var]):
             out = [*batch_ids, *[str(v.hash_key()) for v in vs]]

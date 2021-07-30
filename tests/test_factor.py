@@ -105,32 +105,42 @@ def test_normalize():
 
 # # TODO: test where they vary accross batch dims
 # def test_multiple_graph_dims():
-#     v = TensorVar(torch.ones(5, 3, 2), domain=Range(2), usage=tx.ANNOTATED)
+#     v = TensorVar(torch.ones(5, 4, 6), domain=Range(2), usage=tx.ANNOTATED)
 #     # 5 per batch
-#     # 2 x 2 = 4 factors per graph
+#     # (4-1) x 6 = 18 factors per graph
 #     f = TensorFactor(v[..., :-1, :], v[..., 1:, :], tensor=torch.tensor([
 #         [1, 0],
 #         [0, 1],
 #     ]).log(), graph_dims=2)
+#     assert f.shape == (5, 3, 6, 2, 2)
+#     assert f.input_shape == (5, 3, 6)
+#     assert f.out_shape == (2, 2)
+#     assert f.batch_shape == (5,)
+
 #     # a0 a1
 #     # b0 b1
 #     # c0 c1
 #     # equivalent to separately adding in:
 #     # TF(a0, b0)
 #     # TF(b0, c0)
-#     # TF(a1, b1)
-#     # TF(b1, c1)
+#     # TF(c0, d0)
+#     #  ...
+#     # TF(a5, b5)
+#     # TF(b5, c5)
+#     # TF(c5, d5)
 #     # the factor says that these pairs need to be the same
 #     # so the 0s and 1s can each choose separately 0 or 1;
-#     # if I set the x1's to 0, then this configuration
-#     # represents one out of four legal configurations (for each batch)
-#     v[..., 1].tensor = 0
-#     v.clamp_annotated()
-#     expected = torch.tensor([0.25] * 5).log()
-#     out = f.product_marginal()
-#     assert out.allclose(expected)
-#     out2 = f.product_marginal()
-#     assert out2.allclose(expected)
+#     # if I clamp one of the 1's at the end, all of the 1's should get set to True
+#     # represents one out of 2 ** 5 == 32 legal configurations (for each batch)
+#     v[..., 0, 0].set_usage(tx.CLAMPED)
+#     # v[..., 0, 0].set_tensor(0)
+#     # tx.BP(passes=10).predict([f])
+#     # out = v[..., 0].tensor
+#     # assert (out == 0).all()
+#     v[..., 0, 0].set_tensor(1)
+#     tx.BP(passes=10).predict([f])
+#     out = v[..., 0].tensor
+#     assert (out == 1).all()
 
 
 # test_multiple_graph_dims()

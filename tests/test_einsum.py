@@ -229,7 +229,7 @@ def test_hmm():
     logz_clamped = bp.product_marginal(factors)
     print([f.dense for f in factors])
 
-    tx.factor.uncache(factors)
+    # tx.factor.uncache(factors)
     for v in variables:
         v.unclamp_annotated()
 
