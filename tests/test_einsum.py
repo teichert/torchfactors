@@ -144,6 +144,38 @@ def test_log_dot():
     assert out.allclose(ac_expected)
 
 
+def test_log_dot_hard():
+    b = torch.tensor([
+        0, 1, 0,
+    ], requires_grad=True, dtype=torch.float)
+    ab = torch.tensor([
+        [1, 2, 3],
+        [2, 4, 5]
+    ], requires_grad=True, dtype=torch.float)
+    bc = torch.tensor([
+        [1, 2, 3, 8],
+        [2, 4, 5, 3],
+        [1, 4, 5, 3],
+    ], requires_grad=True, dtype=torch.float)
+    ac_expected = torch.tensor([  # 2 x 4
+        [4, 8, 10, 6],
+        [8, 16, 20, 12]
+    ]).float()
+    log_out, = tx.log_dot(
+        [
+            (b.log(), ['b']),
+            (ab.log(), list('ab')),
+            (bc.log(), list('bc'))],
+        [list('ac')])
+    out = log_out.exp()
+    assert out.allclose(ac_expected)
+
+    out.sum().backward()
+    assert not b.grad.isnan().any()
+    assert not ab.grad.isnan().any()
+    assert not bc.grad.isnan().any()
+
+
 # def test_log_dot1_5():
 #     t1 = torch.eye(2).log()
 #     t2 = torch.tensor([0, 1])
