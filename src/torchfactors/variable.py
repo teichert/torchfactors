@@ -434,8 +434,8 @@ class TensorVar(Var):
         when the shape is another variable object, that indicates that this variable object
         is being
         """
-        self.__cached_possible: Optional[Tensor] = None
-        self.__cached_padding: Optional[Tensor] = None
+        # self.__cached_possible: Optional[Tensor] = None
+        # self.__cached_padding: Optional[Tensor] = None
         self._domain = domain
         self._tensor = tensor
         # can only build usage if there is a tensor

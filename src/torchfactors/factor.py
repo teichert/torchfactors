@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from abc import abstractmethod
-from typing import Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Iterator, List, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -59,8 +59,13 @@ class Factor:
     as input and a set of (einsum style) queries to respond to.
     """
 
-    def __init__(self, variables: Sequence[Var]):
-        self.cached: Optional[Tensor] = None
+    def __init__(self, variables: Sequence[Var], graph_dims: int = 0):
+        r"""
+        graph_dims is the number of dimensions (from the right)
+        that are to contribute to the same factor graph
+        """
+        # self.cached: Optional[Tensor] = None
+        self.graph_dims = graph_dims
         for v in variables:
             if not isinstance(v, Var):
                 raise TypeError(
@@ -72,7 +77,7 @@ class Factor:
                              "this factor (sorry, this is not supported yet).")
         self.variables = variables
         for v in self.variables[1:]:
-            if v.shape != self.variables[0].shape:
+            if v.shape[:self.num_batch_dims] != self.variables[0].shape[:self.num_batch_dims]:
                 raise ValueError("all variables must have the same shape (domains can vary)")
         # self._usage_equation = self.__vars_equation(
         #     [(v,) for v in self.variables],
@@ -178,7 +183,8 @@ class Factor:
         [and thus the output dimensions] need not be consitent.)
         """
         # should be the same for all variables (maybe worth checking?)
-        return Factor.batch_shape_from_variables(self.variables)
+        full = Factor.batch_shape_from_variables(self.variables)
+        return full[:len(full) - self.graph_dims]
 
     @property
     def num_batch_dims(self):
