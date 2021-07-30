@@ -3,7 +3,7 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import cached_property, lru_cache
+from functools import lru_cache
 from itertools import chain
 from typing import (DefaultDict, Dict, FrozenSet, Iterable, Iterator, List,
                     Sequence, Set, Tuple)
@@ -40,15 +40,15 @@ class Region(object):
     def ndims(self) -> int:
         return self.factor_graph.region_variables(self.factor_graph_nodes)[0].ndims
 
-    @cached_property
+    @property
     def variables(self) -> Sequence[Var]:
         return self.factor_graph.region_variables(self.factor_graph_nodes)
 
-    @cached_property
+    @property
     def factors(self) -> Sequence[Factor]:
         return self.factor_graph.region_factors(self.factor_graph_nodes)
 
-    @cached_property
+    @property
     def factor_set(self) -> FrozenSet[Factor]:
         return frozenset(self.factors)
 

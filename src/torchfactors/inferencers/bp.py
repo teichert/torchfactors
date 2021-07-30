@@ -61,7 +61,8 @@ class BPInference:
 
     def logz(self) -> torch.Tensor:
         region_free_energies = []
-        for rid, r in enumerate(self.strategy.regions):
+        for rid, r in enumerate(tqdm(self.strategy.regions, desc="Computing region energies...",
+                                     delay=0.5, leave=False)):
             this_free_energy = r.free_energy(self.in_messages(rid))
             if r.ndims > 0:
                 end = len(this_free_energy.shape)

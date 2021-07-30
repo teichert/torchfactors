@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from functools import cached_property
 from typing import Optional, Union, cast
 
 import torch
@@ -103,7 +102,7 @@ class LinearFactor(Factor):
                     input.shape[:self.num_batch_dims] != self.batch_shape):
                 raise ValueError("prefix dimensions of input must match batch_dims")
 
-    @cached_property
+    @property
     def in_shape(self) -> Optional[ShapeType]:
         if self.input is None:
             return None
