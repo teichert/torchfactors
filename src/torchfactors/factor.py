@@ -58,13 +58,8 @@ class Factor:
     as input and a set of (einsum style) queries to respond to.
     """
 
-    def __init__(self, variables: Sequence[Var], graph_dims: int = 0):
-        r"""
-        graph_dims is the number of dimensions (from the right)
-        that are to contribute to the same factor graph
-        """
+    def __init__(self, variables: Sequence[Var]):
         # self.cached: Optional[Tensor] = None
-        self.graph_dims = graph_dims
         for v in variables:
             if not isinstance(v, Var):
                 raise TypeError(
@@ -152,7 +147,7 @@ class Factor:
         r"""
         Returns the shape of the (possibly implicit) tensor that would represent this tensor
         """
-        return tuple([*self.input_shape, *self.out_shape])
+        return tuple([*self.batch_shape, *self.out_shape])
 
     @property
     def cells(self):
@@ -170,12 +165,12 @@ class Factor:
         """
         return math.prod(self.batch_shape)
 
-    @property
-    def input_shape(self):
-        r"""
-        includes batch and graph dims
-        """
-        return Factor.batch_shape_from_variables(self.variables)
+    # @property
+    # def input_shape(self):
+    #     r"""
+    #     includes batch and graph dims
+    #     """
+    #     return Factor.batch_shape_from_variables(self.variables)
 
     @property
     def batch_shape(self):
@@ -189,8 +184,7 @@ class Factor:
         [and thus the output dimensions] need not be consitent.)
         """
         # should be the same for all variables (maybe worth checking?)
-        full = Factor.batch_shape_from_variables(self.variables)
-        return full[:len(full) - self.graph_dims]
+        return Factor.batch_shape_from_variables(self.variables)
 
     @property
     def num_batch_dims(self):
@@ -249,7 +243,7 @@ class Factor:
                       VarUsage.ANNOTATED,
                       VarUsage.LATENT,
                       VarUsage.PADDING,
-                      self.num_batch_dims + self.graph_dims)
+                      self.num_batch_dims)
         # self.cached =
         # return d.where(
         #     self._is_not_padding,
@@ -282,7 +276,7 @@ class Factor:
         # equation = self.__vars_equation(
         #     [self.variables, *[other.variables for other in other_factors]],
         #     queries, force_multi=True)
-        batch_ids = [str(d) for d in range(self.num_batch_dims + self.graph_dims)]
+        batch_ids = [str(d) for d in range(self.num_batch_dims)]
 
         def with_batch_ids(vs: Sequence[Var]):
             out = [*batch_ids, *[str(v.hash_key()) for v in vs]]

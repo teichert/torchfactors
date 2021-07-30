@@ -83,6 +83,10 @@ class Var(ABC):
        slice of the original tensor or mode. We should be able to branch from a
        branch variable just fine.  If variables are created in the model,
        those could, in principle, be accessible via the resulting factor graph.
+
+    Each Variable also is aware of the number of dimensions that are to be considered
+    within the same element (as opposed to containing separate elements of the same batch).
+    (the root stores the info and the branches cannot change it).
     """
 
     @property
@@ -232,6 +236,10 @@ class Var(ABC):
     def out_slice(self) -> NDSlice:
         return ndslices_cat(self.ndslice, (slice(None),))
 
+    @property
+    def ndims(self) -> int:
+        raise NotImplementedError("no ndims for this variable")
+
     def flatten(self, usage: Optional[VarUsage] = None) -> Tensor:
         r"""
         Returns the flattened underlying tensor.
@@ -315,6 +323,10 @@ class VarBranch(Var):
     def _get_ndslice(self) -> NDSlice:
         return self.__ndslice
 
+    @property
+    def ndims(self) -> int:
+        return self.origin.ndims - (len(self.origin.shape) - len(self.shape))
+
 
 class VarField(Var):
     r"""
@@ -328,12 +340,14 @@ class VarField(Var):
                   usage: Optional[VarUsage] = None,
                   shape: Union[Var, ShapeType, None] = None,
                   init: Callable[[ShapeType], Tensor] = torch.zeros,
-                  info: typing_extensions._AnnotatedAlias = None):
+                  info: typing_extensions._AnnotatedAlias = None,
+                  *, ndims: Optional[int] = None):
         self._domain = domain
         self._usage = usage
         self._shape = shape
         self._init = init
         self._info = info
+        self._ndims = ndims
 
     @___init__.register
     def ___init_usage_domain(self,
@@ -341,8 +355,10 @@ class VarField(Var):
                              domain: Domain = Domain.OPEN,
                              shape: Union[Var, ShapeType, None] = None,
                              init: Callable[[ShapeType], Tensor] = torch.zeros,
-                             info: typing_extensions._AnnotatedAlias = None):
-        self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info)
+                             info: typing_extensions._AnnotatedAlias = None,
+                             *, ndims: Optional[int] = None):
+        self.___init__(domain=domain, usage=usage, shape=shape, init=init, info=info,
+                       ndims=ndims)
 
     @overload
     def __init__(self,
@@ -350,7 +366,8 @@ class VarField(Var):
                  usage: Optional[VarUsage] = VarUsage.DEFAULT,
                  shape: Union[Var, ShapeType, None] = None,
                  init: Callable[[ShapeType], Tensor] = torch.zeros,
-                 info: typing_extensions._AnnotatedAlias = None): ...  # pragma: no cover
+                 info: typing_extensions._AnnotatedAlias = None,
+                 *, ndims: Optional[int] = None): ...  # pragma: no cover
 
     @overload
     def __init__(self,
@@ -358,7 +375,8 @@ class VarField(Var):
                  domain: Domain = Domain.OPEN,
                  shape: Union[Var, ShapeType, None] = None,
                  init: Callable[[ShapeType], Tensor] = torch.zeros,
-                 info: typing_extensions._AnnotatedAlias = None): ...  # pragma: no cover
+                 info: typing_extensions._AnnotatedAlias = None,
+                 *, ndims: Optional[int] = None): ...  # pragma: no cover
 
     def __init__(self, *args, **kwargs):
         self.___init__(*args, **kwargs)
@@ -429,7 +447,8 @@ class TensorVar(Var):
                   usage: Union[VarUsage, Tensor] = VarUsage.LATENT,
                   tensor: Optional[Tensor] = None,
                   info: typing_extensions._AnnotatedAlias = None,
-                  stack_shapes: Optional[Sequence[ShapeType]] = None):
+                  stack_shapes: Optional[Sequence[ShapeType]] = None,
+                  *, ndims: Optional[int] = None):
         """
         when the shape is another variable object, that indicates that this variable object
         is being
@@ -445,60 +464,72 @@ class TensorVar(Var):
             self._usage = usage
         self._info = info
         self._stack_shapes = stack_shapes
+        self._ndims = ndims
 
     @___init__.register
     def _dom_tensor_usage(self, domain: Domain,
                           tensor: Tensor,
-                          usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT):
-        self.___init__(domain, usage, tensor)
+                          usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT,
+                          *, ndims: Optional[int] = None):
+        self.___init__(domain, usage, tensor, ndims=ndims)
 
     @___init__.register
     def _tensor_dom_usage(self, tensor: Tensor, domain: Domain = Domain.OPEN,
-                          usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT):
-        self.___init__(domain, usage, tensor)
+                          usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT,
+                          *, ndims: Optional[int] = None):
+        self.___init__(domain, usage, tensor, ndims=ndims)
 
     @___init__.register
     def _tensor_usage_dom(self, tensor: Tensor, usage: Union[VarUsage, Tensor],
-                          domain: Domain = Domain.OPEN):
-        self.___init__(domain, usage, tensor)
+                          domain: Domain = Domain.OPEN,
+                          *, ndims: Optional[int] = None):
+        self.___init__(domain, usage, tensor, ndims=ndims)
 
     @___init__.register
     def _usage_dom_tensor(self, usage: VarUsage, domain: Domain = Domain.OPEN,
-                          tensor: Optional[Tensor] = None):
-        self.___init__(domain, usage, tensor)
+                          tensor: Optional[Tensor] = None,
+                          *, ndims: Optional[int] = None):
+        self.___init__(domain, usage, tensor, ndims=ndims)
 
     @___init__.register
     def _usage_tensor_dom(self, usage: VarUsage, tensor: Tensor,
-                          domain: Domain = Domain.OPEN):
-        self.___init__(domain, usage, tensor)
+                          domain: Domain = Domain.OPEN,
+                          *, ndims: Optional[int] = None):
+        self.___init__(domain, usage, tensor, ndims=ndims)
 
     @overload
     def __init__(self, domain: Domain = Domain.OPEN,
                  usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT,
                  tensor: Optional[Tensor] = None,
                  info: typing_extensions._AnnotatedAlias = None,
-                 stack_shapes: Optional[Sequence[ShapeType]] = None): ...  # pragma: no cover
+                 stack_shapes: Optional[Sequence[ShapeType]] = None,
+                 *, ndims: Optional[int] = None): ...  # pragma: no cover
 
     @overload
     def __init__(self, domain: Domain,
                  tensor: Tensor,
-                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT): ...  # pragma: no cover
+                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT,
+                 *, ndims: Optional[int] = None): ...  # pragma: no cover
 
     @overload
     def __init__(self, tensor: Tensor, domain: Domain = Domain.OPEN,
-                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT): ...  # pragma: no cover
+                 usage: Union[VarUsage, Tensor] = VarUsage.DEFAULT,
+                 *, ndims: Optional[int] = None): ...  # pragma: no cover
 
     @overload
     def __init__(self, tensor: Tensor, usage: Union[VarUsage, Tensor],
-                 domain: Domain = Domain.OPEN): ...  # pragma: no cover
+                 domain: Domain = Domain.OPEN,
+                 *, ndims: Optional[int] = None): ...  # pragma: no cover
 
     @overload
     def __init__(self, usage: VarUsage, domain: Domain = Domain.OPEN,
-                 tensor: Optional[Tensor] = None): ...  # pragma: no cover
+                 tensor: Optional[Tensor] = None,
+                 *, ndims: Optional[int] = None): ...  # pragma: no cover
 
     @overload
     def __init__(self, usage: VarUsage, tensor: Tensor,
-                 domain: Domain = Domain.OPEN): ...  # pragma: no cover
+                 domain: Domain = Domain.OPEN,
+                 *, ndims: Optional[int] = None): ...  # pragma: no cover
 
     def __init__(self, *args, **kwargs):
         self.___init__(*args, **kwargs)
@@ -514,6 +545,13 @@ class TensorVar(Var):
         if self._tensor is None:
             raise ValueError("need to have a tensor before subscripting")
         return VarBranch(root=self, ndslice=ndslice)
+
+    @property
+    def ndims(self) -> int:
+        if self._ndims is None:
+            return len(self.shape)
+        else:
+            return self._ndims
 
     # def _is_padding(self):
     #     # if self.__cached_padding is None:
@@ -593,7 +631,8 @@ class TensorVar(Var):
             stacked_tensors[[i, *x_indexs]] = x.tensor
             stacked_usages[[i, *x_indexs]] = x.usage
         return TensorVar(first.domain, tensor=stacked_tensors,
-                         usage=stacked_usages, stack_shapes=stack_shapes)
+                         usage=stacked_usages, stack_shapes=stack_shapes,
+                         ndims=first.ndims)
 
     def unstack(self):
         if (self._tensor is None or
@@ -608,7 +647,7 @@ class TensorVar(Var):
                 domain=self.domain,
                 usage=at(usage, as_ndslice(shape)),
                 tensor=at(tensor, as_ndslice(shape)),
-                info=self._info)
+                info=self._info, ndims=self.ndims)
             for usage, tensor, shape
             in zip(usages, tensors, self._stack_shapes)
         ]

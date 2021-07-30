@@ -144,6 +144,8 @@ class Subject:
                     if isinstance(var_field._shape, Var):
                         source_var = cls_attr_id_to_var[id(var_field._shape)]
                         specified_shape = source_var.shape
+                        if var_instance._ndims is None and source_var._ndims is not None:
+                            var_instance._ndims = source_var._ndims
                     else:
                         specified_shape = var_field._shape
                     if (var_instance._tensor is not None and

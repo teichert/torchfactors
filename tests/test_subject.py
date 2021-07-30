@@ -411,3 +411,54 @@ def test_subject_clone5():
     subject = MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
     subject2 = subject.to_device(torch.device('meta'))
     assert subject2.a.tensor.device == torch.device('meta')
+
+
+def test_subject_ndims():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=LATENT)
+
+    with pytest.raises(NotImplementedError):
+        MySubject.a.ndims
+
+    subject = MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
+    assert subject.a.ndims == 2
+    assert subject.b.ndims == 2
+
+
+def test_subject_ndims2():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=LATENT)
+
+    subject = MySubject(
+        tx.TensorVar(torch.tensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]),
+                     ndims=1))
+    assert subject.a.ndims == 1
+    assert subject.b.ndims == 1
+
+    subject2 = MySubject(
+        tx.TensorVar(torch.tensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]),
+                     ndims=1),
+        tx.TensorVar(ndims=0))
+    assert subject2.a.ndims == 1
+    assert subject2.b.ndims == 0
+
+
+# # Maybe sometime, it will be useful to do it this way
+# def test_subject_ndims3():
+#     @tx.dataclass
+#     class MySubject(tx.Subject):
+#         a: Var = VarField(Range(5))
+#         b: Var = VarField(Range(5), shape=a, usage=LATENT, ndims=0)
+
+#     subject = MySubject(
+#         tx.TensorVar(torch.tensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]),
+#                      ndims=1))
+#     assert subject.a.ndims == 1
+#     assert subject.b.ndims == 0
+
+
+test_subject_ndims2()

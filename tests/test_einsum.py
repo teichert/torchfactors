@@ -144,8 +144,6 @@ def test_log_dot():
     assert out.allclose(ac_expected)
 
 
-test_log_dot()
-
 # def test_log_dot1_5():
 #     t1 = torch.eye(2).log()
 #     t2 = torch.tensor([0, 1])
@@ -244,3 +242,29 @@ def test_hmm():
 def test_nonan_logsumexp():
     out = nonan_logsumexp(torch.ones(3, 4), dims=[])
     assert out.allclose(torch.ones(3, 4))
+
+
+# def test_log_dot_graph_dims():
+#     ab = torch.tensor([
+#         [[1, 2], [3, 4]],
+#         [[5, 6], [7, 8]],
+#         [[9, 10], [11, 12]]
+#     ])
+#     bc= torch.tensor([
+#         [[1, 2],
+#          [3, 8]],
+#         [[2, 4],
+#          [5, 3]],
+#         [[1, 4],
+#          [5, 3]],
+#     ])
+#     ac_expected= torch.tensor([  # 2 x 4
+#         [1+4+3+2+8+12,  3+10+15+8+6+9],
+#         [2+8+5+4+16+20, 6+20+25+16+12+15]
+#     ]).float()
+#     log_out,= tx.log_dot(
+#         [(ab.log(), list('ab'), 1),
+#          (bc.log(), list('bc'), 1)],
+#         [list('ac')])
+#     out= log_out.exp()
+#     assert out.allclose(ac_expected)

@@ -9,30 +9,13 @@ import torchfactors as tx
 from spr.data import SPRL, SPRLData_v1_0
 
 
-# class SPRLModel(tx.Model[SPRL]):
-
-#     def factors(self, x: SPRL):
-#         n = x.property.shape[-1]
-#         for i in range(n):
-#             yield tx.LinearFactor(self.namespace('rating-property'),
-#                                   x.rating[..., i], x.property[..., i])
-#             # if i > 1:
-#             #     yield tx.LinearFactor(self.namespace('rating-pair'),
-#             #                           x.rating[..., i - 1], x.rating[..., i],
-#             #                           x.property[..., i - 1], x.property[..., i])
-#             for j in range(0, i):
-#                 yield tx.LinearFactor(self.namespace('rating-pair'),
-#                                       x.rating[..., j], x.rating[..., i],
-#                                       x.property[..., j], x.property[..., i])
-
-
 class SPRLModel(tx.Model[SPRL]):
 
     def factors(self, x: SPRL):
         n = x.property.shape[-1]
         for i in range(n):
             yield tx.LinearFactor(self.namespace('rating-property'),
-                                  x.rating, x.property, graph_dims=1)
+                                  x.rating[..., i], x.property[..., i])
             # if i > 1:
             #     yield tx.LinearFactor(self.namespace('rating-pair'),
             #                           x.rating[..., i - 1], x.rating[..., i],
@@ -41,6 +24,32 @@ class SPRLModel(tx.Model[SPRL]):
                 yield tx.LinearFactor(self.namespace('rating-pair'),
                                       x.rating[..., j], x.rating[..., i],
                                       x.property[..., j], x.property[..., i])
+
+
+# class SPRLModel(tx.Model[SPRL]):
+
+#     def factors(self, x: SPRL):
+#         # n = x.property.shape[-1]
+#         # x.add_factor(
+#         #     tx.LinearFactor(self.namespace('rating-property'),
+#         #     x.rating[..., tx.gslice()], x.property))
+#         yield tx.LinearFactor(self.namespace('rating-property'),
+#                               x.rating, x.property)
+# #         firsts, seconds = zip(*itertools.combinations(range(n), 2))
+# #         # yield tx.LinearFactor(
+# #         #     self.namespace('rating-pair'),
+# #         #     x.rating[..., tx.gslice(firsts)], x.rating[..., tx.gslice(seconds)],
+# #         #     x.property[..., tx.gslice(firsts)], x.property[..., tx.gslice(seconds)],
+# #         #     graph_dims=1)
+# #         # for i in range(n):
+# #         #     # if i > 1:
+# #         #     #     yield tx.LinearFactor(self.namespace('rating-pair'),
+# #         #     #                           x.rating[..., i - 1], x.rating[..., i],
+# #         #     #                           x.property[..., i - 1], x.property[..., i])
+# #         #     yield tx.LinearFactor(self.namespace('rating-pair'),
+# #         #                           x.rating[..., tx.gslice([i] * (n - 1))], x.rating[..., i],
+# #         #                           x.property[..., tx.gslice([i] * (n - 1))],
+# x.property[..., i])
 
 
 if __name__ == '__main__':

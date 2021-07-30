@@ -2,6 +2,7 @@ import math
 
 import pytest
 import torch
+import torchfactors as tx
 from torchfactors import (ANNOTATED, CLAMPED, LATENT, OBSERVED, PADDING,
                           Factor, Range, TensorFactor, TensorVar, ndarange)
 
@@ -101,6 +102,15 @@ def test_normalize():
     out = Factor.normalize(torch.ones(2, 3, 4, 5), 2)
     expected = torch.full((2, 3, 4, 5), fill_value=-math.log(20))
     assert out.isclose(expected).all()
+
+
+def test_graph_dim():
+    v = TensorVar(torch.ones(5, 3, 1, 2), domain=Range(3), usage=tx.ANNOTATED, ndims=2)
+    f = TensorFactor(v, tensor=torch.tensor([0.25, 0.25, 0.25]).log())
+    logz = tx.BP(passes=1).product_marginal([f])
+    assert list(logz.shape) == [5, 3]
+    expected = torch.tensor((0.25 ** 2) * (3 ** 2)).expand_as(logz)
+    assert logz.exp().allclose(expected)
 
 
 # # TODO: test where they vary accross batch dims

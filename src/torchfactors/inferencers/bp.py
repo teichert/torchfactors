@@ -63,6 +63,10 @@ class BPInference:
         region_free_energies = []
         for rid, r in enumerate(self.strategy.regions):
             this_free_energy = r.free_energy(self.in_messages(rid))
+            if r.ndims > 0:
+                end = len(this_free_energy.shape)
+                start = end - r.ndims
+                this_free_energy = this_free_energy.sum(dim=list(range(start, end)))
             region_free_energies.append(r.counting_number * this_free_energy)
         return -sum_tensors(region_free_energies)
 

@@ -22,10 +22,9 @@ class TensorFactor(Factor):
     """
 
     def __init__(self, *variables: Var,
-                 graph_dims: int = 0,
                  tensor: Optional[torch.Tensor] = None,
                  init: Callable[[ShapeType], torch.Tensor] = float_zeros):
-        super().__init__(variables, graph_dims=graph_dims)
+        super().__init__(variables)
         exemplar = self.variables[0].origin.tensor
         if tensor is None:
             tensor = init(self.shape)
@@ -47,10 +46,9 @@ class Message(TensorFactor):
     """
 
     def __init__(self, *variables: Var,
-                 graph_dims: int = 0,
                  tensor: Optional[torch.Tensor] = None,
                  init: Callable[[ShapeType], torch.Tensor] = float_zeros):
-        super().__init__(*variables, graph_dims=graph_dims, tensor=tensor, init=init)
+        super().__init__(*variables, tensor=tensor, init=init)
 
     @property
     def dense(self):

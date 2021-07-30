@@ -36,6 +36,10 @@ class Region(object):
     factor_graph_nodes: Tuple[int, ...]
     counting_number: float
 
+    @property
+    def ndims(self) -> int:
+        return self.factor_graph.region_variables(self.factor_graph_nodes)[0].ndims
+
     @cached_property
     def variables(self) -> Sequence[Var]:
         return self.factor_graph.region_variables(self.factor_graph_nodes)

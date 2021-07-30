@@ -93,9 +93,8 @@ class LinearFactor(Factor):
                  params: ParamNamespace,
                  *variables: Var,
                  input: Optional[Tensor] = None,
-                 bias: bool = True,
-                 graph_dims: int = 0):
-        super().__init__(variables, graph_dims=graph_dims)
+                 bias: bool = True):
+        super().__init__(variables)
         self.input = input
         self.bias = bias
         self.params = params
