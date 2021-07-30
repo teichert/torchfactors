@@ -1,4 +1,5 @@
 from __future__ import annotations
+import torch
 
 import math
 from abc import abstractmethod
@@ -27,7 +28,7 @@ def check_queries(queries: Sequence[Union[Var, Sequence[Var]]]):
 #     # return factors
 
 
-# @torch.jit.script
+@torch.jit.script
 def adjust(tensor: Tensor, var_infos: List[Tuple[Tensor, Tensor, List[int]]],
            ANNOTATED: int,
            LATENT: int,
