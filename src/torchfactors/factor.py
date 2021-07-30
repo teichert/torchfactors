@@ -1,10 +1,10 @@
 from __future__ import annotations
-import torch
 
 import math
 from abc import abstractmethod
 from typing import Iterator, List, Sequence, Tuple, Union
 
+import torch
 from torch import Tensor
 
 from .einsum import log_dot
@@ -293,7 +293,7 @@ class Factor:
         # any nans in any factor should be treated as a log(1)
         # meaning that it doesn't impact the product
         # out = log_einsum(equation, *input_tensors)
-        out = log_dot(input_tensors, labeled_queries)
+        out = log_dot(input_tensors, labeled_queries, nan_to_num=True)
         return out
         # return f
 

@@ -120,9 +120,12 @@ class Strategy(object):
     edges: List[Tuple[int, int]]
     passes: int = 2
 
+    def edge_groups(self) -> List[Tuple[int, List[int]]]:
+        return list((s, ts) for s, ts in enumerate(self.outfrom) if ts)
+
     def __iter__(self) -> Iterator[Tuple[int, List[int]]]:
-        # naive default for now is to pass everything twice
-        schedule = list((s, ts) for s, ts in enumerate(self.outfrom) if ts)
+        # naive default for now is to pass everything a fixed number of times
+        schedule = self.edge_groups()
         return itertools.chain.from_iterable(itertools.repeat(schedule, self.passes))
 
     def __post_init__(self):

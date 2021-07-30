@@ -1,11 +1,12 @@
 
-from .utils import sum_tensors
 from functools import singledispatch
 from typing import Dict, Hashable, List, Sequence, Tuple, Union
 
 import torch
 import torch_semiring_einsum as tse  # type: ignore
 from torch import Tensor
+
+from .utils import sum_tensors
 
 
 class MultiEquation(object):
@@ -175,13 +176,17 @@ def expand_to(t: Tensor, names: List[int], shape: List[int]):  # pragma: no cove
 @torch.jit.script
 def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
              inverse_queries: List[Tuple[List[int], List[int]]],
-             full_shape: List[int]) -> List[Tensor]:  # pragma: no cover
+             full_shape: List[int],
+             nan_to_num: bool = False) -> List[Tensor]:  # pragma: no cover
     r"""
     This version assumes that all ids are integers between 0 and len(full_shape),
     and that all tensors and queries are in increasing order of those ids
     """
     aligned = [expand_to(t, names, full_shape) for t, names in tensors]
+    # product = sum_tensors(aligned).nan_to_num()
     product = sum_tensors(aligned)
+    # if nan_to_num:
+    #     product = product.nan_to_num()
     answers = [product.logsumexp(dim=iq).permute(unpermute) if len(iq) > 0 else product
                for iq, unpermute in inverse_queries]
     return answers
@@ -189,7 +194,8 @@ def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
 
 @torch.jit.script
 def log_dot(tensors: List[Tuple[Tensor, List[str]]],
-            queries: List[List[str]]) -> List[Tensor]:  # pragma: no cover
+            queries: List[List[str]],
+            nan_to_num: bool = False) -> List[Tensor]:  # pragma: no cover
     """
     Carries out a generalized tensor dot product across multiple named
     tensors.
@@ -199,7 +205,7 @@ def log_dot(tensors: List[Tuple[Tensor, List[str]]],
     out_tensors = [_map_and_order_tensor(t, name_to_ix, names) for t, names in tensors]
     shape = [size for _, size in name_to_ix.values()]
     out_inverse_queries = [_map_order_and_invert_query(name_to_ix, names) for names in queries]
-    return _log_dot(out_tensors, out_inverse_queries, shape)
+    return _log_dot(out_tensors, out_inverse_queries, shape, nan_to_num)
 
 
 # def _log_dot2(tensors: List[Tuple[Tensor, List[int]]],

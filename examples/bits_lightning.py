@@ -1,8 +1,10 @@
+import argparse
 from dataclasses import dataclass
+from typing import Optional
 
 import pytorch_lightning as pl
 import torchfactors as tx
-from torchfactors.lightning import LitSystem
+from torchfactors.subject import ListDataset
 
 
 # Describe the "Subject" of the Model
@@ -64,7 +66,32 @@ data = [Bits(tx.vtensor(bits)) for bits in bit_sequences]
 #     def configure_inferencer(self) -> Inferencer:
 #         return BP(passes=self.passes)
 
+class BitsData(tx.lightning.DataModule):
 
-trainer = pl.Trainer()
-system = LitSystem(BitsModel())
-trainer.fit(system, Bits.data_loader(data))
+    def setup(self, stage: Optional[str] = None) -> None:
+        if stage in (None, 'fit'):
+            self.train = ListDataset(data)
+            self.setup_val()
+        if stage in (None, 'test'):
+            self.test = ListDataset(data)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(add_help=False)
+    parser = tx.LitSystem.add_argparse_args(parser)
+    args = pl.Trainer.parse_argparser(parser.parse_args())
+    # args = pl.Trainer.parse_argparser(parser.parse_args("--split_max_count 10".split()))
+    trainer = pl.Trainer.from_argparse_args(args)
+    model = BitsModel()
+    system = tx.LitSystem.from_args(
+        model=model, data=BitsData(),
+        args=args)
+
+    # def eval(dataloader: DataLoader[SPRL], gold: SPRL):
+    #     predicted = system.predict(train)
+    #     logging.info(torchmetrics.functional.f1(
+    #         predicted.rating.flatten() > 3,
+    #         train.rating.flatten() > 3,
+    #         num_classes=len(predicted.rating.domain)))
+
+    trainer.fit(system)

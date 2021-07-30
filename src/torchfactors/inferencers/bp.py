@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from functools import lru_cache
-from typing import Callable, Dict, List, Sequence, Tuple, Union
+from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from torch.functional import Tensor
@@ -29,13 +29,16 @@ class BPInference:
     exact if a junction-tree based strategy is used.
     """
 
-    def __init__(self, graph: FactorGraph, strategy: Strategy):
+    def __init__(self, graph: FactorGraph, strategy: Strategy,
+                 compute_change: bool = False):
         self.graph = graph
         self.strategy = strategy
         # the message from one region to another will be a factor dealing with the
         # variables of the target
         self.messages: Dict[Tuple[int, int], TensorFactor] = {}
-        self.message_changes: Dict[TensorFactor, Tensor] = {}
+        # self.message_changes: Dict[TensorFactor, Tensor] = {}
+        self.total_amount_changed: Optional[Tensor] = None
+        self.compute_change = compute_change
 
     def amount_changed(self, old: Tensor, new: Tensor, num_batch_dims: int) -> Tensor:
         num_dims = len(old.shape)
@@ -52,12 +55,12 @@ class BPInference:
             old, num_batch_dims=num_batch_dims), log_prob=True)
         return out
 
-    def total_amount_changed(self):
-        r"""returns the sum of the KL divergences from the most recent message
-        to the previous version.  If this value is 0, then convergence has been
-        achieved."""
-        changes = torch.tensor(list(self.message_changes.values())).sum()
-        return changes
+    # def total_amount_changed(self):
+    #     r"""returns the sum of the KL divergences from the most recent message
+    #     to the previous version.  If this value is 0, then convergence has been
+    #     achieved."""
+    #     changes = torch.tensor(list(self.message_changes.values())).sum()
+    #     return changes
 
     def logz(self) -> torch.Tensor:
         region_free_energies = []
@@ -142,50 +145,51 @@ class BPInference:
         return [self.message(m) for m in pokes_s]
 
     # @ cache
-    def update_messages_from_region(self, source_id: int, target_ids: Tuple[int, ...]
+    def update_messages_from_region(self, source_id: int, target_ids: Tuple[int, ...],
+                                    accumulate_change=False
                                     ):  # -> Callable[[], None]:
         r"""
         returns a method that will update all of the messages from the specified
         source to each each of the specified targets
         """
         source = self.strategy.regions[source_id]
-        targets = [self.strategy.regions[target_id] for target_id in target_ids]
         out_messages = [self.message((source_id, target_id)) for target_id in target_ids]
         in_messages = self.in_messages(source_id)
         numerators = source.product_marginals([out.variables for out in out_messages],
                                               other_factors=in_messages)
-
-        # we will divide out everything but the message of interest
-        messages_to_divide_out_per_target = [
-            tuple([self.message(m)
-                   for m in self.strategy.penetrating_edges(target_id)
-                   if m != (source_id, target_id)])
-            for target_id in target_ids]
-        denominators = [
-            target_region.product_marginals([out_message.variables], other_factors=denom_messages)
-            for target_region, denom_messages, out_message
-            in zip(targets, messages_to_divide_out_per_target, out_messages)]
-
-        # I want to cache the setup here, but I want it to be flexible??
-        # def update_messages():
-        # numerators = compute_numerators()
-        for numerator, out, denominator in zip(
-                numerators, out_messages, denominators):
-            # keep the nans, but the negative infs can be ignored
-            denominator = denominator[0].nan_to_num(
-                nan=float('nan'), posinf=float('inf'), neginf=0)
+        updated_messages = []
+        for target_id, numerator, out in zip(
+                target_ids, numerators, out_messages):
+            target = self.strategy.regions[target_id]
+            messages_to_divide_out = tuple([self.message(m)
+                                            for m in self.strategy.penetrating_edges(target_id)
+                                            if m != (source_id, target_id)])
+            denominator, = target.product_marginals([out.variables],
+                                                    other_factors=messages_to_divide_out)
+            denominator = denominator.masked_fill(
+                denominator == float('-inf'), 0)
             # - and + rather than / and * since this is in log space
-            updated = Factor.normalize(numerator - denominator,
-                                       num_batch_dims=out.num_batch_dims)
+            updated_messages.append(Factor.normalize(numerator - denominator,
+                                                     num_batch_dims=out.num_batch_dims))
+        for out, updated in zip(out_messages, updated_messages):
             # keep track of how far from convergence we were before this message
-            change = self.amount_changed(out.tensor, updated, out.num_batch_dims)
-            self.message_changes[out] = change
-            out.tensor = updated
-        # return update_messages
+            if accumulate_change:
+                change = self.amount_changed(out.tensor, updated, out.num_batch_dims).sum()
+                if self.total_amount_changed is None:
+                    self.total_amount_changed = change
+                else:
+                    self.total_amount_changed = self.total_amount_changed + change
+            else:  # not changing on penalty pass
+                out.tensor = updated
 
     def run(self):
         for s, ts in tqdm(list(self.strategy), leave=False, delay=1, desc='Passing messages...'):
             self.update_messages_from_region(s, tuple(ts))
+        if self.compute_change:
+            self.total_amount_changed = None
+            for s, ts in tqdm(self.strategy.edge_groups(), leave=False, delay=1,
+                              desc='Computing change...'):
+                self.update_messages_from_region(s, tuple(ts), accumulate_change=True)
 
     def display(self):  # pragma: no cover
         """display the variables and factors for debugging"""
@@ -245,7 +249,7 @@ class BP(Inferencer):
                            ) -> Sequence[torch.Tensor]:
         fg = FactorGraph(factors)
         strategy = self.strategy_factory(fg, self.passes)
-        bp = BPInference(fg, strategy)
+        bp = BPInference(fg, strategy, compute_change=append_total_change)
         bp.run()
 
         if () in queries or not normalize:
@@ -260,5 +264,5 @@ class BP(Inferencer):
                     belief = belief + logz
                 responses.append(belief)
         if append_total_change:
-            responses.append(bp.total_amount_changed())
+            responses.append(cast(Tensor, bp.total_amount_changed))
         return responses

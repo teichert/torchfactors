@@ -336,7 +336,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
 
         self.primed = False
         if self.data is not None:
-            self.data.setup()
+            self.data.setup(None)
 
     # @abstractmethod
     # def configure_model(self) -> Model[SubjectType]: ...

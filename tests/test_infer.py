@@ -140,7 +140,7 @@ def test_bp_change():
     factors = [
         TensorFactor(bits[..., 0], tensor=torch.tensor([0, 0.5]).log()),
     ]
-    bp = BP()
+    bp = BP(passes=1)
     _, change = bp.partition_with_change(factors)
     assert change.sum() == 0.0
 
@@ -148,8 +148,25 @@ def test_bp_change():
 def test_bp_change2():
     bits = TensorVar(Range(2), torch.tensor([False]), ANNOTATED)
     factors = [
-        TensorFactor(bits[..., 0], tensor=torch.tensor([0.25, 0.75]).log()),
+        TensorFactor(bits[..., 0], tensor=torch.tensor([0, 0.5]).log()),
+    ]
+    bp = BP(passes=0)
+    _, change = bp.partition_with_change(factors)
+    assert change.sum() > 0.0
+
+
+def test_bp_change3():
+    bits = TensorVar(Range(2), torch.tensor([False, False, False]), ANNOTATED)
+    t = torch.tensor([[0.25, 0.75], [0.75, 0.25]]).log()
+    factors = [
+        TensorFactor(bits[..., 0], tensor=torch.tensor([0.25, 0.75])),
+        TensorFactor(bits[..., 0], bits[..., 1], tensor=t),
+        TensorFactor(bits[..., 1], bits[..., 2], tensor=t),
+        TensorFactor(bits[..., 2], bits[..., 0], tensor=t),
     ]
     bp = BP(passes=1)
     _, change = bp.partition_with_change(factors)
     assert change.sum() > 0.0
+
+
+test_bp_change3()
