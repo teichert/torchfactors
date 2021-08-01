@@ -202,7 +202,7 @@ def test_log_dot_hard2():
         (b2.log(), ['b']),
         (ab.log(), list('ab')),
         (bc.log(), list('bc'))]
-    queries = ['ac']
+    queries = [list('ac')]
     log_out, = tx.log_dot(named, queries)
     log_out.exp().sum().backward()
     assert not b.grad[2:].isnan().any()
