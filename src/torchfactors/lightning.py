@@ -14,6 +14,7 @@ import torch
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
+from tqdm import tqdm  # type: ignore
 
 from torchfactors.inferencers.bp import BP
 
@@ -367,18 +368,32 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
         batch: SubjectType = cast(SubjectType, args[0])
         # batch_idx: int = cast(int, args[1])
         # self.log('batch_idx', batch_idx)
-        batch.clamp_annotated()
-        logz_clamped = self.system.product_marginal(batch)
-        batch.unclamp_annotated()
-        logz_free, penalty = self.system.partition_with_change(batch)
-        loss = (logz_free - logz_clamped).clamp_min(0).sum()
-        penalty = penalty.sum()
-        self.log('loss', loss)
-        self.log('penalty', penalty)
-        if self.penalty_coeff != 0:
-            loss = loss + self.penalty_coeff * penalty.exp()
-        self.log('combo', loss)
-        return loss
+        info = dict(status="initializing")
+        with tqdm(total=8, desc="Training Step", postfix=info, delay=0.5, leave=False) as progress:
+            def update(status: str):
+                info['status'] = status
+                progress.set_postfix(info)
+                progress.update()
+            update('clamping')
+            batch.clamp_annotated()
+            update('clamped marginals')
+            logz_clamped = self.system.product_marginal(batch)
+            update('unclamping')
+            batch.unclamp_annotated()
+            update('unclamped marginals (and penalty)')
+            logz_free, penalty = self.system.partition_with_change(batch)
+            update('loss')
+            loss = (logz_free - logz_clamped).clamp_min(0).sum()
+            update('penalty')
+            penalty = penalty.sum()
+            self.log('loss', loss)
+            self.log('penalty', penalty)
+            update('full loss')
+            if self.penalty_coeff != 0:
+                loss = loss + self.penalty_coeff * penalty.exp()
+            self.log('combo', loss)
+            update('starting backward...')
+            return loss
 
     def train_dataloader(self):
         if self.data is None:

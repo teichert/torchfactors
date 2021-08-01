@@ -76,9 +76,9 @@ class SPRLModel(tx.Model[SPRL]):
         #     x.rating[..., :-1], x.rating[..., 1:],
         #     x.property[..., :-1], x.property[..., 1:])
 
-        for i in range(n):
-            yield tx.LinearFactor(self.namespace('rating-property'),
-                                  x.rating[..., i], x.property[..., i])
+        # for i in range(n):
+        #     yield tx.LinearFactor(self.namespace('rating-property'),
+        #                           x.rating[..., i], x.property[..., i])
 
 
 # #         firsts, seconds = zip(*itertools.combinations(range(n), 2))
@@ -88,13 +88,14 @@ class SPRLModel(tx.Model[SPRL]):
 # #         #     x.property[..., tx.gslice(firsts)], x.property[..., tx.gslice(seconds)],
 # #         #     graph_dims=1)
         for i in range(n):
-            if i > 1:
+            # if i > 1:
+            #     yield tx.LinearFactor(self.namespace('rating-pair'),
+            #                           x.rating[..., i - 1], x.rating[..., i],
+            #                           x.property[..., i - 1], x.property[..., i])
+            for j in range(i):
                 yield tx.LinearFactor(self.namespace('rating-pair'),
-                                      x.rating[..., i - 1], x.rating[..., i],
-                                      x.property[..., i - 1], x.property[..., i])
-# #         #     yield tx.LinearFactor(self.namespace('rating-pair'),
-# #         #                           x.rating[..., tx.gslice([i] * (n - 1))], x.rating[..., i],
-# #         #                           x.property[..., tx.gslice([i] * (n - 1))],
+                                      x.rating[..., j], x.rating[..., i],
+                                      x.property[..., j], x.property[..., i])
 # x.property[..., i])
 
 
@@ -103,7 +104,8 @@ if __name__ == '__main__':
     parser = tx.LitSystem.add_argparse_args(parser)
     torch.set_num_threads(1)
     args = pl.Trainer.parse_argparser(parser.parse_args())
-    # args = pl.Trainer.parse_argparser(parser.parse_args("--split_max_count 10".split()))
+    # args = pl.Trainer.parse_argparser(parser.parse_args(
+    #     "--batch_size 50 --split_max_count 50 --passes 5 --lr 0.1".split()))
     trainer = pl.Trainer.from_argparse_args(args)
     model = SPRLModel()
     system = tx.LitSystem.from_args(

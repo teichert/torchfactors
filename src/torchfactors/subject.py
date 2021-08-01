@@ -8,6 +8,7 @@ from typing import (Callable, Dict, FrozenSet, Generic, Hashable, List,
 import torch
 from torch._C import Size
 from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm  # type: ignore
 
 from .domain import Domain
 from .factor import Factor
@@ -261,13 +262,13 @@ class Subject:
         r"""Returns a clone of the input example with annotated variable cells
         being marked as clamped"""
         # out = self.clone()
-        for attr_name in self.__varset:
+        for attr_name in tqdm(self.__varset, leave=False, delay=0.5, desc="Clamping ..."):
             cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
 
     def unclamp_annotated(self: SubjectType):
         r"""Returns a clone of the input example with clamped variable cells
         being marked as annotated"""
-        for attr_name in self.__varset:
+        for attr_name in tqdm(self.__varset, leave=False, delay=0.5, desc="Unclamping ..."):
             cast(TensorVar, getattr(self, attr_name)).unclamp_annotated()
 
     def __post_init__(self):
