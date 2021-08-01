@@ -1,109 +1,108 @@
 
-from functools import singledispatch
-from typing import Dict, Hashable, List, Sequence, Tuple, Union
+from typing import Dict, List, Tuple
 
 import torch
-import torch_semiring_einsum as tse  # type: ignore
+# import torch_semiring_einsum as tse  # type: ignore
 from torch import Tensor
 
 from torchfactors.utils import min_tensors, sum_tensors
 
+# class MultiEquation(object):
+#     r"""
+#     Represents multiple einsum equations to operate on the same input
+#     """
 
-class MultiEquation(object):
-    r"""
-    Represents multiple einsum equations to operate on the same input
-    """
-
-    def __init__(self, equations: Sequence[tse.equation.Equation]):
-        self.equations = list(equations)
-
-
-@singledispatch
-def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 100):
-    return log_einsum2(compiled_equation, *[t for t in tensors],
-                       block_size=block_size)
+#     def __init__(self, equations: Sequence[tse.equation.Equation]):
+#         self.equations = list(equations)
 
 
-@log_einsum.register
-def _from_multi(compiled_equation: MultiEquation,
-                *tensors: Tensor, block_size: int = 100):
-    return tuple(log_einsum(eq, *tensors, block_size=block_size)
-                 for eq in compiled_equation.equations)
+# @singledispatch
+# def log_einsum(compiled_equation: tse.equation.Equation, *tensors: Tensor, block_size: int = 100):
+#     return log_einsum2(compiled_equation, *[t for t in tensors],
+#                        block_size=block_size)
 
 
-def compile_equation(equation: str, force_multi: bool = False
-                     ) -> tse.equation.Equation:
-    args_str, outputs_str = equation.split('->', 1)
-    arg_strs = args_str.split(',')
-    out_strs = outputs_str.split(',')
-    return compile_obj_equation(arg_strs, out_strs, repr=equation, force_multi=force_multi)
+# @log_einsum.register
+# def _from_multi(compiled_equation: MultiEquation,
+#                 *tensors: Tensor, block_size: int = 100):
+#     return tuple(log_einsum(eq, *tensors, block_size=block_size)
+#                  for eq in compiled_equation.equations)
 
 
-def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
-                         out_strs: Sequence[Sequence[Hashable]],
-                         repr: str = '', force_multi: bool = False
-                         ) -> Union[tse.equation.Equation, MultiEquation]:
-    r"""modified from: https://github.com/bdusell/semiring-einsum/blob/7fbebdddc70aab81ede5e7c086719bff700b3936/torch_semiring_einsum/equation.py#L63-L92
-
-    Pre-compile an einsum equation for use with the einsum functions in
-    this package.
-
-    :return: A pre-compiled equation.
-    """  # noqa: E501
-    char_to_int: Dict[Hashable, int] = {}
-    int_to_arg_dims: List[List[Tuple[int, int]]] = []
-    args_dims: List[List[int]] = []
-    for arg_no, arg_str in enumerate(arg_strs):
-        arg_dims = []
-        for dim_no, dim_char in enumerate(arg_str):
-            dim_int = char_to_int.get(dim_char)
-            if dim_int is None:
-                dim_int = char_to_int[dim_char] = len(char_to_int)
-                int_to_arg_dims.append([])
-            int_to_arg_dims[dim_int].append((arg_no, dim_no))
-            arg_dims.append(dim_int)
-        args_dims.append(arg_dims)
-    num_variables = len(char_to_int)
-    equations = []
-    for out_str in out_strs:
-        output_dims = [char_to_int[c] for c in out_str]
-        equations.append(tse.equation.Equation(
-            repr,
-            int_to_arg_dims,
-            args_dims,
-            output_dims,
-            num_variables))
-    if len(equations) != 1 or force_multi:
-        return MultiEquation(equations)
-    else:
-        return equations[0]
+# def compile_equation(equation: str, force_multi: bool = False
+#                      ) -> tse.equation.Equation:
+#     args_str, outputs_str = equation.split('->', 1)
+#     arg_strs = args_str.split(',')
+#     out_strs = outputs_str.split(',')
+#     return compile_obj_equation(arg_strs, out_strs, repr=equation, force_multi=force_multi)
 
 
-def nonan_logsumexp(a: Tensor, dims):
-    if dims:
-        return torch.logsumexp(a.nan_to_num(), dim=dims)
-    else:
-        return a
+# def compile_obj_equation(arg_strs: Sequence[Sequence[Hashable]],
+#                          out_strs: Sequence[Sequence[Hashable]],
+#                          repr: str = '', force_multi: bool = False
+#                          ) -> Union[tse.equation.Equation, MultiEquation]:
+#     r"""modified from: https://github.com/bdusell/semiring-einsum/blob/"""
+#     r"""7fbebdddc70aab81ede5e7c086719bff700b3936/torch_semiring_einsum/equation.py#L63-L92
+#
+#     Pre-compile an einsum equation for use with the einsum functions in
+#     this package.
+
+#     :return: A pre-compiled equation.
+#     """  # noqa: E501
+#     char_to_int: Dict[Hashable, int] = {}
+#     int_to_arg_dims: List[List[Tuple[int, int]]] = []
+#     args_dims: List[List[int]] = []
+#     for arg_no, arg_str in enumerate(arg_strs):
+#         arg_dims = []
+#         for dim_no, dim_char in enumerate(arg_str):
+#             dim_int = char_to_int.get(dim_char)
+#             if dim_int is None:
+#                 dim_int = char_to_int[dim_char] = len(char_to_int)
+#                 int_to_arg_dims.append([])
+#             int_to_arg_dims[dim_int].append((arg_no, dim_no))
+#             arg_dims.append(dim_int)
+#         args_dims.append(arg_dims)
+#     num_variables = len(char_to_int)
+#     equations = []
+#     for out_str in out_strs:
+#         output_dims = [char_to_int[c] for c in out_str]
+#         equations.append(tse.equation.Equation(
+#             repr,
+#             int_to_arg_dims,
+#             args_dims,
+#             output_dims,
+#             num_variables))
+#     if len(equations) != 1 or force_multi:
+#         return MultiEquation(equations)
+#     else:
+#         return equations[0]
 
 
-def log_einsum2(
-        equation: tse.equation.Equation,
-        *args: torch.Tensor,
-        block_size: int) -> torch.Tensor:
-    def callback(compute_sum):
-        return compute_sum(
-            # (lambda a, b: torch.logaddexp(a.nan_to_num(), b.nan_to_num(), out=a)),
-            None,
-            nonan_logsumexp,
-            tse.utils.add_in_place)
-
-    writeable_args = [t.as_subclass(torch.Tensor) for t in args]  # type: ignore
-    out = tse.semiring_einsum_forward(equation, writeable_args, block_size, callback)
-    return out
+# def nonan_logsumexp(a: Tensor, dims):
+#     if dims:
+#         return torch.logsumexp(a.nan_to_num(), dim=dims)
+#     else:
+#         return a
 
 
-# def ids(values: Iterable[object]) -> List[int]:
-#     return list(map(id, values))
+# def log_einsum2(
+#         equation: tse.equation.Equation,
+#         *args: torch.Tensor,
+#         block_size: int) -> torch.Tensor:
+#     def callback(compute_sum):
+#         return compute_sum(
+#             # (lambda a, b: torch.logaddexp(a.nan_to_num(), b.nan_to_num(), out=a)),
+#             None,
+#             nonan_logsumexp,
+#             tse.utils.add_in_place)
+
+#     writeable_args = [t.as_subclass(torch.Tensor) for t in args]  # type: ignore
+#     out = tse.semiring_einsum_forward(equation, writeable_args, block_size, callback)
+#     return out
+
+
+# # def ids(values: Iterable[object]) -> List[int]:
+# #     return list(map(id, values))
 
 
 @torch.jit.script
