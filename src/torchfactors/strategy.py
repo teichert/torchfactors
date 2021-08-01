@@ -3,7 +3,7 @@ from __future__ import annotations
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from functools import lru_cache
+# from functools import lru_cache
 from itertools import chain
 from typing import (DefaultDict, Dict, FrozenSet, Iterable, Iterator, List,
                     Sequence, Set, Tuple)
@@ -16,7 +16,7 @@ from .factor import Factor
 from .factor_graph import FactorGraph
 from .variable import Var
 
-cache = lru_cache(maxsize=None)
+# cache = lru_cache(maxsize=None)
 
 
 def pick_controller(factors: Iterable[Factor]) -> Tuple[Factor, Sequence[Factor]]:

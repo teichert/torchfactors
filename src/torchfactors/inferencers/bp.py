@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from functools import lru_cache
+# from functools import lru_cache
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import torch
@@ -18,7 +18,7 @@ from ..strategy import Strategy
 from ..utils import sum_tensors
 from ..variable import TensorVar, Var, at
 
-cache = lru_cache(maxsize=None)
+# cache = lru_cache(maxsize=None)
 
 
 class BPInference:
