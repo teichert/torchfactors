@@ -6,7 +6,7 @@ import torch
 import torch_semiring_einsum as tse  # type: ignore
 from torch import Tensor
 
-from torchfactors.utils import sum_tensors
+from torchfactors.utils import min_tensors, sum_tensors
 
 
 class MultiEquation(object):
@@ -184,10 +184,10 @@ def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
     """
     aligned = [expand_to(t, names, full_shape) for t, names in tensors]
     product = sum_tensors(aligned)
-    # minimum = min_tensors(aligned)
-    # mask = minimum == float('-inf')
-    # ninf = float('-inf')
-    # product = product.masked_fill(mask, ninf)
+    minimum = min_tensors(aligned)
+    mask = minimum == float('-inf')
+    ninf = float('-inf')
+    product = product.masked_fill(mask, ninf)
     answers = [product.logsumexp(dim=iq).permute(unpermute)
                if len(iq) > 0 else product
                for iq, unpermute in inverse_queries]
