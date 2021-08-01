@@ -24,6 +24,14 @@ def sum_tensors(tensors: List[Tensor]) -> Tensor:  # pragma: no cover
     return out
 
 
+@torch.jit.script
+def min_tensors(tensors: List[Tensor]) -> Tensor:  # pragma: no cover
+    out = tensors[0]
+    for t in tensors[1:]:
+        out = out.min(t)
+    return out
+
+
 def logsumexp(t: Tensor, dim: Union[None, int, List[int], Tuple[int, ...]] = None,
               keepdim=False, *, out=None):
     if dim is None:

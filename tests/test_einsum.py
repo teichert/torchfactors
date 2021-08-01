@@ -146,34 +146,67 @@ def test_log_dot():
 
 def test_log_dot_hard():
     b = torch.tensor([
-        0, 1, 0,
+        0, 1, 1, 0
+    ], requires_grad=True, dtype=torch.float)
+    b2 = torch.tensor([
+        1, 2, 3, 0
+    ], requires_grad=True, dtype=torch.float)
+    b3 = torch.tensor([
+        0, 0, 3, 0
     ], requires_grad=True, dtype=torch.float)
     ab = torch.tensor([
-        [1, 2, 3],
-        [2, 4, 5]
+        [1, 2, 3, 1],
+        [2, 4, 5, 1]
     ], requires_grad=True, dtype=torch.float)
     bc = torch.tensor([
         [1, 2, 3, 8],
         [2, 4, 5, 3],
         [1, 4, 5, 3],
+        [0, 0, 0, 0],
     ], requires_grad=True, dtype=torch.float)
     ac_expected = torch.tensor([  # 2 x 4
-        [4, 8, 10, 6],
-        [8, 16, 20, 12]
+        [27, 108, 135, 81],
+        [45, 180, 225, 135]
     ]).float()
-    log_out, = tx.log_dot(
-        [
-            (b.log(), ['b']),
-            (ab.log(), list('ab')),
-            (bc.log(), list('bc'))],
-        [list('ac')])
+    named = [
+        (b.log(), ['b']),
+        (b2.log(), ['b']),
+        (b3.log(), ['b']),
+        (ab.log(), list('ab')),
+        (bc.log(), list('bc'))]
+    queries = [list('ac')]
+    log_out, = tx.log_dot(named, queries)
     out = log_out.exp()
     assert out.allclose(ac_expected)
 
-    out.sum().backward()
-    assert not b.grad.isnan().any()
-    assert not ab.grad.isnan().any()
-    assert not bc.grad.isnan().any()
+
+def test_log_dot_hard2():
+    b = torch.tensor([
+        0, 0, 1, 1
+    ], requires_grad=True, dtype=torch.float)
+    b2 = torch.tensor([
+        1, 1, 0, 0
+    ], requires_grad=True, dtype=torch.float)
+    ab = torch.tensor([
+        [1, 2, 3, 1],
+        [2, 4, 5, 1]
+    ], requires_grad=True, dtype=torch.float)
+    bc = torch.tensor([
+        [1, 2, 3, 8],
+        [2, 4, 5, 3],
+        [1, 4, 5, 3],
+        [0, 0, 0, 0],
+    ], requires_grad=True, dtype=torch.float)
+    named = [
+        (b.log(), ['b']),
+        (b2.log(), ['b']),
+        (ab.log(), list('ab')),
+        (bc.log(), list('bc'))]
+    queries = ['ac']
+    log_out, = tx.log_dot(named, queries)
+    log_out.exp().sum().backward()
+    assert not b.grad[2:].isnan().any()
+    assert not b2.grad[:2].isnan().any()
 
 
 # def test_log_dot1_5():

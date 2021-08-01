@@ -6,7 +6,7 @@ import torch
 import torch_semiring_einsum as tse  # type: ignore
 from torch import Tensor
 
-from .utils import sum_tensors
+from torchfactors.utils import sum_tensors
 
 
 class MultiEquation(object):
@@ -106,7 +106,7 @@ def log_einsum2(
 #     return list(map(id, values))
 
 
-@torch.jit.script
+# @torch.jit.script
 def _map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[str, Tuple[int, int]],
                           names: List[str]) -> Tuple[Tensor, List[int]]:  # pragma: no cover
     # store mapping from name to id and size
@@ -119,7 +119,7 @@ def _map_and_order_tensor(t: Tensor, name_to_id_and_size: Dict[str, Tuple[int, i
     return t.permute(permutation), out_names
 
 
-@torch.jit.script
+# @torch.jit.script
 def _map_and_order_names(name_to_id_and_size: Dict[str, Tuple[int, int]], names: List[str]
                          ) -> Tuple[List[int], List[int]]:  # pragma: no cover
     r"""
@@ -135,7 +135,7 @@ def _map_and_order_names(name_to_id_and_size: Dict[str, Tuple[int, int]], names:
     return out_names, unpermutation
 
 
-@torch.jit.script
+# @torch.jit.script
 def _map_order_and_invert_query(name_to_ix: Dict[str, Tuple[int, int]], names: List[str]
                                 ) -> Tuple[List[int], List[int]]:  # pragma: no cover
     r"""
@@ -155,7 +155,7 @@ def _map_order_and_invert_query(name_to_ix: Dict[str, Tuple[int, int]], names: L
     return out_query, unpermutation
 
 
-@torch.jit.script
+# @torch.jit.script
 def expand_to(t: Tensor, names: List[int], shape: List[int]):  # pragma: no cover
     """
     returns an expanded view of t with shape matching that given
@@ -183,16 +183,18 @@ def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
     and that all tensors and queries are in increasing order of those ids
     """
     aligned = [expand_to(t, names, full_shape) for t, names in tensors]
-    # product = sum_tensors(aligned).nan_to_num()
     product = sum_tensors(aligned)
-    # if nan_to_num:
-    #     product = product.nan_to_num()
-    answers = [product.logsumexp(dim=iq).permute(unpermute) if len(iq) > 0 else product
+    # minimum = min_tensors(aligned)
+    # mask = minimum == float('-inf')
+    # ninf = float('-inf')
+    # product = product.masked_fill(mask, ninf)
+    answers = [product.logsumexp(dim=iq).permute(unpermute)
+               if len(iq) > 0 else product
                for iq, unpermute in inverse_queries]
     return answers
 
 
-@torch.jit.script
+# @torch.jit.script
 def log_dot(tensors: List[Tuple[Tensor, List[str]]],
             queries: List[List[str]],
             nan_to_num: bool = False) -> List[Tensor]:  # pragma: no cover
