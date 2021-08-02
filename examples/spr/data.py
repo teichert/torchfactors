@@ -36,6 +36,11 @@ class SPRL(tx.Subject):
         def examples():
             for info, pair_df in data.groupby(['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin',
                                                'Arg.Tokens.End', 'Annotator.ID']):
+                for property, prop_df in pair_df.groupby('Property'):
+                    if len(prop_df) > 1:
+                        logging.warning(f'multiple annotations: {info}, {property}')
+                    if pair_df['Response'].isna().any():
+                        logging.warning(f'nan response: {info}, {property}')
                 if not pair_df['Response'].isna().any():
                     property_values = model.domain_ids(
                         SPRL.property_domain, pair_df['Property'].values)
@@ -45,8 +50,8 @@ class SPRL(tx.Subject):
                         property=properties,
                         info=info)
                     yield example
-
-        out = ListDataset[SPRL](list(tqdm(islice(examples(), max_count), desc="Loading data...")))
+        all_examples = list(islice(examples(), max_count))
+        out = ListDataset[SPRL](list(tqdm(all_examples, desc="Loading data...")))
         logging.info(f"Loaded: {len(out)} examples covering {len(cls.property_domain)} properties: "
                      f"{cls.property_domain.values}")
         first = out.examples[0]

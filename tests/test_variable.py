@@ -587,17 +587,29 @@ def test_frozen_flex_domain():
     m = tx.Model[tx.Subject]()
     m.domain_ids(domain, ['this', 'is', 'this', 'test', 'is', 'this'])
     domain.freeze()
-    ids = m.domain_ids(domain, ['now', 'what', 'is', 'this', 'test', '?'])
-    values = m.domain_values(domain, ids)
-    assert values == [
+    with pytest.warns(RuntimeWarning):
+        ids = m.domain_ids(domain, ['now', 'what', 'is', 'this', 'test', '?'])
+
+    expected_values = [
         domain.unk,
         domain.unk,
         'is',
         'this',
         'test',
         domain.unk]
+
+    with pytest.warns(RuntimeWarning):
+        m.domain_values(domain, torch.tensor([1, -1, 1]))
+
+    with pytest.warns(RuntimeWarning):
+        m.domain_values(domain, torch.tensor([1, 4, 1]))
+
+    values = m.domain_values(domain, ids)
+    assert values == expected_values
+
     assert len(domain) == 4
-    assert domain.get_value(100) == domain.unk
+    with pytest.warns(RuntimeWarning):
+        assert domain.get_value(100) == domain.unk
 
 
 def test_flatten():

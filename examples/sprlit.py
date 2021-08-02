@@ -105,7 +105,7 @@ if __name__ == '__main__':
     torch.set_num_threads(1)
     args = pl.Trainer.parse_argparser(parser.parse_args())
     # args = pl.Trainer.parse_argparser(parser.parse_args(
-    # "--batch_size 19 --split_max_count 19".split()))
+    #     "--batch_size 19 --split_max_count 19".split()))
     trainer = pl.Trainer.from_argparse_args(args)
     model = SPRLModel()
     system = tx.LitSystem.from_args(

@@ -91,9 +91,9 @@ class Model(torch.nn.Module, Generic[SubjectType]):
         return super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
                                              missing_keys, unexpected_keys, error_msgs)
 
-    def domain_ids(self, domain: FlexDomain, values: Sequence[Hashable]) -> torch.Tensor:
+    def domain_ids(self, domain: FlexDomain, values: Sequence[Hashable], warn=True) -> torch.Tensor:
         domain = self._domains.setdefault(domain.name, domain)
-        ids = torch.tensor([domain.get_id(value) for value in values])
+        ids = torch.tensor([domain.get_id(value, warn=warn) for value in values])
         return ids
 
     def domain_values(self, domain: FlexDomain, ids: torch.Tensor) -> Sequence[Hashable]:
