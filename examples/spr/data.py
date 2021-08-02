@@ -33,9 +33,17 @@ class SPRL(tx.Subject):
     @classmethod
     def from_data_frame(cls, data: DataFrame, model: tx.Model[SPRL], max_count: Optional[int] = None
                         ) -> ListDataset:
+        # get repetition number for each annotation;
+        # (groupby everything and add row numbers as ids)
+        with_rep_number = tx.utils.with_rep_number(
+            data, ['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin', 'Arg.Tokens.End'])
+
         def examples():
-            for info, pair_df in data.groupby(['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin',
-                                               'Arg.Tokens.End', 'Annotator.ID']):
+            for info, pair_df in with_rep_number.groupby(
+                    ['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin', 'Arg.Tokens.End', 'rep']):
+
+                # take median
+                pair_df.groupby('Property', as_index=False)['Response']
                 for property, prop_df in pair_df.groupby('Property'):
                     if len(prop_df) > 1:
                         logging.warning(f'multiple annotations: {info}, {property}')
