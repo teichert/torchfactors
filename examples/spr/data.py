@@ -33,16 +33,20 @@ class SPRL(tx.Subject):
     @classmethod
     def from_data_frame(cls, data: DataFrame, model: tx.Model[SPRL], max_count: Optional[int] = None
                         ) -> ListDataset:
-        iter = (SPRL(
-            rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
-            property=tx.TensorVar(model.domain_ids(
-                SPRL.property_domain, pair_df['Property'].values)),
-            info=info)
+        def examples():
             for info, pair_df in data.groupby(['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin',
-                                               'Arg.Tokens.End', 'Annotator.ID'])
-            if not pair_df['Response'].isna().any()
-        )
-        out = ListDataset[SPRL](list(tqdm(islice(iter, max_count), desc="Loading data...")))
+                                               'Arg.Tokens.End', 'Annotator.ID']):
+                if not pair_df['Response'].isna().any():
+                    property_values = model.domain_ids(
+                        SPRL.property_domain, pair_df['Property'].values)
+                    properties = tx.TensorVar(property_values)
+                    example = SPRL(
+                        rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
+                        property=properties,
+                        info=info)
+                    yield example
+
+        out = ListDataset[SPRL](list(tqdm(islice(examples(), max_count), desc="Loading data...")))
         logging.info(f"Loaded: {len(out)} examples covering {len(cls.property_domain)} properties: "
                      f"{cls.property_domain.values}")
         first = out.examples[0]

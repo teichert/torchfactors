@@ -103,9 +103,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=False)
     parser = tx.LitSystem.add_argparse_args(parser)
     torch.set_num_threads(1)
-    args = pl.Trainer.parse_argparser(parser.parse_args())
-    # args = pl.Trainer.parse_argparser(parser.parse_args(
-    #     "--batch_size 50 --split_max_count 50 --passes 5 --lr 0.1".split()))
+    # args = pl.Trainer.parse_argparser(parser.parse_args())
+    args = pl.Trainer.parse_argparser(parser.parse_args(
+        "--batch_size 19 --split_max_count 19".split()))
     trainer = pl.Trainer.from_argparse_args(args)
     model = SPRLModel()
     system = tx.LitSystem.from_args(
