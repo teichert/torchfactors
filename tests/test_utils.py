@@ -357,7 +357,7 @@ def test_with_rep_number():
         label=[1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2]
     )
     df = pd.DataFrame(orig)
-    with_rep = tx.utils.with_rep_number(
+    with_rep = tx.extra_utils.with_rep_number(
         df, group_key=['sentence', 'property'], name='my_rep')
     expected = dict(
         sentence=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],

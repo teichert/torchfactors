@@ -38,7 +38,7 @@ class SPRL(tx.Subject):
         data = data[data['Dataset'] == 'bulkfiltered']  # type: ignore
         keys = ['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin', 'Arg.Tokens.End']
 
-        with_rep_number = tx.utils.with_rep_number(
+        with_rep_number = tx.extra_utils.with_rep_number(
             data, keys + ['Property'])
         with_rep_number = with_rep_number[with_rep_number['rep'] == 0]  # type: ignore
 

@@ -12,6 +12,7 @@ from .components.linear_factor import LinearFactor
 from .components.tensor_factor import TensorFactor
 from .domain import Domain, FlexDomain, Range, SeqDomain
 from .einsum import log_dot
+from .extra_utils import with_rep_number
 from .factor import Factor
 from .factor_graph import FactorGraph
 from .inferencer import Inferencer
@@ -37,8 +38,8 @@ DEFAULT = VarUsage.DEFAULT
 OPEN = Domain.OPEN
 
 __all__ = [
+    'LitSystem', 'with_rep_number',
     'data_len',
-    'LitSystem',
     'gdrop', 'GeneralizedDimensionDrop', 'at', 'num_trainable',
     'dataclass', 'logsumexp',
     'one_hot',

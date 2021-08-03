@@ -3,12 +3,10 @@ from __future__ import annotations
 import itertools
 import math
 from itertools import chain
-from typing import (Any, List, Optional, Sequence, Sized, Tuple, Union, cast,
-                    overload)
+from typing import Any, List, Optional, Sized, Tuple, Union, cast, overload
 
 import torch
 from multimethod import multidispatch
-from pandas.core.frame import DataFrame
 from torch import Tensor, arange
 from torch._C import Generator
 from torch.utils.data.dataset import Dataset, random_split
@@ -359,22 +357,3 @@ def split_data(data: Dataset, portion: float | None = None,
     first_size = cast(int, count)
     second_size = length - first_size
     return random_split(data, [first_size, second_size], generator=generator)
-
-
-def with_rep_number(data: DataFrame, group_key: Sequence[str],
-                    name: str = 'rep',
-                    ) -> DataFrame:
-    r"""
-    Returns a copy of the given data frame augmented by an aditional column
-    specifying how many examples with the same group_key came before it (i.e.
-    what row it would be on if grouped by the given key)
-
-    Parameters:
-
-        data: the dataframe
-
-        group_key: the key to group on
-
-        name: the name of the column to be added
-    """
-    return data.assign(**{name: data.groupby(group_key).cumcount()})
