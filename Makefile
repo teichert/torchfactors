@@ -109,3 +109,25 @@ profile: $(edeps) pyproject.lock
 .PHONY: profile2
 profile2: $(edeps) pyproject.lock
 	poetry run python -m scalene --profile-all --profile-interval 30 --profile-only torchfactors/src/torchfactors --reduced-profile --outfile scalene.report $e
+
+
+.PHONY: profile2g
+.ONESHELL:
+profile2g: $(edeps) pyproject.lock
+	. `poetry env info --path`/bin/activate
+	. /home/gqin2/scripts/acquire-gpu	
+	python -m scalene --profile-all --profile-interval 30 --profile-only torchfactors/src/torchfactors --reduced-profile --outfile scalene.report $e --gpus 1
+
+.PHONY: exampleg
+.ONESHELL:
+exampleg: $(edeps) pyproject.lock
+	. `poetry env info --path`/bin/activate
+	. /home/gqin2/scripts/acquire-gpu	
+	python $e --gpus 1
+
+.PHONY: demo
+.ONESHELL:
+demo: $(edeps) pyproject.lock
+	. `poetry env info --path`/bin/activate
+	. /home/gqin2/scripts/acquire-gpu	
+	python -c "import os; print('Available: ' + os.environ['CUDA_VISIBLE_DEVICES'])"
