@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 
 import pytorch_lightning as pl
 import torch
@@ -100,6 +101,11 @@ class SPRLModel(tx.Model[SPRL]):
 
 
 if __name__ == '__main__':
+    print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
+    try:
+        torch.tensor(0.0).to("cuda")
+    except RuntimeError:
+        pass
     parser = argparse.ArgumentParser(add_help=False)
     parser = tx.LitSystem.add_argparse_args(parser)
     torch.set_num_threads(1)
