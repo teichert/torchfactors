@@ -194,9 +194,8 @@ class Var(ABC):
     def __eq__(self, other) -> bool:
         return self.hash_key() == other.hash_key()
 
-    # TODO: only look at the id of the origin (not the origin tensor which may change)
     def hash_key(self):
-        return (id(self.origin._tensor),
+        return (id(self.origin),
                 as_ndrange(self.ndslice, self.origin.tensor.shape))
 
     def __hash__(self) -> int:

@@ -45,7 +45,7 @@ class Stereotype(CliqueModel):
 
             if self.linear:
                 one_scale = [torch.linspace(0, 1, len(v.domain)) for v in variables]
-                scales = tx.utils.outer(*one_scale)
+                scales = tx.utils.outer(one_scale)
             else:
                 scales = params.namespace('group-scale').parameter(tuple(
                     len(v.domain) for v in variables))

@@ -332,9 +332,11 @@ def test_eq():
     v2 = TensorVar(t, Range(4))
     v3 = v1[2:, :]
     v4 = v2[2:, :]
-    assert v1 == v2
-    assert v3 == v4
+    v6 = v2[2:, :]
+    assert v1 != v2
+    assert v3 != v4
     assert v1 != v3
+    assert v6 == v4
     v5 = TensorVar(t2, Range(4))
     assert v1 != v5
 
@@ -343,7 +345,7 @@ def test_dict():
     t = torch.ones(3, 4)
     t2 = torch.ones(3, 4)
     v1 = TensorVar(t, Range(4))
-    v2 = TensorVar(t, Range(4))
+    v2 = v1[(...,)]
     assert hash(v1) == hash(v2)
     v3 = v1[2:, :]
     v4 = v2[2:, :]

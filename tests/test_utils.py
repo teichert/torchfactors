@@ -108,7 +108,7 @@ def test_ndslices_cat():
 def test_outer2():
     a = torch.tensor([1, 2, 3])
     b = torch.tensor([2, 3])
-    out = outer(a, b)
+    out = outer([a, b])
     assert out.allclose(torch.tensor([
         [2, 3],
         [4, 6],
@@ -120,7 +120,7 @@ def test_outer3():
     a = torch.tensor([1, 2, 3])
     b = torch.tensor([2, 3])
     c = torch.tensor([7, 9])
-    out = outer(a, b, c)
+    out = outer([a, b, c])
     assert out.allclose(torch.tensor([
         [[14, 18], [21, 27]],
         [[28, 36], [42, 54]],
@@ -132,7 +132,7 @@ def test_outer_batch():
     a = torch.tensor([[1, 2, 3], [1, 2, 6]])
     b = torch.tensor([[2, 3], [2, 3]])
     c = torch.tensor([[7, 9], [7, 9]])
-    out = outer(a, b, c, num_batch_dims=1)
+    out = outer([a, b, c], num_batch_dims=1)
     expected = torch.tensor([[
         [[14, 18], [21, 27]],
         [[28, 36], [42, 54]],

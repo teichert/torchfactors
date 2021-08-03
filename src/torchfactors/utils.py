@@ -46,10 +46,6 @@ def logsumexp(t: Tensor, dim: Union[None, int, List[int], Tuple[int, ...]] = Non
         return torch.logsumexp(t, dim, keepdim=keepdim, out=out)
 
 
-def outer(*tensors: Tensor, num_batch_dims=0):
-    return outer2(tensors, num_batch_dims)
-
-
 @torch.jit.script
 def expand(t: Tensor, num_batch_dims: int, index_of_t: int, target_shape: List[int]
            ):  # pragma: no cover
@@ -64,7 +60,7 @@ def expand(t: Tensor, num_batch_dims: int, index_of_t: int, target_shape: List[i
 
 
 @torch.jit.script
-def outer2(tensors: List[Tensor], num_batch_dims: int):  # pragma: no cover
+def outer(tensors: List[Tensor], num_batch_dims: int = 0):  # pragma: no cover
     batch_shape = list(tensors[0].shape[:num_batch_dims])
     out_shape = batch_shape + [t.shape[-1] for t in tensors]
     tensors = [expand(t, num_batch_dims, i, out_shape) for i, t in enumerate(tensors)]
