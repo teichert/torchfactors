@@ -32,17 +32,38 @@ class SPRL(tx.Subject):
 
     @classmethod
     def from_data_frame(cls, data: DataFrame, model: tx.Model[SPRL], max_count: Optional[int] = None
-                        ) -> ListDataset:
-        iter = (SPRL(
-            rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
-            property=tx.TensorVar(model.domain_ids(
-                SPRL.property_domain, pair_df['Property'].values)),
-            info=info)
-            for info, pair_df in data.groupby(['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin',
-                                               'Arg.Tokens.End', 'Annotator.ID'])
-            if not pair_df['Response'].isna().any()
-        )
-        out = ListDataset[SPRL](list(tqdm(islice(iter, max_count), desc="Loading data...")))
+                        ) -> ListDataset[SPRL]:
+        # get repetition number for each annotation;
+        # (groupby everything and add row numbers as ids)
+        data = data[data['Dataset'] == 'bulkfiltered']  # type: ignore
+        keys = ['Sentence.ID', 'Pred.Token', 'Arg.Tokens.Begin', 'Arg.Tokens.End']
+
+        with_rep_number = tx.utils.with_rep_number(
+            data, keys + ['Property'])
+        with_rep_number = with_rep_number[with_rep_number['rep'] == 0]  # type: ignore
+
+        def examples():
+            first_property_values = None
+            for info, pair_df in with_rep_number.groupby(keys):
+                #     if len(prop_df) > 1:
+                #         logging.warning(f'multiple annotations: {info}, {property}')
+                if pair_df['Response'].isna().any():
+                    # logging.warning(f'nan response: {info}, {property}')
+                    continue
+                # if not pair_df['Response'].isna().any():
+                property_values = model.domain_ids(
+                    SPRL.property_domain, pair_df['Property'].values)
+                if first_property_values is None:
+                    first_property_values = property_values
+                elif first_property_values.tolist() != property_values.tolist():
+                    raise RuntimeError(f'properties out of order: {info}, {property}')
+                example = SPRL(
+                    rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
+                    property=tx.TensorVar(property_values),
+                    info=info)
+                yield example
+        all_examples = list(islice(examples(), max_count))
+        out = ListDataset[SPRL](list(tqdm(all_examples, desc="Loading data...")))
         logging.info(f"Loaded: {len(out)} examples covering {len(cls.property_domain)} properties: "
                      f"{cls.property_domain.values}")
         first = out.examples[0]
@@ -76,3 +97,28 @@ class SPRLData_v1_0(tx.lightning.DataModule[SPRL]):
             test_split = 'test' if self.test_mode else 'dev'
             self.train = SPRL.from_data_frame(self._data_splits[test_split],
                                               self.model, self.test_limit)
+
+
+def test_spr_data():
+    df = pd.DataFrame({
+        'Dataset': ['bulkfiltered'] * 15,
+        'Split': ['train'] * 6 + ['dev'] * 9,
+        'Sentence.ID': ['sentence 1'] * 6 + ['sentence 2'] * 6 + ['sentence 3'] * 3,
+        'Annotator.ID': ['a'] * 3 + ['b'] * 3 + ['a'] * 3 + ['c'] * 3 + ['c'] * 3,
+        'Pred.Token': [1] * 6 + [2] * 9,
+        'Arg.Tokens.Begin': [3] * 6 + [4] * 9,
+        'Arg.Tokens.End': [5] * 6 + [6] * 9,
+        'Property': ['c', 'd', 'e'] * 5,
+        'Response': [1, 2, 3, 4, 5, 4, 3, 2, 1, 5, 4, 3, 3, float('nan'), 4],
+        'Applicable': [True, False, True] * 5,
+    })
+    data = SPRL.from_data_frame(df, Model[SPRL]())
+    assert len(data) == 2
+    assert data[0].property.tensor.tolist() == [1, 2, 3]
+    assert data[1].property.tensor.tolist() == [1, 2, 3]
+    assert data[0].rating.tensor.tolist() == [0, 1, 2]
+    assert data[1].rating.tensor.tolist() == [2, 1, 0]
+
+
+if __name__ == '__main__':
+    test_spr_data()

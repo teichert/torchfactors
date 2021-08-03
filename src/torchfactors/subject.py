@@ -135,7 +135,7 @@ class Subject:
                 if not isinstance(var_instance, TensorVar):
                     if var_field._usage != VarUsage.LATENT:
                         raise ValueError("only latent variables can be left implicit; "
-                                         "make sure that you pass in all required variables "
+                                         f"you must pass in a value for '{attr_name}' "
                                          "to the subject constructor")
                     var_instance = TensorVar()
                     setattr(self, attr_name, var_instance)
@@ -149,19 +149,21 @@ class Subject:
                             var_instance._ndims = source_var._ndims
                     else:
                         specified_shape = var_field._shape
-                    if (var_instance._tensor is not None and
-                            specified_shape != var_instance._tensor.shape):
-                        raise ValueError("the shape of the tensor you provided "
-                                         "does not match the pre-specified shape: "
-                                         f"found: {var_instance._tensor.shape}, "
-                                         f"expected: {specified_shape}")
+                    if (var_instance._tensor is not None):
+                        if (specified_shape != var_instance._tensor.shape):
+                            raise ValueError("the shape of the tensor you provided "
+                                             "does not match the pre-specified shape: "
+                                             f"found: {var_instance._tensor.shape}, "
+                                             f"expected: {specified_shape}")
                     # shape can be delegated to earlier field
                     elif isinstance(var_field._shape, VarField):
                         source_var = cls_attr_id_to_var[id(var_field._shape)]
                         # source should already have tensor with shape by now
-                        var_instance._tensor = var_field._init(source_var.shape)
+                        var_instance._tensor = var_field._init(source_var.shape,
+                                                               dtype=torch.long)  # type: ignore
                     else:
-                        var_instance._tensor = var_field._init(cast(ShapeType, var_field._shape))
+                        var_instance._tensor = var_field._init(cast(ShapeType, var_field._shape),
+                                                               dtype=torch.long)  # type: ignore
                 elif var_instance._tensor is None:
                     raise ValueError(
                         "need to specify an actual tensor (or a shape)"

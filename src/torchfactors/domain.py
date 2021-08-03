@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import ClassVar, Hashable, Sequence, Tuple, TypeVar, overload
@@ -58,17 +59,20 @@ class FlexDomain(Domain):
     def freeze(self):
         self.frozen = True
 
-    def get_id(self, value: Hashable) -> int:
+    def get_id(self, value: Hashable, warn=True) -> int:
         default = 0 if self.frozen else len(self.values)
         id = self.value_to_id.setdefault(value, default)
+        if warn and id == 0:
+            warnings.warn("unknown value on frozen flex domain", RuntimeWarning)
         if id >= len(self.values):
             self.values.append(value)
         return id
 
     def get_value(self, id: int) -> Hashable:
-        if id < len(self.values):
+        if id < len(self.values) and id >= 0:
             return self.values[id]
         else:
+            warnings.warn("id out of range for domain, returning unk value", RuntimeWarning)
             return self.unk
 
     def __iter__(self):

@@ -62,10 +62,10 @@ def test_flex_domain():
     d.freeze()
     assert d.get_id('test') == 1
     assert d.get_id('test2') == 2
-    assert d.get_id('test3') == 0
+    assert d.get_id('test3', warn=False) == 0
     assert d.get_id('test') == 1
     assert d.get_id('test2') == 2
-    assert d.get_id('test3') == 0
+    assert d.get_id('test3', warn=False) == 0
 
 
 def test_domain_to_list():
@@ -87,3 +87,14 @@ def test_domains_from_list():
     out = model.domain_ids(domain2, values2).tolist()
     assert out == [2, 4, 2, 5, 1, 3, 1]
     assert domain2.frozen
+
+
+def test_flex_unk():
+    d = domain.FlexDomain("Domain")
+    with pytest.warns(RuntimeWarning):
+        d.get_value(1)
+    with pytest.warns(RuntimeWarning):
+        d.get_value(-1)
+    d.freeze()
+    with pytest.warns(RuntimeWarning):
+        d.get_id("test")

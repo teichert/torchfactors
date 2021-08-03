@@ -314,6 +314,19 @@ def test_subject_bad_shape1():
         MySubject(vtensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]]))
 
 
+def test_subject_bad_shape1b():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=LATENT)
+
+    MySubject(vtensor([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]]))
+
+    with pytest.raises(ValueError):
+        MySubject(vtensor([[1, 2, 3, 4, 5], [1, 2, 3, 4, 5]]),
+                  vtensor([[1, 2, 3, 4, 5, 6, 7, 8], [1, 2, 3, 4, 5, 6, 7, 8]]))
+
+
 def test_subject_bad_shape2():
     @tx.dataclass
     class MySubject(tx.Subject):
@@ -461,4 +474,14 @@ def test_subject_ndims2():
 #     assert subject.b.ndims == 0
 
 
-test_subject_ndims2()
+def test_specify_optional():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        a: Var = VarField(Range(5))
+        b: Var = VarField(Range(5), shape=a, usage=OBSERVED)
+
+    t = torch.tensor([[1, 2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6, 7]])
+    t2 = t + 1
+    subject = MySubject(tx.TensorVar(t), tx.TensorVar(t2))
+    assert subject.a.tensor.allclose(t)
+    assert subject.b.tensor.allclose(t2)
