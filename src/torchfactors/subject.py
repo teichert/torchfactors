@@ -135,7 +135,7 @@ class Subject:
                 if not isinstance(var_instance, TensorVar):
                     if var_field._usage != VarUsage.LATENT:
                         raise ValueError("only latent variables can be left implicit; "
-                                         "make sure that you pass in all required variables "
+                                         f"you must pass in a value for '{attr_name}' "
                                          "to the subject constructor")
                     var_instance = TensorVar()
                     setattr(self, attr_name, var_instance)
