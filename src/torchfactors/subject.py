@@ -23,7 +23,7 @@ ExampleType = TypeVar('ExampleType')
 
 @ dataclass
 class ListDataset(Dataset, Generic[ExampleType]):
-    examples: Sequence[ExampleType] = ()  # field(default_factory=list)
+    examples: Sequence[ExampleType] = ()
 
     def __len__(self):
         return len(self.examples)
@@ -65,14 +65,6 @@ class Environment(object):
                 return self.factors.setdefault(key, out)
 
 
-# class Domains(Mapping[str, FlexDomain]):
-#     def __getitem__(self, k: str) -> FlexDomain:
-#         try:
-#             return super().__getitem__(k)
-#         except KeyError:
-#             return super().setdefault(k, FlexDomain(k))
-
-
 @ dataclass
 class Subject:
     r"""
@@ -83,12 +75,6 @@ class Subject:
     have to be repeated for each instance.
 
     """
-    # @classmethod
-    # def domain(cls, name: str):
-    #     if not hasattr(cls, 'domains'):
-    #         cls.domains = Domains()
-    #     return cls.domains[name]
-
     # TODO: [ ] a model should be agnostic whether (and how many times) this
     # subject has been stacked the idea is that a model should be a model of a
     # single one of these; [ ] there should be a canonical way to slice with
@@ -192,17 +178,14 @@ class Subject:
                 "Not allowed to stack already stacked subjects")
         out = copy.deepcopy(first)
         out.is_stacked = True
-        # cls = type(out)
         generic_fields = set(field.name for field in fields(Subject))
         my_fields = set(field.name for field in fields(first)) - first.__varset - generic_fields
         for attr_name in first.__varset:
-            # attr = cast(TensorVar, getattr(out, attr_name))
             stacked = TensorVar.pad_and_stack([
                 cast(TensorVar, getattr(subject, attr_name))
                 for subject in subjects])
             setattr(out, attr_name, stacked)
         for attr_name in my_fields:
-            # attr = getattr(out, attr_name)
             out.__lists[attr_name] = [
                 getattr(subject, attr_name)
                 for subject in subjects]
@@ -263,7 +246,6 @@ class Subject:
     def clamp_annotated(self: SubjectType):
         r"""Returns a clone of the input example with annotated variable cells
         being marked as clamped"""
-        # out = self.clone()
         for attr_name in tqdm(self.__varset, leave=False, delay=0.5, desc="Clamping ..."):
             cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
 

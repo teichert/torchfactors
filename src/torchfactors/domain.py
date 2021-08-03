@@ -127,8 +127,6 @@ class _Range:
 
     @staticmethod
     def __getitem__(key: slice) -> SeqDomain:
-        # if isinstance(key, int):
-        #     return SeqDomain(range(key))
         return SeqDomain(range(
             key.start if key.start is not None else 0,
             key.stop if key.stop is not None else 0,

@@ -9,7 +9,6 @@ from typing import (Any, List, Optional, Sequence, Sized, Tuple, Union, cast,
 import torch
 from multimethod import multidispatch
 from pandas.core.frame import DataFrame
-# from opt_einsum import contract  # type: ignore
 from torch import Tensor, arange
 from torch._C import Generator
 from torch.utils.data.dataset import Dataset, random_split
@@ -49,15 +48,6 @@ def logsumexp(t: Tensor, dim: Union[None, int, List[int], Tuple[int, ...]] = Non
 
 def outer(*tensors: Tensor, num_batch_dims=0):
     return outer2(tensors, num_batch_dims)
-
-
-# def outer(*tensors: Tensor, num_batch_dims=0):
-#     r"""Returns a generalized outer product"""
-#     return contract(*[arg
-#                       for t in tensors
-#                       for arg in [t, [*range(num_batch_dims), id(t)]]],
-#                     [*range(num_batch_dims), *list(map(id, tensors))],
-#                     backend='torch')
 
 
 @torch.jit.script
@@ -391,5 +381,4 @@ def with_rep_number(data: DataFrame, group_key: Sequence[str],
 
         name: the name of the column to be added
     """
-    # return data.assign(groupby(group_key).apply
     return data.assign(**{name: data.groupby(group_key).cumcount()})

@@ -60,7 +60,6 @@ class Inferencer(ABC):
         check_queries(queries)
         wrapped_queries = tuple([(q,) if isinstance(q, Var) else q for q in queries])
         factors_list = list(factors)
-        # uncache(factors_list)
         out = self.product_marginals_(factors_list, *wrapped_queries, normalize=normalize,
                                       append_total_change=append_total_change)
         return out
@@ -74,8 +73,6 @@ class Inferencer(ABC):
     # pick the max of each variable
     def predict_(self, factors: Sequence[Factor], variables: Sequence[Var]) -> None:
         queries = [(v,) for v in variables]
-        # uncache(factors)
         marginals = self.product_marginals_(factors, *queries)
-        # uncache(factors)
         for marginal, variable in zip(marginals, variables):
             variable.tensor = marginal.argmax(-1)

@@ -36,7 +36,6 @@ class BPInference:
         # the message from one region to another will be a factor dealing with the
         # variables of the target
         self.messages: Dict[Tuple[int, int], TensorFactor] = {}
-        # self.message_changes: Dict[TensorFactor, Tensor] = {}
         self.total_amount_changed: Optional[Tensor] = None
         self.compute_change = compute_change
 
@@ -54,13 +53,6 @@ class BPInference:
         out = kldivergence(new, Factor.normalize(
             old, num_batch_dims=num_batch_dims), log_prob=True)
         return out
-
-    # def total_amount_changed(self):
-    #     r"""returns the sum of the KL divergences from the most recent message
-    #     to the previous version.  If this value is 0, then convergence has been
-    #     achieved."""
-    #     changes = torch.tensor(list(self.message_changes.values())).sum()
-    #     return changes
 
     def logz(self) -> torch.Tensor:
         region_free_energies = []
@@ -144,7 +136,6 @@ class BPInference:
         pokes_s = self.strategy.penetrating_edges(region_id)
         return [self.message(m) for m in pokes_s]
 
-    # @ cache
     def update_messages_from_region(self, source_id: int, target_ids: Tuple[int, ...],
                                     accumulate_change=False
                                     ):  # -> Callable[[], None]:

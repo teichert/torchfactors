@@ -21,13 +21,6 @@ def check_queries(queries: Sequence[Union[Var, Sequence[Var]]]):
                          "or if you want to just get the partition function.")
 
 
-# def uncache(factors: Sequence[Factor]):
-#     pass
-#     # for f in factors:
-#     #     f.clear_cache()
-#     # return factors
-
-
 @torch.jit.script
 def adjust(tensor: Tensor, var_infos: List[Tuple[Tensor, Tensor, List[int]]],
            ANNOTATED: int,
@@ -60,7 +53,6 @@ class Factor:
     """
 
     def __init__(self, variables: Sequence[Var]):
-        # self.cached: Optional[Tensor] = None
         for v in variables:
             if not isinstance(v, Var):
                 raise TypeError(
@@ -74,31 +66,12 @@ class Factor:
         for v in self.variables[1:]:
             if v.shape[:self.num_batch_dims] != self.variables[0].shape[:self.num_batch_dims]:
                 raise ValueError("all variables must have the same shape (domains can vary)")
-        # self._usage_equation = self.__vars_equation(
-        #     [(v,) for v in self.variables],
-        #     [self.variables])
-
-    # def clear_cache(self):
-    #     self.cached = None
-    #     for v in self.variables:
-    #         v.clear_cache()
 
     def __iter__(self) -> Iterator[Var]:
         return iter(self.variables)
 
     def __len__(self) -> int:
         return len(self.variables)
-
-    # def __vars_equation(self, input_var_groups: Sequence[Sequence[Var]],
-    #                     output_var_groups: Sequence[Sequence[Var]],
-    #                     force_multi=False):
-    #     batch_dims = [object() for _ in range(self.num_batch_dims)]
-
-    #     def with_batch_dims(objs: Sequence[object]) -> Sequence[object]:
-    #         return tuple([*batch_dims, *objs])
-    #     groups = [with_batch_dims(group) for group in input_var_groups]
-    #     queries = [with_batch_dims(group) for group in output_var_groups]
-    #     return compile_obj_equation(groups, queries, force_multi=force_multi)
 
     def product_marginal(self, query: Union[Sequence[Var], Var, None] = None,
                          other_factors: Sequence[Factor] = ()
@@ -112,14 +85,6 @@ class Factor:
             query = (query,)
         out, = self.product_marginals(query, other_factors=other_factors)
         return out
-
-    # def product_marginals(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
-    #                       ) -> Sequence[Tensor]:
-    #     r"""
-    #     """
-    #     check_queries(queries)
-    #     # return self.marginals_closure(*queries, other_factors=other_factors)()
-    #     return self.marginals(*queries, other_factors=other_factors)
 
     @staticmethod
     def out_shape_from_variables(variables: Sequence[Var]) -> ShapeType:
@@ -166,13 +131,6 @@ class Factor:
         """
         return math.prod(self.batch_shape)
 
-    # @property
-    # def input_shape(self):
-    #     r"""
-    #     includes batch and graph dims
-    #     """
-    #     return Factor.batch_shape_from_variables(self.variables)
-
     @property
     def batch_shape(self):
         r"""
@@ -198,26 +156,6 @@ class Factor:
     @abstractmethod
     def dense_(self) -> Tensor: ...  # pragma: no cover
 
-    # @property
-    # def _is_possible(self) -> Tensor:
-    #     return outer_and([v.is_possible for v in self.variables],
-    #                      num_batch_dims=self.num_batch_dims)
-
-    # @property
-    # def _is_not_possible(self) -> Tensor:
-    #     return outer_or([v.is_possible.logical_not() for v in self.variables],
-    #                     num_batch_dims=self.num_batch_dims)
-
-    # @property
-    # def _is_not_padding(self) -> Tensor:
-    #     return outer_or([v.is_padding for v in self.variables],
-    #                     num_batch_dims=self.num_batch_dims).logical_not()
-
-    # @property
-    # def _is_padding(self) -> Tensor:
-    #     return outer_or([v.is_padding for v in self.variables],
-    #                     num_batch_dims=self.num_batch_dims)
-
     def prime(self):
         """ensures that all parameters are loaded for this factor"""
         self.dense_()
@@ -233,35 +171,15 @@ class Factor:
         number of factors not change.  Another issue is that non-densable factors will
         need to separately implement this logic :(
         """
-        # if self.cached is not None:
-        #     return self.cached
         d = self.dense_()
         if d.shape != self.shape:
             d = d[None].expand(self.shape)
-        # return d
         var_infos = [(v.usage, v.tensor, v.marginal_shape) for v in self.variables]
         return adjust(d, var_infos,
                       VarUsage.ANNOTATED,
                       VarUsage.LATENT,
                       VarUsage.PADDING,
                       self.num_batch_dims)
-        # self.cached =
-        # return d.where(
-        #     self._is_not_padding,
-        #     torch.zeros_like(d)
-        # ).where(
-        #     self._is_possible,
-        #     torch.full_like(d, float('-inf'))
-        # )
-        # return d.masked_fill(
-        #     self._is_padding,
-        #     0.0
-        # ).masked_fill(
-        #     self._is_not_possible,
-        #     float('-inf')
-        # )
-
-        # return self.cached
 
     def product_marginals(self, *queries: Sequence[Var], other_factors: Sequence[Factor] = ()
                           ) -> Sequence[Tensor]:
@@ -274,9 +192,6 @@ class Factor:
         If no queries are specified, then the partition function is queried.
         """
         check_queries(queries)
-        # equation = self.__vars_equation(
-        #     [self.variables, *[other.variables for other in other_factors]],
-        #     queries, force_multi=True)
         batch_ids = [str(d) for d in range(self.num_batch_dims)]
 
         def with_batch_ids(vs: Sequence[Var]):
@@ -287,15 +202,8 @@ class Factor:
             (f.dense, with_batch_ids(f.variables)) for f in other_factors]]
         labeled_queries = [with_batch_ids(q) for q in queries]
 
-        # def f() -> Sequence[Tensor]:
-        # might be able to pull this out, but I want to make
-        # sure that changes in e.g. usage are reflected
-        # any nans in any factor should be treated as a log(1)
-        # meaning that it doesn't impact the product
-        # out = log_einsum(equation, *input_tensors)
         out = log_dot(input_tensors, labeled_queries, nan_to_num=True)
         return out
-        # return f
 
     @ staticmethod
     def normalize(tensor: Tensor, num_batch_dims=0) -> Tensor:

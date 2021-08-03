@@ -62,6 +62,3 @@ class ProportionalOdds(CliqueModel):
             # the values k >= j are all impossible
             for label in range(1, len(v.domain)):
                 yield KIsAtLeastJ(v, binary_variables[v, label], label)
-            # yield VIsKAndAtLeastB(v, [
-            #     binary_variables[v, label] for label in range(1, len(v.domain))
-            # ])

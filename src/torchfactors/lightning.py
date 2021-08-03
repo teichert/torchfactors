@@ -73,24 +73,6 @@ lit_init_names = dict(
                               'multiplied by the exponentiated total KL from previous message'))
 
 
-# class DataConsumer(Generic[SubjectType]):
-
-#     def maybe_add(self, split: str, item: Callable[[], SubjectType]):
-#         """
-#         This should be overriden in every sub-class"""
-#         raise NotImplementedError("data consumer not implemented")
-
-#     def accept_item(self, split: str, item: SubjectType) -> bool:
-#         return self.accept(split, split, lambda: item)
-
-#     def accept(self, split: str, item: Callable[[], SubjectType]) -> bool:
-#         try:
-#             self.maybe_add(split, item)
-#             return True
-#         except StopIteration:
-#             return False
-
-
 @dataclass
 class DataModule(pl.LightningDataModule, Generic[SubjectType]):
     r"""
@@ -120,30 +102,6 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
     train: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset)
     val: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset)
     test: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset)
-
-    # def maybe_add(self, split: str, get: Callable[[], SubjectType]):
-    #     if split == 'train':
-    #         train = cast(ListDataset, self.train)
-    #         if len(train.examples) < self.compute_max_count(self.train_max_count,
-    #                                                         self.split_max_count):
-    #             train.examples.append(get)
-    #         else:
-    #             raise StopIteration
-    #     else:
-    #         if split == 'dev' and self.test_mode:
-
-    #         self.test_length < self.max_test_count and (
-    #             self.test_mode and split == 'test' or
-    #                 not self.test_mode and split == 'dev'):
-
-    #     if split == 'train' and self.train_length < self.max_train_count:
-    #         cast(ListDataset, self.train).examples.append(get())
-    #     elif self.test_length < self.max_test_count and (
-    #             self.test_mode and split == 'test' or
-    #             not self.test_mode and split == 'dev'):
-    #         cast(ListDataset, self.test).examples.append(get())
-    #     else:
-    #         raise StopIteration()
 
     @property
     def train_length(self) -> int:
@@ -181,31 +139,6 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
             return self.negative_to_none(self.split_max_count)
         else:
             return self.negative_to_none(split_max_count)
-
-    # def set_split(self, split: str, examples: Dataset[SubjectType]
-    #               ) -> None:
-    #     dataset = cast(torch.utils.data.Dataset, examples)
-    #     if split == 'train':
-    #         self.train = dataset
-    #     if split == 'val':
-    #         self.val = dataset
-    #     if split == 'test':
-    #         self.test = dataset
-
-    # def split_max_counts(self, stage: Optional[str]) -> Dict[str, int]:
-    #     split_max_sizes = {}
-    #     if stage in (None, 'fit'):
-    #         split_max_sizes['train'] = self.compute_max_count(self.train_max_count)
-    #     if stage in (None, 'test'):
-    #         max_count = self.compute_max_count(self.test_max_count)
-    #         if self.test_mode:
-    #             split_max_sizes['test'] = max_count
-    #         else:
-    #             split_max_sizes['dev'] = max_count
-    #     return split_max_sizes
-
-    # def train(self) -> Sequence[SubjectType]:
-    #     raise ValueError("no train data specified")
 
     def make_data_loader(self, examples: Dataset[SubjectType],
                          batch_size: int | None):
@@ -309,7 +242,6 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
                  inference_kwargs: Optional[Dict[str, Any]] = None,
                  ):
         super().__init__()
-        # self.model = self.configure_model()
         self.model = model
         self.optimizer_name = optimizer
         self.data = data
@@ -339,9 +271,6 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
         if self.data is not None:
             self.data.setup(None)
 
-    # @abstractmethod
-    # def configure_model(self) -> Model[SubjectType]: ...
-
     def setup(self, stage=None) -> None:
         logging.info(self.optimizer_kwargs)
         logging.info(self.inference_kwargs)
@@ -355,19 +284,12 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
     def configure_optimizers(self) -> Optimizer:
         return optimizers[self.optimizer_name](self.parameters(), **self.optimizer_kwargs)
 
-    # @abstractmethod
-    # def configure_inferencer(self) -> Inferencer: ...
-
-    # def forward(self, x: SubjectType, *args, **kwargs) -> SubjectType:
-    #     return self.system.predict(x)
     def transfer_batch_to_device(self, _batch, device, dataloader_idx):
         batch: SubjectType = cast(SubjectType, _batch)
         return batch.to_device(device)
 
     def training_step(self, *args, **kwargs) -> Union[torch._tensor.Tensor, Dict[str, Any]]:
         batch: SubjectType = cast(SubjectType, args[0])
-        # batch_idx: int = cast(int, args[1])
-        # self.log('batch_idx', batch_idx)
         info = dict(status="initializing")
         with tqdm(total=8, desc="Training Step", postfix=info, delay=0.5, leave=False) as progress:
             def update(status: str):

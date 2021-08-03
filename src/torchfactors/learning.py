@@ -62,10 +62,6 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
     system = System(model, BP(passes=passes))
     system.prime(data_loader)
     optimizer = optimizer_cls(model.parameters(), **optimizer_kwargs)
-    # optimizer = torch.optim.LBFGS(model.parameters(), lr=lr)
-    # optimizer = torch.optim.Rprop(model.parameters(), lr=lr)
-    # optimizer = optim.RAdam(model.parameters(), lr=lr)
-    # optimizer = optim.AdaBound(model.parameters(), lr=lr)
     logging.info('staring training...')
     if log_info is None:
         log_info = {}
@@ -97,8 +93,6 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
             return loss
 
         optimizer.step(closure)
-        # log_info['lr'] = scheduler.get_last_lr()
-        # scheduler.step()
         if each_step is not None:
             each_step(system, data_loader, data)
         if j == 0 and each_epoch is not None:
