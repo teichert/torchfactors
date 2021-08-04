@@ -99,8 +99,8 @@ class Strategy(object):
     edges: List[Tuple[int, int]]
     passes: int = 2
 
-    def edge_groups(self) -> List[Tuple[int, List[int]]]:
-        return list((s, ts) for s, ts in enumerate(self.outfrom) if ts)
+    def edge_groups(self) -> List[Tuple[int, List[int]]]: ...  # pragma: no cover
+    # return list((s, ts) for s, ts in enumerate(self.outfrom) if ts)
 
     def __iter__(self) -> Iterator[Tuple[int, List[int]]]:
         # naive default for now is to pass everything a fixed number of times

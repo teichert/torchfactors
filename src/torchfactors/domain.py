@@ -49,20 +49,27 @@ class FlexDomain(Domain):
     a different order could change their id.
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, unk: bool = False):
         self.name = name
         self.frozen = False
-        self.unk = object()
-        self.values = [self.unk]
-        self.value_to_id = {self.unk: 0}
+        if unk:
+            self.unk = object()
+            self.unk_id = 0
+            self.values = [self.unk]
+            self.value_to_id = {self.unk: 0}
+        else:
+            self.unk = None
+            self.unk_id = -1
+            self.values = []
+            self.value_to_id = {}
 
     def freeze(self):
         self.frozen = True
 
     def get_id(self, value: Hashable, warn=True) -> int:
-        default = 0 if self.frozen else len(self.values)
+        default = self.unk_id if self.frozen else len(self.values)
         id = self.value_to_id.setdefault(value, default)
-        if warn and id == 0:
+        if warn and id == self.unk_id:
             warnings.warn("unknown value on frozen flex domain", RuntimeWarning)
         if id >= len(self.values):
             self.values.append(value)
@@ -81,13 +88,18 @@ class FlexDomain(Domain):
     def __len__(self):
         return len(self.values)
 
-    def to_list(self) -> Tuple[str, Sequence[Hashable]]:
-        return self.name, self.values[1:]
+    def to_list(self) -> Tuple[str, bool, Sequence[Hashable]]:
+        return self.name, self.unk is not None, self.values[(1 + self.unk_id):]
 
     @staticmethod
-    def from_list(input: Tuple[str, Sequence[Hashable]]) -> FlexDomain:
-        name, values = input
-        domain = FlexDomain(name)
+    def from_list(input: Tuple[str, bool, Sequence[Hashable]]) -> FlexDomain:
+        r"""
+        returns a FlexDomain with the given string as the domain name,
+        the bool indicates if the domain should include an unknown (unk)
+        value
+        """
+        name, unk, values = input
+        domain = FlexDomain(name, unk=unk)
         for value in values:
             domain.get_id(value)
         domain.freeze()

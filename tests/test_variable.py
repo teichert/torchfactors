@@ -573,7 +573,7 @@ def test_broken_usage():
 
 
 def test_flex_domain():
-    domain = tx.FlexDomain('property')
+    domain = tx.FlexDomain('property', unk=True)
     m = tx.Model[tx.Subject]()
     input = ['this', 'is', 'this', 'test', 'is', 'this']
     ids = m.domain_ids(domain, input)
@@ -585,7 +585,7 @@ def test_flex_domain():
 
 
 def test_frozen_flex_domain():
-    domain = tx.FlexDomain('property')
+    domain = tx.FlexDomain('property', unk=True)
     m = tx.Model[tx.Subject]()
     m.domain_ids(domain, ['this', 'is', 'this', 'test', 'is', 'this'])
     domain.freeze()

@@ -33,6 +33,9 @@ class FactorGraph:
     def __iter__(self) -> Iterator[Factor]:
         return iter(self.factors)
 
+    def is_factor_node(self, node):
+        return node < self.num_factors
+
     def region_variable_ids(self, node_ids: Sequence[int]
                             ) -> List[int]:
         return list(set([

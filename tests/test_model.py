@@ -229,7 +229,7 @@ def test_custom_init():
 
 def test_model_domain_state_dict():
     model = Model[DummySubject]()
-    domain = FlexDomain('test')
+    domain = FlexDomain('test', unk=True)
     values1 = ['this', 'test', 'is', 'a', 'test', 'of', 'this']
     values2 = ['test', 'a', 'test', 'of', 'this', 'is', 'this']
     ids1 = model.domain_ids(domain, values1).tolist()
@@ -242,7 +242,7 @@ def test_model_domain_state_dict():
     model2 = Model[DummySubject]()
     model2.load_state_dict(loaded_state)
 
-    domain2 = FlexDomain('test')
+    domain2 = FlexDomain('test', unk=True)
     out2 = model2.domain_ids(domain2, values2).tolist()
     assert out2 == ids2
     out1 = model2.domain_ids(domain2, values1).tolist()

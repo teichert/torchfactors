@@ -35,6 +35,9 @@ def test_lit_learning():
     trainer.fit(lit, data_loader)
 
 
+test_lit_learning()
+
+
 @pytest.mark.filterwarnings('ignore::UserWarning')
 def test_lit_learning_fit_twice():
     trainer = pl.Trainer(max_epochs=10)

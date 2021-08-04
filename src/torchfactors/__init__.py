@@ -17,7 +17,7 @@ from .factor import Factor
 from .factor_graph import FactorGraph
 from .inferencer import Inferencer
 from .inferencers.bp import BP
-from .lightning import LitSystem
+from .lightning import DataModule, ListDataset, LitSystem
 from .model import Model
 from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
@@ -38,7 +38,7 @@ DEFAULT = VarUsage.DEFAULT
 OPEN = Domain.OPEN
 
 __all__ = [
-    'LitSystem', 'with_rep_number',
+    'ListDataset', 'DataModule', 'LitSystem', 'with_rep_number',
     'data_len',
     'gdrop', 'GeneralizedDimensionDrop', 'at', 'num_trainable',
     'dataclass', 'logsumexp',

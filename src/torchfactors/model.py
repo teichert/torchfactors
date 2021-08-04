@@ -87,7 +87,8 @@ class Model(torch.nn.Module, Generic[SubjectType]):
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
         domains = state_dict.pop(prefix + '_domains')
-        self._domains = {name: FlexDomain.from_list((name, values)) for name, values in domains}
+        self._domains = {name: FlexDomain.from_list((name, unk, values))
+                         for name, unk, values in domains}
         return super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
                                              missing_keys, unexpected_keys, error_msgs)
 

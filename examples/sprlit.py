@@ -101,17 +101,17 @@ class SPRLModel(tx.Model[SPRL]):
 
 
 if __name__ == '__main__':
-    print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
     try:
+        print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
         torch.tensor(0.0).to("cuda")
-    except RuntimeError:
+    except KeyError:
         pass
     parser = argparse.ArgumentParser(add_help=False)
     parser = tx.LitSystem.add_argparse_args(parser)
     torch.set_num_threads(1)
     args = pl.Trainer.parse_argparser(parser.parse_args())
     # args = pl.Trainer.parse_argparser(parser.parse_args(
-    #     "--batch_size 19 --split_max_count 19".split()))
+    #     "--batch_size 3 --auto_lr_find True".split()))
     trainer = pl.Trainer.from_argparse_args(args)
     model = SPRLModel()
     system = tx.LitSystem.from_args(
@@ -125,5 +125,9 @@ if __name__ == '__main__':
     #         predicted.rating.flatten() > 3,
     #         train.rating.flatten() > 3,
     #         num_classes=len(predicted.rating.domain)))
-
+    trainer.tune(system, lr_find_kwargs=dict(
+        update_attr=True,
+        num_training=2,
+    ))
+    print(system.hparams)
     trainer.fit(system)

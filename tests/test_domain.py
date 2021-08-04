@@ -54,7 +54,7 @@ def test_fail_open():
 
 
 def test_flex_domain():
-    d = tx.FlexDomain('domain')
+    d = tx.FlexDomain('domain', unk=True)
     assert d.get_id('test') == 1
     assert d.get_id('test2') == 2
     assert d.get_id('test') == 1
@@ -70,15 +70,15 @@ def test_flex_domain():
 
 def test_domain_to_list():
     model = Model[DummySubject]()
-    domain1 = domain.FlexDomain('test1')
+    domain1 = domain.FlexDomain('test1', unk=True)
     values1 = ['this', 'test', 'is', 'a', 'test', 'of', 'this']
     model.domain_ids(domain1, values1)
     out = domain1.to_list()
-    assert out == ('test1', ['this', 'test', 'is', 'a', 'of'])
+    assert out == ('test1', True, ['this', 'test', 'is', 'a', 'of'])
 
 
 def test_domains_from_list():
-    input = ('test1', ['this', 'test', 'is', 'a', 'of'])
+    input = ('test1', True, ['this', 'test', 'is', 'a', 'of'])
     domain2 = domain.FlexDomain.from_list(input)
     assert domain2.name == 'test1'
 

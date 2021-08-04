@@ -6,8 +6,10 @@ import itertools
 import logging
 import re
 from argparse import ArgumentParser, Namespace
+from collections import ChainMap
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, List, Optional, Sized, Union, cast
+from typing import (Any, Dict, Generic, List, Mapping, Optional, Sized, Union,
+                    cast)
 
 import pytorch_lightning as pl
 import torch
@@ -25,6 +27,7 @@ from .utils import split_data
 
 optimizers = dict(
     Adam=torch.optim.Adam,
+    AdamW=torch.optim.AdamW,
     LBFGS=torch.optim.LBFGS,
 )
 
@@ -58,7 +61,8 @@ class ArgParseArg:
 
 
 default_optimizer_kwargs = dict(
-    lr=ArgParseArg(float, 1.0, 'learning rate')
+    lr=ArgParseArg(float, 1.0, 'learning rate'),
+    weight_decay=ArgParseArg(float, None, 'weight decay'),
 )
 
 default_inference_kwargs = dict(
@@ -270,6 +274,16 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
         self.primed = False
         if self.data is not None:
             self.data.setup(None)
+        self._hparams = dict(**self.optimizer_kwargs, **self.inference_kwargs, **self.self_kwargs)
+
+    def get_progress_bar_dict(self) -> Mapping[str, Union[int, str]]:  # type: ignore
+        return ChainMap(
+            self.log_info,
+            super().get_progress_bar_dict())
+
+    @property
+    def hparams(self):
+        return self._hparams
 
     def setup(self, stage=None) -> None:
         logging.info(self.optimizer_kwargs)

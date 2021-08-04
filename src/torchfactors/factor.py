@@ -61,7 +61,9 @@ class Factor:
                     "e.g. TensorFactor(v, tensor=t)")
         if len(set(variables)) < len(variables):
             raise ValueError("It looks like you've used the same variable more than once in "
-                             "this factor (sorry, this is not supported yet).")
+                             "this factor (sorry, this is not supported yet). Did you forget "
+                             "ellipses when you indexed into a variable (e.g. v[:-1], v[1:] "
+                             "instead of v[..., :-1], v[..., 1:])?")
         self.variables = variables
         for v in self.variables[1:]:
             if v.shape[:self.num_batch_dims] != self.variables[0].shape[:self.num_batch_dims]:
