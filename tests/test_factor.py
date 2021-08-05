@@ -1,4 +1,5 @@
 import math
+from typing import Iterable
 
 import pytest
 import torch
@@ -9,7 +10,7 @@ from torchfactors import (ANNOTATED, CLAMPED, LATENT, OBSERVED, PADDING,
 
 def test_factor():
     t = torch.ones(3, 4)
-    v = TensorVar(t, Range(10), LATENT)
+    v = TensorVar(t, Range(10), LATENT, ndims=0)
     factor_tensor = ndarange(3, 4, 10).log()
     with pytest.raises(TypeError):
         # needs to name factor_tensor argument since it comes after varargs
@@ -33,44 +34,44 @@ def test_factor():
 
 def test_bad_tensor_factor():
     t = torch.ones(3, 4)
-    v = TensorVar(t, domain=Range(10))
+    v = TensorVar(t, domain=Range(10), ndims=0)
     with pytest.raises(ValueError):
         TensorFactor(v, tensor=torch.rand(3, 4, 9))
 
 
 def test_bad_repeat_var():
     t = torch.ones(3, 4)
-    v = TensorVar(t, domain=Range(10))
+    v = TensorVar(t, domain=Range(10), ndims=0)
     with pytest.raises(ValueError):
         TensorFactor(v, v, tensor=torch.rand(3, 4, 10, 10))
 
 
 def test_init_tensor_factor():
     t = torch.ones(3, 4)
-    v = TensorVar(t, domain=Range(10))
+    v = TensorVar(t, domain=Range(10), ndims=0)
     f = TensorFactor(v)
     assert f.dense.shape == (3, 4, 10)
     assert (f.dense == 0).all()
 
 
 def test_multi_factor():
-    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
-    v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10), ndims=0)
+    v2 = TensorVar(torch.ones(3, 4), domain=Range(5), ndims=0)
     f = TensorFactor(v1, v2)
     assert f.shape == (3, 4, 10, 5)
 
 
 def test_bad_multi_factor():
-    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
-    v2 = TensorVar(torch.ones(4, 4), domain=Range(10))
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10), ndims=0)
+    v2 = TensorVar(torch.ones(4, 4), domain=Range(10), ndims=0)
     with pytest.raises(ValueError):
         # batch dims don't match
         TensorFactor(v1, v2)
 
 
 def test_multi_factor_var():
-    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
-    v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10), ndims=0)
+    v2 = TensorVar(torch.ones(3, 4), domain=Range(5), ndims=0)
     f = TensorFactor(v1, v2)
     assert f.product_marginal(v1).shape == (3, 4, 10)
     assert (f.product_marginal(v1).exp() == 5).all()
@@ -79,8 +80,8 @@ def test_multi_factor_var():
 
 
 def test_multi_factor_2vars():
-    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
-    v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10), ndims=0)
+    v2 = TensorVar(torch.ones(3, 4), domain=Range(5), ndims=0)
     f = TensorFactor(v1, v2)
     v1marg, v2marg = f.product_marginals([v1], [v2])
     assert v1marg.shape == (3, 4, 10)
@@ -90,8 +91,8 @@ def test_multi_factor_2vars():
 
 
 def test_multi_factor_bad_2vars():
-    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
-    v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10), ndims=0)
+    v2 = TensorVar(torch.ones(3, 4), domain=Range(5), ndims=0)
     f = TensorFactor(v1, v2)
     with pytest.raises(ValueError):
         # missing the brackets around the variables makes things ambiguous
@@ -115,7 +116,7 @@ def test_graph_dim():
 
 # # TODO: test where they vary accross batch dims
 # def test_multiple_graph_dims():
-#     v = TensorVar(torch.ones(5, 4, 6), domain=Range(2), usage=tx.ANNOTATED)
+#     v = TensorVar(torch.ones(5, 4, 6), domain=Range(2), usage=tx.ANNOTATED, ndims=0)
 #     # 5 per batch
 #     # (4-1) x 6 = 18 factors per graph
 #     f = TensorFactor(v[..., :-1, :], v[..., 1:, :], tensor=torch.tensor([
@@ -158,8 +159,8 @@ def test_graph_dim():
 
 def test_bad_variables():
     # cannot pass more than one variable without putting them into a sequence
-    v1 = TensorVar(torch.ones(3, 4), domain=Range(10))
-    v2 = TensorVar(torch.ones(3, 4), domain=Range(5))
+    v1 = TensorVar(torch.ones(3, 4), domain=Range(10), ndims=0)
+    v2 = TensorVar(torch.ones(3, 4), domain=Range(5), ndims=0)
     t = TensorFactor(v1, v2)
     assert t.shape == (3, 4, 10, 5)
 
@@ -177,7 +178,7 @@ def test_mask():
         LATENT,
         CLAMPED,
         PADDING,
-    ]))
+    ]), ndims=0)
     factor = TensorFactor(v, tensor=torch.full(v.marginal_shape, math.log(3)))
     out = factor.dense
     assert out.allclose(torch.tensor([
@@ -202,7 +203,7 @@ def test_mask2():
         ANNOTATED,
         OBSERVED,
         LATENT,
-    ]))
+    ]), ndims=0)
 
     v2 = TensorVar(tensor=torch.tensor([
         2,
@@ -216,7 +217,7 @@ def test_mask2():
         LATENT,
         PADDING,
         CLAMPED,
-    ]))
+    ]), ndims=0)
 
     factor = TensorFactor(v, v2, tensor=torch.full((5, 2, 4), math.log(3)))
     out = factor.dense  # in x v x v2
@@ -242,3 +243,26 @@ def test_mask2():
             [0, 3, 0, 0],
         ],
     ]).log())
+
+
+def test_reused_inputs():
+    @tx.dataclass
+    class Example(tx.Subject):
+        labels: tx.Var = tx.VarField(tx.Range(7), tx.ANNOTATED, ndims=1)
+        inputs: tx.Var = tx.VarField(tx.OBSERVED, ndims=1)
+
+    x = Example(
+        labels=tx.TensorVar(torch.ones(3, 4, 5)),
+        inputs=tx.TensorVar(torch.ones(3, 4, 5, 10))
+    )
+
+    class MyModel(tx.Model[Example]):
+        def factors(self, x: Example) -> Iterable[tx.Factor]:
+            yield tx.LinearFactor(
+                self.namespace('factor'),
+                x.labels, input=x.inputs.tensor)
+
+    sys = tx.System(MyModel(), tx.BP())
+    sys.prime(x)
+
+    assert tx.num_trainable(sys.model) == (10 + 1) * 7

@@ -91,9 +91,6 @@ def test_stack_twice():
         Utterance.stack([u])
 
 
-test_stack_twice()
-
-
 def test_no_vars():
     @dataclass
     class Utterance(Subject):

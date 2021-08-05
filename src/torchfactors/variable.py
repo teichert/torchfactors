@@ -93,6 +93,12 @@ class Var(ABC):
     def shape(self) -> Size:
         return self.tensor.shape
 
+    # @property
+    # def batch_shape(self) -> Size:
+    #     shape = self.shape
+    #     n = len(shape)
+    #     return shape[:(n - self.ndims)]
+
     @property
     def marginal_shape(self) -> List[int]:
         return [*self.tensor.shape, len(self.domain)]

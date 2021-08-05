@@ -134,9 +134,9 @@ def testKIsAtLeastJ():
 
 
 def test_binary():
-    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
     assert tuple(a.marginal_shape) == (5, 4)
-    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     assert tuple(b.marginal_shape) == (5, 3)
 
     env = Environment()
@@ -173,8 +173,8 @@ def test_nominal():
     model = Nominal()
     params = DummyParamNamespace()
     input = torch.ones(5, 8)
-    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
-    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     factors = list(model.factors(env, params, a, b, input=input))
     [f.dense for f in factors]
 
@@ -196,8 +196,8 @@ def test_prop_odds():
     model = ProportionalOdds()
     params = DummyParamNamespace()
     input = torch.ones(5, 9)
-    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
-    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     factors = list(model.factors(env, params, a, b, input=input))
     [f.dense for f in factors]
     # pairing 3 binary to other 2 binary and adding in mapping for each
@@ -217,8 +217,8 @@ def test_non_linear_stereotype():
     model = Stereotype(linear=False)
     params = DummyParamNamespace()
     input = torch.ones(5, 9)
-    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
-    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     factors = [f.dense for f in model.factors(env, params, a, b, input=input)]
     assert len(factors) == 2
 
@@ -233,8 +233,8 @@ def test_linear_stereotype():
     model = Stereotype()
     params = DummyParamNamespace()
     input = torch.ones(5, 9)
-    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
-    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     factors = [f.dense for f in model.factors(env, params, a, b, input=input)]
     assert len(factors) == 2
 
@@ -248,8 +248,8 @@ def test_linear_stereotyp_bias_only():
     env = Environment()
     model = Stereotype()
     params = DummyParamNamespace()
-    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4))
-    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3))
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     factors = [f.dense for f in model.factors(env, params, a, b, input=None)]
     assert len(factors) == 1
 

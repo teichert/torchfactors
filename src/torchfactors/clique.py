@@ -76,7 +76,8 @@ def make_binary_threshold_variables(env: Environment, *variables: Var, key: Hash
         out = TensorVar(
             domain=Range(2),
             usage=usage,
-            tensor=(v.tensor >= len(v.domain) / 2).int())
+            tensor=(v.tensor >= len(v.domain) / 2).int(),
+            ndims=v.ndims)
         return out
     binary_variables: Dict[Var, Var] = {
         v: env.variable((v, key), lambda: binary_variable(v))
