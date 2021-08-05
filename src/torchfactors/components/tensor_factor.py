@@ -28,12 +28,10 @@ class TensorFactor(Factor):
         exemplar = self.variables[0].origin.tensor
         if tensor is None:
             tensor = init(self.shape)
-
-        if tensor.shape != self.shape:
-            try:
-                tensor = tensor[None].expand(self.shape)
-            except RuntimeError:
-                raise ValueError("you didn't provide a tensor with the correct shape")
+        if len(tensor.shape) < len(self.shape) and tensor.shape == self.out_shape:
+            tensor = tensor[(None,) * self.num_batch_dims].expand(self.shape)
+        elif tensor.shape != self.shape:
+            raise ValueError("you didn't provide a tensor with the correct shape")
         self.tensor = tensor.to(exemplar.device)
 
     def dense_(self):

@@ -126,6 +126,8 @@ class Subject:
                     var_instance = TensorVar()
                     setattr(self, attr_name, var_instance)
                 cls_attr_id_to_var[id(var_field)] = var_instance
+                if var_instance._ndims is None and var_field._ndims is not None:
+                    var_instance._ndims = var_field._ndims
                 if var_field._shape is not None:
                     specified_shape: Union[Size, Tuple[int, ...]]
                     if isinstance(var_field._shape, Var):

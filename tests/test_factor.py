@@ -32,11 +32,18 @@ def test_factor():
     assert zs2.isclose(expected_zs).all()
 
 
+def test_okay_tensor_factor():
+    t = torch.ones(3, 4)
+    v = TensorVar(t, domain=Range(10), ndims=0)
+    f = TensorFactor(v, tensor=torch.rand(10))
+    assert f.shape == (3, 4, 10)
+
+
 def test_bad_tensor_factor():
     t = torch.ones(3, 4)
     v = TensorVar(t, domain=Range(10), ndims=0)
     with pytest.raises(ValueError):
-        TensorFactor(v, tensor=torch.rand(3, 4, 9))
+        TensorFactor(v, tensor=torch.rand(3, 5, 10))
 
 
 def test_bad_repeat_var():
@@ -245,24 +252,69 @@ def test_mask2():
     ]).log())
 
 
-def test_reused_inputs():
-    @tx.dataclass
-    class Example(tx.Subject):
-        labels: tx.Var = tx.VarField(tx.Range(7), tx.ANNOTATED, ndims=1)
-        inputs: tx.Var = tx.VarField(tx.OBSERVED, ndims=1)
+@tx.dataclass
+class Example(tx.Subject):
+    labels: tx.Var = tx.VarField(tx.Range(7), tx.ANNOTATED, ndims=1)
+    inputs: tx.Var = tx.VarField(tx.OBSERVED, ndims=1)
 
+
+class MyModel(tx.Model[Example]):
+    def factors(self, x: Example) -> Iterable[tx.Factor]:
+        yield tx.LinearFactor(
+            self.namespace('factor'),
+            x.labels, input=x.inputs.tensor)
+
+
+class MySharedModel(tx.Model[Example]):
+    def factors(self, x: Example) -> Iterable[tx.Factor]:
+        yield tx.LinearFactor(
+            self.namespace('factor'),
+            x.labels, input=x.inputs.tensor,
+            share=True)
+
+
+def test_not_reused_inputs():
     x = Example(
         labels=tx.TensorVar(torch.ones(3, 4, 5)),
         inputs=tx.TensorVar(torch.ones(3, 4, 5, 10))
     )
 
-    class MyModel(tx.Model[Example]):
-        def factors(self, x: Example) -> Iterable[tx.Factor]:
-            yield tx.LinearFactor(
-                self.namespace('factor'),
-                x.labels, input=x.inputs.tensor)
-
     sys = tx.System(MyModel(), tx.BP())
     sys.prime(x)
 
     assert tx.num_trainable(sys.model) == (10 + 1) * 7
+
+
+def test_reused_inputs():
+    x = Example(
+        labels=tx.TensorVar(torch.ones(3, 4, 5)),
+        inputs=tx.TensorVar(torch.ones(3, 4, 10))
+    )
+
+    sys = tx.System(MySharedModel(), tx.BP())
+    assert x.labels.ndims == 1
+    assert x.inputs.ndims == 1
+    sys.prime(x)
+
+    assert tx.num_trainable(sys.model) == (10 + 1) * 7
+
+
+def test_bad_shared1():
+    x = Example(
+        labels=tx.TensorVar(torch.ones(3, 4, 5)),
+        inputs=tx.TensorVar(torch.ones(3, 10))
+    )
+    sys = tx.System(MySharedModel(), tx.BP())
+    with pytest.raises(ValueError):
+        # share=True, but batches don't match
+        sys.prime(x)
+
+
+def test_bad_shared2():
+    x = Example(
+        labels=tx.TensorVar(torch.ones(3, 4, 5)),
+        inputs=tx.TensorVar(torch.ones(3, 4, 5, 10))
+    )
+    sys = tx.System(MySharedModel(), tx.BP())
+    sys.prime(x)
+    assert tx.num_trainable(sys.model) == ((10 * 5) + 1) * 7

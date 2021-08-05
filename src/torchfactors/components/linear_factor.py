@@ -73,7 +73,7 @@ class ShapedLinear(torch.nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         flattened_in: Tensor
-        if self.input_shape is None:
+        if self.input_shape is None or not self.input_shape:
             flattened_in = x
         else:
             flattened_in = x.flatten(len(x.shape) - len(self.input_shape))
@@ -85,22 +85,44 @@ class ShapedLinear(torch.nn.Module):
 class LinearFactor(Factor):
     r"""
     A factor for which the configuration scores come from a
-    ShapedLinear layer applied to the specified input
+    ShapedLinear layer applied to the specified input:
+
+    the input should exactly match all batch dim (including graph_dims)
+    the remaining dimensions will be used to get a different
+    output for each batch element
     """
 
     def __init__(self,
                  params: ParamNamespace,
                  *variables: Var,
                  input: Optional[Tensor] = None,
-                 bias: bool = True):
+                 bias: bool = True,
+                 share: bool = False):
+        r"""
+        share: if True, then the input will be expanded to match the
+        graph_dims of the first variable (i.e. using the same features
+        within a particular batch element)
+        """
         super().__init__(variables)
-        self.input = input
         self.bias = bias
         self.params = params
         if input is not None and input.shape:
-            if (len(input.shape) < self.num_batch_dims or
-                    input.shape[:self.num_batch_dims] != self.batch_shape):
+            if share:
+                # repeat the input across each replicate in the batch element graph
+                graph_dims = variables[0].ndims
+                actual_batch_dims = self.num_batch_dims - graph_dims
+                actual_batch_shape = input.shape[:actual_batch_dims]
+                input_shape = input.shape[actual_batch_dims:]
+                if actual_batch_shape == self.batch_shape[:actual_batch_dims]:
+                    graph_shape = variables[0].shape[actual_batch_dims:]
+                    # leave batch_dims alone, add graph_dims
+                    input = input[(slice(None),) * actual_batch_dims + (None,) * variables[0].ndims]
+                    input = input.expand((-1,) * actual_batch_dims + graph_shape + input_shape)
+                else:
+                    raise ValueError("tried to expand shared input, but it didn't work")
+            if input.shape[:self.num_batch_dims] != self.batch_shape:
                 raise ValueError("prefix dimensions of input must match batch_dims")
+        self.input = input
 
     @property
     def in_shape(self) -> Optional[ShapeType]:
