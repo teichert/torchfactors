@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field, fields
-from typing import (Callable, Dict, FrozenSet, Generic, Hashable, List,
-                    Optional, Sequence, Sized, Tuple, TypeVar, Union, cast)
+from typing import (Callable, Dict, FrozenSet, Generic, Hashable, Iterator,
+                    List, Optional, Sequence, Sized, Tuple, TypeVar, Union,
+                    cast)
 
 import torch
 from torch._C import Size
@@ -26,10 +27,10 @@ ExampleType = TypeVar('ExampleType')
 class ListDataset(IterableDataset[ExampleType], Generic[ExampleType]):
     examples: Sequence[ExampleType] = ()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.examples)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[ExampleType]:
         for index in range(len(self)):
             yield self.__getitem__(index)
 
@@ -41,10 +42,10 @@ class ListDataset(IterableDataset[ExampleType], Generic[ExampleType]):
 class ChainDataset(Dataset[ExampleType], Generic[ExampleType]):
     datasets: Sequence[Dataset[ExampleType]]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return sum(len(cast(Sized, dataset)) for dataset in self.datasets)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[ExampleType]:
         for dataset in self.datasets:
             yield from cast(IterableDataset, dataset)
 

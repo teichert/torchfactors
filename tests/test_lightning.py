@@ -302,3 +302,28 @@ def test_args4():
     assert sys.optimizer_name == 'LBFGS'
     assert sys.inferencer.passes == 10
     assert cast(DataModule, sys.data).path == "hello!"
+
+
+def test_dev_test():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        i: int
+
+    class Data(tx.DataModule[MySubject]):
+        def setup(self, stage=None):
+            self.train = tx.ListDataset([MySubject(i) for i in range(0, 1)])
+            self.val = tx.ListDataset([MySubject(i) for i in range(1, 2)])
+            self.dev = tx.ListDataset([MySubject(i) for i in range(3, 6)])
+            self.test = tx.ListDataset([MySubject(i) for i in range(9, 12)])
+
+    data1 = Data(test_mode=False)
+    data1.setup()
+    assert [x.i for x in list(data1.test_dataloader())] == [3, 4, 5]
+
+    data2 = Data(test_mode=True)
+    data2.setup()
+    assert [x.i for x in list(data2.test_dataloader())] == [9, 10, 11]
+
+    data3 = Data()  # dev should be default
+    data3.setup()
+    assert [x.i for x in list(data3.test_dataloader())] == [3, 4, 5]
