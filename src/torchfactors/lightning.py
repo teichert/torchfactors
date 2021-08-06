@@ -22,7 +22,7 @@ from torchfactors.inferencers.bp import BP
 
 from .model import Model
 from .model_inferencer import System
-from .subject import ListDataset, SubjectType
+from .subject import ChainDataset, ListDataset, SubjectType
 from .utils import split_data
 
 optimizers = dict(
@@ -103,9 +103,10 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
     test_batch_size: Optional[int] = None
 
     test_mode: bool = False
-    train: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset)
-    val: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset)
-    test: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset)
+    train: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset[SubjectType])
+    val: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset[SubjectType])
+    dev: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset[SubjectType])
+    test: Dataset[SubjectType] = dataclasses.field(default_factory=ListDataset[SubjectType])
 
     @property
     def train_length(self) -> int:
@@ -117,7 +118,7 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
 
     @property
     def test_length(self) -> int:
-        return len(cast(Sized, self.test))
+        return len(cast(Sized, self.test if self.test_mode else self.dev))
 
     @property
     def train_limit(self) -> int:
@@ -145,7 +146,13 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
             return self.negative_to_none(split_max_count)
 
     def make_data_loader(self, examples: Dataset[SubjectType],
-                         batch_size: int | None):
+                         batch_size: int | None,
+                         limit: int | None):
+        if limit is not None and len(cast(Sized, examples)) > limit:
+            raise ValueError("You tried to create a dataloader with a bigger number of examples "
+                             "than what your limit says.  When you set e.g. `dm.train = data`, "
+                             "did you forget to limit `data`?: e.g. "
+                             "`dm.train = data[:dm.train_limit]")
         computed_batch_size = self.computed_batch_size(examples, batch_size)
         if examples:
             return examples[0].data_loader(examples, batch_size=computed_batch_size)
@@ -160,21 +167,41 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
             out = self.negative_to_none(split_batch_size)
         return len(cast(Sized, examples)) if out is None else out
 
-    def train_dataloader(self) -> DataLoader | List[DataLoader]:
-        return self.make_data_loader(self.train, batch_size=self.train_batch_size)
+    def train_dataloader(self) -> DataLoader[SubjectType] | List[DataLoader[SubjectType]]:
+        return self.make_data_loader(self.train, batch_size=self.train_batch_size,
+                                     limit=self.train_limit)
 
-    def val_dataloader(self) -> DataLoader | List[DataLoader]:
-        return self.make_data_loader(self.val, batch_size=self.val_batch_size)
+    def val_dataloader(self) -> DataLoader[SubjectType] | List[DataLoader[SubjectType]]:
+        return self.make_data_loader(self.val, batch_size=self.val_batch_size,
+                                     limit=self.val_limit)
 
-    def test_dataloader(self) -> DataLoader | List[DataLoader]:
-        return self.make_data_loader(self.test, batch_size=self.test_batch_size)
+    def test_dataloader(self) -> DataLoader[SubjectType] | List[DataLoader[SubjectType]]:
+        if self.test_mode:
+            return self.make_data_loader(self.test, batch_size=self.test_batch_size,
+                                         limit=self.test_limit)
+        else:
+            return self.make_data_loader(self.dev, batch_size=self.test_batch_size,
+                                         limit=self.test_limit)
 
-    def setup_val(self):
+    def split_val_from_train(self):
+        r"""
+        achieves the target val number or proportion by spliting off the first
+        so many examples from the train data
+        """
         if self.val_portion is not None or self.val_max_count is not None:
             self.val, self.train = split_data(self.train,
                                               portion=self.val_portion,
                                               count=self.val_limit,
                                               generator=torch.Generator().manual_seed(42))
+
+    def add_val_to_train(self):
+        r"""
+        after calling this method, there will be no val data
+        and the train data will start with the examples
+        that were in val
+        """
+        self.train = ChainDataset([self.val, self.train])
+        self.val = ListDataset[SubjectType]()
 
 
 class LitSystem(pl.LightningModule, Generic[SubjectType]):
@@ -331,20 +358,20 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             update('starting backward...')
             return loss
 
-    def train_dataloader(self):
+    def train_dataloader(self) -> DataLoader[SubjectType] | List[DataLoader[SubjectType]]:
         if self.data is None:
             raise TypeError("did not specify data")
-        return self.data.train_dataloader()
+        return cast(DataLoader[SubjectType], self.data.train_dataloader())
 
-    def val_dataloader(self):
+    def val_dataloader(self) -> DataLoader[SubjectType] | List[DataLoader[SubjectType]]:
         if self.data is None:
             raise TypeError("did not specify data")
-        return self.data.val_dataloader()
+        return cast(DataLoader[SubjectType], self.data.val_dataloader())
 
-    def test_dataloader(self):
+    def test_dataloader(self) -> DataLoader[SubjectType] | List[DataLoader[SubjectType]]:
         if self.data is None:
             raise TypeError("did not specify data")
-        return self.data.test_dataloader()
+        return cast(DataLoader[SubjectType], self.data.test_dataloader())
 
     @ classmethod
     def add_argparse_args(cls, parser: ArgumentParser):
@@ -360,3 +387,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             if field_type is not None:
                 parser.add_argument(f'--{field.name}', type=field_type)
         return parser
+
+
+# class DataLoader(Generic[SubjectType]):
+#     def __getitem__(self, ix: Any) -> SubjectType: ...

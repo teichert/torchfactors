@@ -7,7 +7,7 @@ import torchfactors as tx
 from torch.utils.data import Dataset
 from torchfactors import (ANNOTATED, CLAMPED, LATENT, OBSERVED, Range, Subject,
                           TensorFactor, TensorVar, VarField)
-from torchfactors.subject import Environment
+from torchfactors.subject import ChainDataset, Environment, ListDataset
 from torchfactors.variable import Var, vtensor
 
 
@@ -216,6 +216,29 @@ def test_stacked():
 
     assert x1.observations.usage.shape == (7,)
     assert x2.observations.usage.shape == (4,)
+
+
+def test_full_batch():
+    @dataclass
+    class Utterance(Subject):
+        id1: int
+        id2: int
+        observations: Var = VarField(Range(10), OBSERVED)
+        hidden: Var = VarField(Range(4), LATENT, shape=observations)
+
+    u1 = Utterance(1, 6, TensorVar(torch.tensor([1, 3, 2, 4, 3, 5, 4])))
+
+    data = [
+        u1,
+        Utterance(2, 7, TensorVar(torch.tensor([2, 4, 3, 5]))),
+        Utterance(3, 8, TensorVar(torch.tensor([4, 6, 5]))),
+        Utterance(4, 9, TensorVar(torch.tensor([3, 2, 4, 3, 5, 4, 6, 5]))),
+        Utterance(5, 0, TensorVar(torch.tensor([3]))),
+    ]
+    loader = Utterance.data_loader(data, batch_size=-1)
+    instances: List[Utterance] = list(loader)
+    assert len(instances) == 1
+    assert instances[0].observations.shape == (5, 8)
 
 
 def test_variables():
@@ -482,3 +505,34 @@ def test_specify_optional():
     subject = MySubject(tx.TensorVar(t), tx.TensorVar(t2))
     assert subject.a.tensor.allclose(t)
     assert subject.b.tensor.allclose(t2)
+
+
+def test_chain_dataset():
+    @tx.dataclass
+    class MySubject(tx.Subject):
+        id: int
+    dataset1 = ListDataset([MySubject(i) for i in range(5, 10)])
+    dataset2 = ListDataset([MySubject(i) for i in range(15, 20)])
+    dataset3 = ListDataset([MySubject(i - 3) for i in range(2, 4)])
+
+    dataset4 = ChainDataset[MySubject]([dataset1, dataset2, dataset3])
+    assert len(dataset4) == 12
+    assert dataset4[0].id == 5
+    assert dataset4[3].id == 8
+    assert dataset4[7].id == 17
+    assert dataset4[9].id == 19
+    assert dataset4[10].id == -1
+    assert dataset4[11].id == 0
+    assert dataset4[-1].id == 0
+    assert dataset4[-2].id == -1
+    assert dataset4[-3].id == 19
+    assert dataset4[-12].id == 5
+    assert list(dataset4) == [
+        MySubject(i) for i in [5, 6, 7, 8, 9, 15, 16, 17, 18, 19, -1, 0]
+    ]
+
+    with pytest.raises(IndexError):
+        dataset4[12]
+
+    with pytest.raises(IndexError):
+        dataset4[-13]

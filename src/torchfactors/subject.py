@@ -8,6 +8,7 @@ from typing import (Callable, Dict, FrozenSet, Generic, Hashable, List,
 import torch
 from torch._C import Size
 from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.dataset import IterableDataset
 from tqdm import tqdm  # type: ignore
 
 from .domain import Domain
@@ -21,15 +22,46 @@ SubjectType = TypeVar('SubjectType', bound='Subject')
 ExampleType = TypeVar('ExampleType')
 
 
-@ dataclass
-class ListDataset(Dataset, Generic[ExampleType]):
+@dataclass
+class ListDataset(IterableDataset[ExampleType], Generic[ExampleType]):
     examples: Sequence[ExampleType] = ()
 
     def __len__(self):
         return len(self.examples)
 
+    def __iter__(self):
+        for index in range(len(self)):
+            yield self.__getitem__(index)
+
     def __getitem__(self, index) -> ExampleType:
         return self.examples[index]
+
+
+@dataclass
+class ChainDataset(Dataset[ExampleType], Generic[ExampleType]):
+    datasets: Sequence[Dataset[ExampleType]]
+
+    def __len__(self):
+        return sum(len(cast(Sized, dataset)) for dataset in self.datasets)
+
+    def __iter__(self):
+        for dataset in self.datasets:
+            yield from cast(IterableDataset, dataset)
+
+    def __getitem__(self, index: int) -> ExampleType:
+        # TODO: could use binary search to make this faster
+        full_length = len(self)
+        if index < 0:
+            index = full_length + index
+        if index < 0 or index >= full_length:
+            raise IndexError("index out of bounds")
+        for dataset in self.datasets:
+            this_length = len(cast(Sized, dataset))
+            if index < this_length:
+                return dataset[index]
+            else:
+                index -= this_length
+        assert False  # can't get here  # pragma: no cover
 
 
 class Environment(object):
@@ -86,7 +118,8 @@ class Subject:
     __length: int = field(init=False, default=1)
     __lists: Dict[str, List[object]] = field(init=False, default_factory=dict)
     __varset: FrozenSet = field(init=False, default=frozenset())
-    environment: Environment = field(init=False, default_factory=Environment)
+    environment: Environment = field(init=False, compare=False, hash=False,
+                                     default_factory=Environment)
 
     def __len__(self) -> int:
         return self.__length

@@ -74,7 +74,7 @@ class BitsData(tx.lightning.DataModule):
     def setup(self, stage: Optional[str] = None) -> None:
         if stage in (None, 'fit'):
             self.train = ListDataset(data)
-            self.setup_val()
+            self.split_val_from_train()
         if stage in (None, 'test'):
             self.test = ListDataset(data)
 

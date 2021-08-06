@@ -35,9 +35,6 @@ def test_lit_learning():
     trainer.fit(lit, data_loader)
 
 
-test_lit_learning()
-
-
 @pytest.mark.filterwarnings('ignore::UserWarning')
 def test_lit_learning_fit_twice():
     trainer = pl.Trainer(max_epochs=10)
@@ -70,21 +67,35 @@ def test_lit_learning_with_optimizers_kwargs():
 more_examples = examples * 2
 
 
-class MyData_v1_0(DataModule):
+class MyData_v1_0(DataModule[MySubject]):
 
     def setup(self, stage=None):
         if stage in (None, 'fit'):
             self.train = ListDataset(more_examples[:self.train_limit])
-            self.setup_val()
+            self.split_val_from_train()
         if stage in (None, 'test'):
             self.test = ListDataset(more_examples[:self.test_limit])
+            self.dev = ListDataset(more_examples[:self.test_limit])
+
+
+class MyData_v3_0(DataModule[MySubject]):
+
+    def setup(self, stage=None):
+        if stage in (None, 'fit'):
+            self.train = ListDataset(more_examples[:self.train_limit])
+            self.val = ListDataset(more_examples[:self.val_limit])
+            self.add_val_to_train()
+            self.split_val_from_train()
+        if stage in (None, 'test'):
+            self.test = ListDataset(more_examples[:self.test_limit])
+            self.dev = ListDataset(more_examples[:self.test_limit])
 
 
 def test_lightning_args():
     parser = argparse.ArgumentParser(add_help=False)
     parser = tx.LitSystem.add_argparse_args(parser)
     args = parser.parse_args(
-        "--passes 5 --lr 10 --val_max_count 0 "
+        "--test_mode True --passes 5 --lr 10 --val_max_count 0 "
         "--batch_size 2 --test_batch_size 1".split())
     assert args.passes == 5
     assert args.lr == 10
@@ -101,7 +112,7 @@ def test_lightning_args():
 
 
 def test_datamodule():
-    data = MyData_v1_0()
+    data = MyData_v1_0(test_mode=True)
     data.setup()
     assert len(data.train_dataloader()) == 4
     assert len(data.val_dataloader()) == 0
@@ -165,7 +176,28 @@ def test_datamodule8():
     assert data.test_length == 4
 
 
-# class MyLit(tx.lightning.LitSystem):
+def test_datamodule10():
+    data = MyData_v3_0(val_portion=0.25, test_mode=True)
+    data.setup(None)
+    assert len(data.train_dataloader()) == 6
+    assert len(data.val_dataloader()) == 2
+    assert len(data.test_dataloader()) == 4
+    assert data.train_length == 6
+    assert data.val_length == 2
+    assert data.test_length == 4
+
+
+def test_datamodule9():
+    class MyData_v2_0(tx.DataModule):
+        def setup(self, stage=None):
+            self.train_max_count = 1
+            self.train = tx.ListDataset(examples)
+
+    data = MyData_v2_0()
+    data.setup()
+    with pytest.raises(ValueError):
+        # shouldn't be allowed to have 2 examples with a max_count of 1
+        data.train_dataloader()
 
 
 def test_args():
@@ -182,6 +214,7 @@ def test_args2():
     sys = tx.lightning.LitSystem.from_args(
         model=model, data=MyData_v1_0(),
         defaults=dict(lr=5.0, optimizer='LBFGS',
+                      test_mode=True,
                       path="hello!",
                       val_batch_size=2,
                       val_max_count=1,
@@ -204,6 +237,7 @@ def test_args3():
     d = vars(namespace)
     d.update(dict(lr=5.0, optimizer='LBFGS',
                   path="hello!",
+                  test_mode=True,
                   val_batch_size=2,
                   val_max_count=1,
                   val_portion=1.0,
@@ -244,3 +278,27 @@ def test_get_type():
     assert get_type("blah") is None
     assert get_type("bool") is bool
     assert get_type("float") is float
+
+
+def test_args4():
+    model = MyModel()
+    namespace = argparse.Namespace()
+    d = vars(namespace)
+    d.update(dict(lr=5.0, optimizer='LBFGS',
+                  path="hello!",
+                  batch_size=-1,
+                  test_mode=True,
+                  val_max_count=2,
+                  passes=10,
+                  fast_dev_run=True
+                  ))
+    sys = tx.lightning.LitSystem.from_args(
+        model=model, data=MyData_v1_0(),
+        args=namespace)
+    assert len(sys.train_dataloader()) == 1
+    assert len(sys.val_dataloader()) == 1
+    assert len(sys.test_dataloader()) == 1
+    assert sys.optimizer_kwargs['lr'] == 5.0
+    assert sys.optimizer_name == 'LBFGS'
+    assert sys.inferencer.passes == 10
+    assert cast(DataModule, sys.data).path == "hello!"

@@ -92,7 +92,7 @@ class SPRLData_v1_0(tx.lightning.DataModule[SPRL]):
         if stage in (None, 'fit'):
             self.train = SPRL.from_data_frame(self._data_splits['train'],
                                               self.model, self.train_limit)
-            super().setup_val()
+            super().split_val_from_train()
         if stage in (None, 'test'):
             test_split = 'test' if self.test_mode else 'dev'
             self.train = SPRL.from_data_frame(self._data_splits[test_split],
