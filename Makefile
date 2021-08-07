@@ -29,9 +29,10 @@ pyproject.lock: pyproject.toml
 	touch pyproject.lock
 
 .PHONY: test
+cov :=
 test: pyproject.lock
 	@echo "running tests..."
-	poetry run python -m pytest --cov=src --cov-branch --cov-report term-missing:skip-covered --cov-report html --codeblocks
+	poetry run python -m pytest --cov=src $(cov) --cov-branch --cov-report term-missing:skip-covered --cov-report html --codeblocks
 
 .PHONY: test-one
 test-one: pyproject.lock
