@@ -7,6 +7,8 @@ from typing import cast
 import pandas as pd
 import torch
 import torchfactors as tx
+from torchmetrics import functional
+from tqdm import tqdm  # type: ignore
 
 import thesis_utils as tu
 
@@ -15,9 +17,10 @@ import thesis_utils as tu
 class SPR(tx.Subject):
     property_domain = tx.FlexDomain('spr-properties')
 
-    labels: tx.Var = tx.VarField(tx.ANNOTATED, tx.Range(5), ndims=1)
-    properties: tx.Var = tx.VarField(tx.OBSERVED, property_domain, ndims=1)
-    features: tx.Var = tx.VarField(tx.OBSERVED, ndims=1)
+    labels: tx.Var = tx.VarField(tx.ANNOTATED, tx.Range(5))
+    binary_labels: tx.Var = tx.VarField(tx.ANNOTATED, tx.Range(2))
+    properties: tx.Var = tx.VarField(tx.OBSERVED, property_domain)
+    features: tx.Var = tx.VarField(tx.OBSERVED)
 
     @staticmethod
     def load_spr1(model: tx.Model[SPR], inputs: pd.DataFrame, labels: pd.DataFrame,
@@ -39,13 +42,86 @@ class SPR(tx.Subject):
                 properties = model.domain_ids(SPR.property_domain, these_labels['Variable.ID'])
                 embed = input_df['embed'].values[0]
                 # embed = embed.unsqueeze(-1).expand(-1, num_properties)
+                labels = torch.tensor(these_labels['Response'].values)
                 yield SPR(
-                    labels=tx.TensorVar(torch.tensor(these_labels['Response'].values)),
+                    labels=tx.TensorVar(labels),
+                    binary_labels=tx.TensorVar((labels >= 3).int()),
                     properties=tx.TensorVar(properties),
                     features=tx.TensorVar(embed)
                 )
         out = list(itertools.islice(examples(), 0, maxn))
         return out
+
+    @staticmethod
+    def evaluate_binary(pred: SPR, gold: SPR):
+        all_gold = []
+        all_pred = []
+        domain = gold.properties.domain
+        entries = []
+        metrics = dict(
+            f1=functional.f1,
+            precision=functional.precision,
+            recall=functional.recall,
+        )
+        for prop_id, property in enumerate(tqdm(domain)):
+            y_gold = gold.binary_labels[..., prop_id].tensor
+            y_pred = pred.binary_labels[..., prop_id].tensor
+            all_pred.extend(list(y_pred * (prop_id + 1)))
+            all_gold.extend(list(y_gold * (prop_id + 1)))
+            for metric_name, metric in metrics.items():
+                entry = dict(property=property)
+                entry['metric'] = metric_name
+                entry['value'] = float(metric(  # type: ignore
+                    preds=torch.tensor(y_pred),
+                    target=torch.tensor(y_gold),
+                    ignore_index=0))
+                entries.append(entry)
+
+        results = pd.DataFrame(entries)
+
+        # micros
+        micros_preharmonic = {
+            metric_name: metric(  # type: ignore
+                preds=torch.tensor(all_pred),
+                target=torch.tensor(all_gold),
+                average="micro",
+                num_classes=len(domain) + 1,
+                ignore_index=0)
+            for metric_name, metric in metrics.items()}
+        for metric_name, value in micros_preharmonic.items():
+            entry = dict(property='total-01-micro-preharmonic')
+            entry['metric'] = metric_name
+            entry['value'] = value
+            entries.append(entry)
+
+        averages = {
+            metric: results[results['metric'] == metric].mean()
+            for metric in metrics
+        }
+
+        # macro pre f1
+        entries.append(dict(
+            property='total-02-macro-preharmonic',
+            metric='f1',
+            value=(2 * averages['precision'] * averages['recall'] /
+                   (averages['precision'] + averages['recall']))
+        ))
+
+        # macro post f1
+        entries.append(dict(
+            property='total-03-macro-preharmonic',
+            metric='f1',
+            value=averages['f1']))
+
+        # macro precision and recall
+        for metric_name in ['precision', 'recall']:
+            for property in ['total-02-macro-preharmonic', 'total-02-macro-postharmonic']:
+                entries.append(dict(
+                    property=property,
+                    metric=metric_name,
+                    value=averages[metric_name]))
+
+        return entries
 
 
 @dataclass
