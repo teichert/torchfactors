@@ -165,7 +165,7 @@ class DataModule(pl.LightningDataModule, Generic[SubjectType]):
             out = self.negative_to_none(self.batch_size)
         else:
             out = self.negative_to_none(split_batch_size)
-        return len(cast(Sized, examples)) if out is None else out
+        return max(1, len(cast(Sized, examples))) if out is None else out
 
     def train_dataloader(self) -> DataLoader[SubjectType] | List[DataLoader[SubjectType]]:
         return self.make_data_loader(self.train, batch_size=self.train_batch_size,
@@ -387,6 +387,12 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             if field_type is not None:
                 parser.add_argument(f'--{field.name}', type=field_type)
         return parser
+
+    def forward(self, *args, **kwargs) -> SubjectType:
+        return self.forward_(cast(SubjectType, args[0]))
+
+    def forward_(self, x: SubjectType) -> SubjectType:
+        return self.system.predict(x)
 
 
 # class DataLoader(Generic[SubjectType]):

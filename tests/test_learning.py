@@ -2,6 +2,7 @@
 import math
 from typing import Dict
 
+import pytest
 import torch
 import torchfactors as tx
 from pytest import approx
@@ -132,6 +133,17 @@ def test_learning5():
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
     assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_lit_learning():
+    import pytorch_lightning as pl
+    model = MyModel()
+    sys = tx.LitSystem(model, tx.DataModule(train=tx.ListDataset(examples)))
+    trainer = pl.Trainer(max_epochs=5)
+    trainer.fit(sys)
+    out = sys(stacked_examples)
+    assert out.v.flatten().tolist() == [1, 1]
 
 
 def test_learning6():
