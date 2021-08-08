@@ -3,12 +3,11 @@ from __future__ import annotations
 from typing import Dict, Iterable, cast
 
 import torchfactors as tx
-from pandas.core.frame import DataFrame
 from pytorch_lightning.trainer.trainer import Trainer
 from sklearn.linear_model import RidgeClassifierCV  # type: ignore
 from tqdm import tqdm  # type: ignore
 
-from sprl import SPR, SPR1DataModule
+from sprl import SPR, SPR1DataModule, SPRSystem
 
 
 class SPRDummyModel(tx.Model[SPR]):
@@ -40,7 +39,7 @@ class SPRDummyModel(tx.Model[SPR]):
 #     def format(num):
 #         return f'{num * 100:3.1f}'
 
-class BaselineSystem(tx.LitSystem[SPR]):
+class BaselineSystem(SPRSystem):
 
     # def __init__(self, model, data):
     #     super().__init__(model, data)
@@ -75,13 +74,6 @@ class BaselineSystem(tx.LitSystem[SPR]):
             out.binary_labels[..., prop_id].tensor = input_tensor.new_tensor(
                 model.predict(input))
         return out
-
-    def test_step(self, *args, **kwargs):
-        x = cast(SPR, args[0])
-        out = self(x)
-        entries = SPR.evaluate_binary(pred=out, gold=x)
-        df = DataFrame(entries)
-        print(df)
 
 
 if __name__ == '__main__':

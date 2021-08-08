@@ -9,7 +9,7 @@ import torch
 import torchfactors as tx
 from torchfactors.domain import FlexDomain
 
-from sprl import SPR, SPR1DataModule
+from sprl import SPR, SPR1DataModule, SPRSystem
 
 
 class SPRLModel(tx.Model[SPR]):
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     except KeyError:
         pass
     parser = argparse.ArgumentParser(add_help=False)
-    parser = tx.LitSystem.add_argparse_args(parser)
+    parser = SPRSystem.add_argparse_args(parser)
     torch.set_num_threads(1)
     args = pl.Trainer.parse_argparser(parser.parse_args())
     # args = pl.Trainer.parse_argparser(parser.parse_args(
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     trainer = pl.Trainer.from_argparse_args(args)
     model = SPRLModel()
     data = SPR1DataModule(model=model)
-    system = tx.LitSystem.from_args(
+    system = SPRSystem.from_args(
         model, data, defaults=dict(
             # path="./data/notxt.spr1.tar.gz",
             path="./data/notxt.mini10.spr1.tar.gz",
@@ -80,3 +80,4 @@ if __name__ == '__main__':
     ))
     print(system.hparams)
     trainer.fit(system)
+    trainer.test(system)

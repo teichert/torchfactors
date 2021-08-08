@@ -91,7 +91,7 @@ class SPR(tx.Subject):
         for metric_name, value in micros_preharmonic.items():
             entry = dict(property='total-01-micro-preharmonic')
             entry['metric'] = metric_name
-            entry['value'] = value
+            entry['value'] = float(value)
             entries.append(entry)
 
         averages = {
@@ -103,15 +103,15 @@ class SPR(tx.Subject):
         entries.append(dict(
             property='total-02-macro-preharmonic',
             metric='f1',
-            value=(2 * averages['precision'] * averages['recall'] /
-                   (averages['precision'] + averages['recall']))
+            value=float((2 * averages['precision'] * averages['recall'] /
+                         (averages['precision'] + averages['recall'])))
         ))
 
         # macro post f1
         entries.append(dict(
             property='total-03-macro-preharmonic',
             metric='f1',
-            value=averages['f1']))
+            value=float(averages['f1'])))
 
         # macro precision and recall
         for metric_name in ['precision', 'recall']:
@@ -119,7 +119,7 @@ class SPR(tx.Subject):
                 entries.append(dict(
                     property=property,
                     metric=metric_name,
-                    value=averages[metric_name]))
+                    value=float(averages[metric_name])))
 
         return entries
 
@@ -154,3 +154,13 @@ class SPR1DataModule(tx.DataModule[SPR]):
             else:
                 self.dev = tx.ListDataset(SPR.load_spr1(
                     self.model, inputs, labels, 'dev', maxn=self.test_limit))
+
+
+class SPRSystem(tx.LitSystem[SPR]):
+
+    def test_step(self, *args, **kwargs):
+        x = cast(SPR, args[0])
+        out = self(x)
+        entries = SPR.evaluate_binary(pred=out, gold=x)
+        df = pd.DataFrame(entries)
+        print(df.to_csv(index=False))
