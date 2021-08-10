@@ -9,6 +9,7 @@ import torch
 import torchfactors as tx
 from torchfactors.domain import FlexDomain
 
+import myhydra
 from sprl import SPR, SPR1DataModule, SPRSystem
 
 
@@ -52,25 +53,24 @@ class SPRLModel(tx.Model[SPR]):
 # x.property[..., i])
 
 
-if __name__ == '__main__':
-    try:
-        print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
-        torch.tensor(0.0).to("cuda")
-    except KeyError:
-        pass
-    parser = argparse.ArgumentParser(add_help=False)
-    parser = SPRSystem.add_argparse_args(parser)
+@myhydra.main(config_path=None)
+def main(cfg):
+    # TODO: pass in other param which is orig dir (to help resolve relative paths)
+    args = argparse.Namespace()
+    vars(args).update(cfg)
+    # parser = argparse.ArgumentParser(add_help=False)
+    # parser = SPRSystem.add_argparse_args(parser)
     torch.set_num_threads(1)
-    args = pl.Trainer.parse_argparser(parser.parse_args())
+    # args = pl.Trainer.parse_argparser(parser.parse_args())
     # args = pl.Trainer.parse_argparser(parser.parse_args(
     #     "--batch_size 3 --auto_lr_find True".split()))
     trainer = pl.Trainer.from_argparse_args(args)
     model = SPRLModel()
     data = SPR1DataModule(model=model)
     system = SPRSystem.from_args(
-        model, data, defaults=dict(
+        model, data, args=args, defaults=dict(
             # path="./data/notxt.spr1.tar.gz",
-            path="./data/notxt.mini10.spr1.tar.gz",
+            path="/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz",
             # split_max_count=100,
             batch_size=-1))
 
@@ -81,3 +81,12 @@ if __name__ == '__main__':
     print(system.hparams)
     trainer.fit(system)
     trainer.test(system)
+
+
+if __name__ == '__main__':
+    try:
+        print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
+        torch.tensor(0.0).to("cuda")
+    except KeyError:
+        pass
+    main()
