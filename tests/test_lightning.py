@@ -301,7 +301,7 @@ def test_args4():
     assert sys.optimizer_kwargs['lr'] == 5.0
     assert sys.optimizer_name == 'LBFGS'
     assert sys.inferencer.passes == 10
-    assert cast(DataModule, sys.data).path == "hello!"
+    assert sys.txdata.path == "hello!"
 
 
 def test_dev_test():

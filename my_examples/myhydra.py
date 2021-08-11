@@ -12,7 +12,7 @@ from pathlib import Path
 
 from hydra import main as hydra_main
 from hydra.core.hydra_config import HydraConfig
-from mlflow import log_param
+from mlflow import log_param  # type: ignore
 
 
 def main(*args, **kwargs):

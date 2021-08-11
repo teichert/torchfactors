@@ -3,13 +3,13 @@ from __future__ import annotations
 import itertools
 from argparse import Namespace
 from dataclasses import dataclass, field
-from typing import ChainMap, Dict, Mapping, Type, cast
+from typing import Any, ChainMap, Dict, Mapping, Type, cast
 
 import pandas as pd
 import torch
 import torchfactors as tx
-from mlflow import log_artifact
-from mlflow.tracking.fluent import log_metrics
+from mlflow import log_artifact  # type: ignore
+from mlflow.tracking.fluent import log_metrics  # type: ignore
 from torchfactors.model import Model
 from torchmetrics import functional
 from tqdm import tqdm  # type: ignore
@@ -179,7 +179,8 @@ class SPRSystem(tx.LitSystem[SPR]):
     @ classmethod
     def from_some_args(cls, model_class: Type[Model[SPR]],
                        data_class: Type[SPRDataModule],
-                       args: Namespace, defaults: Mapping, **kwargs) -> SPRSystem:
+                       args: Namespace,
+                       defaults: Mapping[str, Any], **kwargs) -> SPRSystem:
         all_args = ChainMap(vars(args), kwargs, defaults)
         model = all_args.get('model', None)
         loaded_model = model_class()
@@ -190,7 +191,8 @@ class SPRSystem(tx.LitSystem[SPR]):
         #     if checkpoint is not None:
         #         cls.load_from_checkpoint(checkpoint)
         data = data_class(model=loaded_model)
-        return super().from_args(loaded_model, data, args=args, defaults=defaults, **kwargs)
+        return cast(SPRSystem,
+                    super().from_args(loaded_model, data, args=args, defaults=defaults, **kwargs))
 
     def log_evaluation(self, x: SPR, data_name: str, step: int | None = None
                        ) -> Dict[str, float]:
@@ -211,6 +213,16 @@ class SPRSystem(tx.LitSystem[SPR]):
             self.log_dict(metrics)
             return metrics
 
+    # def training_step(self, *args, **kwargs) -> Union[torch._tensor.Tensor, Dict[str, Any]]:
+    #     out = super().training_step(*args, **kwargs)
+    #     print(out)
+    #     self.log_dict(dict(
+    #         train_loss=out,
+    #         hi=3.0))
+    #     # self.log('train-loss', float(out))
+    #     # self.log('hi', 3.0)
+    #     return out
+
     def validation_step(self, *args, **kwargs):
         x = cast(SPR, args[0])
         if len(x):
@@ -220,11 +232,11 @@ class SPRSystem(tx.LitSystem[SPR]):
     def test_step(self, *args, **kwargs):
         datasets = {}
         if self.txdata.val:
-            datasets['val'] = self.txdata.val_dataloader
-        if self.txdata.dev:
-            datasets['dev'] = self.txdata.dev_dataloader
+            datasets['val'] = self.txdata.val_dataloader()
         if self.txdata.test_mode and self.txdata.test:
-            datasets['test'] = self.txdata.test_dataloader
+            datasets['test'] = self.txdata.test_dataloader()
+        elif not self.txdata.test_mode and self.txdata.dev:
+            datasets['dev'] = self.txdata.test_dataloader()
         for data_name, dataloader in datasets.items():
             x: SPR = cast(SPR, next(iter(dataloader)))
-            log = self.log_evaluation(x, data_name=data_name, step=-1)
+            self.log_evaluation(x, data_name=data_name, step=-1)

@@ -218,7 +218,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
 
     """
     @ classmethod
-    def get_arg(cls, key: str, args: Dict[str, Any], defaults: Dict[str, Any]):
+    def get_arg(cls, key: str, args: Dict[str, Any], defaults: Mapping[str, Any]):
         if key in args:
             return args[key]
         else:
@@ -226,7 +226,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
 
     @ classmethod
     def set_arg(cls, dest: Dict[str, Any], key: str, args: Dict[str, Any],
-                defaults: Dict[str, Any]):
+                defaults: Mapping[str, Any]):
         dest[key] = cls.get_arg(key, args, defaults)
 
     @ classmethod
@@ -234,7 +234,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
                   model: Model[SubjectType],
                   data: DataModule[SubjectType],
                   args: Optional[Namespace] = None,
-                  defaults: Dict[str, Any] | None = None,
+                  defaults: Mapping[str, Any] | None = None,
                   **kwargs
                   ) -> LitSystem[SubjectType]:
         if args is None:
