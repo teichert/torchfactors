@@ -355,12 +355,13 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             loss = (logz_free - logz_clamped).clamp_min(0).sum()
             update('penalty')
             penalty = penalty.sum()
-            self.log(f'step.{data_name}.free-energy', loss)
-            self.log(f'step.{data_name}.penalty', penalty)
+            on_epoch = True if data_name == 'train' else None
+            self.log(f'step.{data_name}.free-energy', loss, on_epoch=on_epoch)
+            self.log(f'step.{data_name}.penalty', penalty, on_epoch=on_epoch)
             update('full loss')
             if self.penalty_coeff != 0:
                 loss = loss + self.penalty_coeff * penalty.exp()
-            self.log(f'step.{data_name}.loss', loss)
+            self.log(f'step.{data_name}.loss', loss, on_epoch=on_epoch)
             update('done')
             return loss
 

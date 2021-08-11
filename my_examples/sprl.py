@@ -218,7 +218,7 @@ class SPRSystem(tx.LitSystem[SPR]):
     #     print(out)
     #     self.log_dict(dict(
     #         train_loss=out,
-    #         hi=3.0))
+    #         hi=3.0), on_epoch=True)
     #     # self.log('train-loss', float(out))
     #     # self.log('hi', 3.0)
     #     return out
