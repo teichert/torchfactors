@@ -1,9 +1,13 @@
+# Allows multirun launches by generated a script and then running it.
+# Maybe I should have done this with a launcher plugin, but this seemed easier
+# at the time.
 
 import logging
 import os
 import pathlib
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 
 import mlflow
@@ -11,103 +15,100 @@ from hydra import main as hydra_main
 from hydra.core.hydra_config import HydraConfig
 from mlflow import log_param
 
-# jobs_run = 0
-
 
 def main(*args, **kwargs):
     r"""
     The function returned will be a decorator that wraps a function to achieve
     the following functionality:
-    1) if -m or --multi-run are found amid the command-line arguments, hydra is
-        used to set up the multiple runs---each in a separate directory
-        including a "run.sh" file that is suitable for "running" with bash,
-        qsub, cat, ls, etc. The script will use hydra to run only that run
-        (strips the -m arguments and points to the stored config without the
-        remaining arguments), in the given folder. The script also creates
-        .started and .finished files before and after the enclosed python script
-        is run respectively.
-    2) otherwise, the single job is run using hydra, setting up an mlflow run
-       and logging the parameters to it.
+    1) If not in multi-run mode, then hydra normally would run the function with
+        the provided argument configuration.  This wrapper additionally sets up
+        a mlflow run that automatically has the parameter values logged and
+        allows reporting of other results and artifacts.  The path to the mlflow
+        results should be given by `exp.mlruns_path` (or mlruns.db will be used
+        as default). The type should be given as file, sqlite, or http, or https
+        via `exp.mlruns_type`.
 
+    2) If -m or --multi-run are found amid the command-line arguments, hydra
+        normally would sweep over the defined settings, creating a folder
+        corresponding to each and then running the wrapped function within the
+        respective folder with the appropriate argument configuration. This
+        wrapper instead instructs hydra to create the folders but rather than
+        running the function directly, it creates a custom script ("run.sh") for
+        each folder which is then run using some specified application. The
+        application to use for running the generated script should be specified
+        via `exp.run_with` (default is "bash" other reasonable options might be
+        "ls" or "cat" for dry-runs).  The contents of the script file should be
+        specified via `exp.sub.script` which will be formatted with python
+        string formatting while providing the following four variables (which
+        can be used within curly braces [without a preceding $ since that would
+        indicate that hydra should exapand the variable]):
+        - {python} will be replaced with the path to the python interpreter
+          currently being used
+        - {script} will be replaced with the path to the python script being run
+          (i.e. the one that is producing these files)
+        - {cwd} will be replaced with the folder in which the script will be
+          created
+        - {hydra} is the HydraConfig (members can be accessed with e.g.
+          {hydra.job.name} or {hydra.job.id}.
 
-    command-line-params:
-    mlruns: this is where the mlruns will be saved (likely shared across may experiments)
-    exp.run_with: what program will be used on the generated .sh file
-
+        If no `exp.sub.script` is defined, then a basic script will be created
+        that simply runs the python file with the appropriate generated config.
     """
 
-    script = str(pathlib.Path(sys.argv[0]).resolve())
+    running_script = str(pathlib.Path(sys.argv[0]).resolve())
 
-    def wrap(f):
-        def wrapped(cfg):
+    def run_with_mlflow(f):
+        def run_with_config(cfg):
             try:
-                mlruns = cfg['exp']['mlruns']
+                mlruns_root = cfg['exp']['mlruns_path']
             except KeyError:
-                mlruns = 'mlruns'
-            mlruns_path = Path(mlruns).resolve()
-            mlruns_path.mkdir(parents=True, exist_ok=True)
+                mlruns_root = 'mlruns.db'
+            try:
+                mlruns_type = cfg['exp']['mlruns_type']
+            except KeyError:
+                mlruns_type = 'sqlite'
+            mlruns_path = Path(mlruns_root).resolve()
+            mlruns_path.parent.mkdir(parents=True, exist_ok=True)
+            # disabling becuase sqlite backend leads to many logger info messages and
+            # switching log-level doesn't work
             logging.getLogger('alembic.runtime.migration').disabled = True
-            mlflow.set_tracking_uri(f'sqlite:///{mlruns_path}/mlruns.db')
-
-            # mlflow.set_tracking_uri(f'file://{mlruns}')
+            mlflow.set_tracking_uri(f'{mlruns_type}:///{mlruns_path}')
             mlflow.start_run()
             for k, v in cfg.items():
-                log_param(k, v)
+                if isinstance(v, (float, str, int, bool)):
+                    log_param(k, v)
             f(cfg)
             mlflow.end_run()
-        wrapped.__module__ = '__main__'
-        return wrapped
+        run_with_config.__module__ = '__main__'
+        return run_with_config
 
-    def make_script(cfg):
-        # global jobs_run
-        # jobs_run += 1
-        cwd = os.getcwd()
-        python = sys.executable
-        # TODO: restarting??
-        run_script = os.path.join(os.getcwd(), 'run.sh')
+    def generate_script_with_config(cfg):
         try:
             run_with = cfg['exp']['run_with']
         except KeyError:
             run_with = 'bash'
         try:
-            mlruns = cfg['exp']['mlruns']
+            script_str = cfg['exp']['sub']['script']
         except KeyError:
-            mlruns = HydraConfig.get()['sweep']['dir']
-        with open(run_script, 'w') as f:
-            print(f"""
-#!/usr/bin/env bash
+            warnings.warn("no exp.sub.script given, using simple builtin")
+            script_str = "{python} {script} -cd {cwd}/.hydra --config-name config"
 
-# (See qsub section for explanation on these flags.)
-#$ -N {HydraConfig.get().job.name}
-#$ -j y -o $JOB_NAME-$JOB_ID.out
-#$ -m e
-#$ -wd {cwd}
+        generated_script = os.path.join(os.getcwd(), 'run.sh')
+        with open(generated_script, 'w') as f:
+            logging.info(f"creating run script: {generated_script}")
+            formatted = script_str.format(
+                python=sys.executable,
+                script=running_script,
+                cwd=os.getcwd(),
+                hydra=HydraConfig.get())
+            print(formatted, file=f)
+        subprocess.run([run_with, generated_script])
 
-# Fill out RAM/memory (same thing) request,
-# the number of GPUs you want,
-# and the hostnames of the machines for special GPU models.
-#$ -l ram_free=1G,mem_free=1G,gpu=1,hostname=b1[123456789]|c0*|c1[123456789]
+    generate_script_with_config.__module__ = '__main__'
 
-# Submit to GPU queue
-#$ -q g.q
-
-echo "writing results to {cwd}..."
-cd {cwd}
-touch {cwd}/.started
-getgpu=/home/gqin2/scripts/acquire-gpu
-if [ -f "$getgpu" ]; then
-    # Assign a free-GPU to your program (make sure -n matches the requested number of GPUs above)
-    source /home/gqin2/scripts/acquire-gpu
-fi
-{python} {script} -cd {os.getcwd()}/.hydra --config-name config
-touch {cwd}/.finished
-""", file=f)
-        subprocess.run([run_with, run_script])
-    make_script.__module__ = '__main__'
-
-    def wrapped(f):
+    def run_with_myhydra(f):
         if '-m' in sys.argv or '--multirun' in sys.argv:
-            return hydra_main(*args, **kwargs)(make_script)
+            return hydra_main(*args, **kwargs)(generate_script_with_config)
         else:
-            return hydra_main(*args, **kwargs)(wrap(f))
-    return wrapped
+            return hydra_main(*args, **kwargs)(run_with_mlflow(f))
+    return run_with_myhydra

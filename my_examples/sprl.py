@@ -12,8 +12,7 @@ from mlflow import log_artifact
 from mlflow.tracking.fluent import log_metrics
 from torchfactors.model import Model
 from torchmetrics import functional
-from tqdm import tqdm
-from werkzeug.sansio.multipart import Data  # type: ignore
+from tqdm import tqdm  # type: ignore
 
 import thesis_utils as tu
 
@@ -68,7 +67,7 @@ class SPR(tx.Subject):
             precision=functional.precision,
             recall=functional.recall,
         )
-        for prop_id, property in enumerate(tqdm(domain)):
+        for prop_id, property in enumerate(tqdm(domain, leave=False, desc="Properties")):
             y_gold = gold.binary_labels[..., prop_id].tensor
             y_pred = pred.binary_labels[..., prop_id].tensor
             all_pred.extend(list(y_pred * (prop_id + 1)))

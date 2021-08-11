@@ -337,7 +337,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
 
     def training_loss(self, batch: SubjectType) -> Tensor:
         info = dict(status="initializing")
-        with tqdm(total=7, desc="Training Eval Step", postfix=info, delay=0.5, leave=False) as progress:
+        with tqdm(total=7, desc="Training Eval (forward)", postfix=info, delay=0.5, leave=False) as progress:
             def update(status: str):
                 info['status'] = status
                 progress.set_postfix(info)
@@ -360,6 +360,7 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             if self.penalty_coeff != 0:
                 loss = loss + self.penalty_coeff * penalty.exp()
             self.log('combo', loss)
+            update('done')
             return loss
 
     def training_step(self, *args, **kwargs) -> Union[torch._tensor.Tensor, Dict[str, Any]]:

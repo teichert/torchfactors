@@ -1,0 +1,41 @@
+exp:
+  run_with: bash
+  mlruns_path: ${oc.env:HOME}/mlruns.db
+  mlruns_type: sqlite
+  sub:
+    mem: 16G
+    hosts: b1[123456789]|c0*|c1[123456789]
+    gpus: 0
+    header_extras: ""
+    pre_script_extras: ""
+    main_script_extras: ""
+    post_script_extras: ""
+    header: |
+      #!/usr/bin/env bash
+      ## Job Name
+      #$   -N {hydra.job.name}
+      ## Join ERR and OUT
+      #$   -j y
+      ## Where to send output
+      #$   -o {hydra.job.name}.out
+      ## Resource Requirements
+      #$   -l ram_free=${exp.sub.mem},mem_free=${exp.sub.mem}
+      #$   -l gpu=${exp.sub.gpus}
+      #$   -l hostname=${exp.sub.hosts}
+    pre_script: |
+      echo "writing results to {cwd}..."
+      cd {cwd}
+      touch {cwd}/.started
+    main_script: |
+      {python} {script} -cd {cwd}/.hydra --config-name config
+    post_script: |
+      touch {cwd}/.finished
+    script: |
+      ${.header}
+      ${.header_extras}
+      ${.pre_script}
+      ${.pre_script_extras}
+      ${.main_script}
+      ${.main_script_extras}
+      ${.post_script}
+      ${.post_script_extras}
