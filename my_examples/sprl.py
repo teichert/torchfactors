@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import itertools
-from dataclasses import dataclass
-from typing import cast
+from argparse import Namespace
+from dataclasses import dataclass, field
+from typing import ChainMap, Dict, Mapping, Type, cast
 
 import pandas as pd
 import torch
 import torchfactors as tx
+from mlflow import log_artifact
+from mlflow.tracking.fluent import log_metrics
+from torchfactors.model import Model
 from torchmetrics import functional
-from tqdm import tqdm  # type: ignore
+from tqdm import tqdm
+from werkzeug.sansio.multipart import Data  # type: ignore
 
 import thesis_utils as tu
 
@@ -72,8 +77,8 @@ class SPR(tx.Subject):
                 entry = dict(property=property)
                 entry['metric'] = metric_name
                 entry['value'] = float(metric(  # type: ignore
-                    preds=torch.tensor(y_pred),
-                    target=torch.tensor(y_gold),
+                    preds=y_pred,
+                    target=y_gold,
                     ignore_index=0))
                 entries.append(entry)
 
@@ -95,7 +100,7 @@ class SPR(tx.Subject):
             entries.append(entry)
 
         averages = {
-            metric: results[results['metric'] == metric].mean()
+            metric: results[results['metric'] == metric]['value'].mean()
             for metric in metrics
         }
 
@@ -124,12 +129,19 @@ class SPR(tx.Subject):
         return entries
 
 
+def missing_required_field(name):
+    def raise_error():
+        raise ValueError(f"Missing required field: {name}")
+    return raise_error
+
+
 @dataclass
-class SPR1DataModule(tx.DataModule[SPR]):
-    model: tx.Model[SPR] | None = None
-    # after preprocessing
-    # RECOMMENDED_BIN_THRESHOLD = 3
-    # MAX_LABEL = 4
+class SPRDataModule(tx.DataModule[SPR]):
+    model: tx.Model[SPR] = field(default_factory=missing_required_field("model in SPRDataModule"))
+    combine_train_and_val: bool = False
+
+
+class SPR1DataModule(SPRDataModule):
 
     def setup(self, stage=None):
         # self, pkl_path, splits,
@@ -144,9 +156,9 @@ class SPR1DataModule(tx.DataModule[SPR]):
             raise TypeError("should have a model by now")
         if stage in (None, 'fit'):
             self.train = SPR.load_spr1(self.model, inputs, labels, 'train', maxn=self.train_limit)
-            self.val = SPR.load_spr1(self.model, inputs, labels, 'val',
-                                     maxn=self.val_limit if self.train_limit is None else 0)
-            self.add_val_to_train()
+            self.val = SPR.load_spr1(self.model, inputs, labels, 'val', maxn=self.val_limit)
+            if self.combine_train_and_val:
+                self.add_val_to_train()
         if stage in (None, 'test'):
             if self.test_mode:
                 self.test = tx.ListDataset(SPR.load_spr1(
@@ -158,9 +170,48 @@ class SPR1DataModule(tx.DataModule[SPR]):
 
 class SPRSystem(tx.LitSystem[SPR]):
 
+    @classmethod
+    def from_some_args(cls, model_class: Type[Model[SPR]],
+                       data_class: Type[SPRDataModule],
+                       args: Namespace, defaults: Mapping, **kwargs) -> SPRSystem:
+        all_args = ChainMap(vars(args), kwargs, defaults)
+        model = all_args.get('model', None)
+        loaded_model = model_class()
+        if model is not None:
+            loaded_model.load_state_dict(torch.load(all_args['model']))
+        # else:
+        #     checkpoint = all_args.get('checkpoint', None)
+        #     if checkpoint is not None:
+        #         cls.load_from_checkpoint(checkpoint)
+        data = data_class(model=loaded_model)
+        return super().from_args(loaded_model, data, args=args, defaults=defaults, **kwargs)
+
+    def log_evaluation(self, x: SPR, data_name: str) -> Dict[str, float]:
+        with torch.set_grad_enabled(False):
+            filename = f'{data_name}.binary.csv'
+            out = self(x)
+            entries = SPR.evaluate_binary(pred=out, gold=x)
+            df = pd.DataFrame(entries)
+            df.to_csv(filename)
+            log_artifact(filename)
+            metrics = {
+                f"{e['property']}.{data_name}.{e['metric']}": e['value']
+                for e in entries
+            }
+            metrics[f'data.{data_name}.training-objective'] = float(self.training_loss(x))
+            log_metrics(metrics)
+            self.log_dict(metrics)
+            return metrics
+
+    def validation_step(self, *args, **kwargs):
+        x = cast(SPR, args[0])
+        if len(x):
+            log = self.log_evaluation(x, 'val')
+            return next(iter(reversed(log.values())))
+
     def test_step(self, *args, **kwargs):
         x = cast(SPR, args[0])
-        out = self(x)
-        entries = SPR.evaluate_binary(pred=out, gold=x)
-        df = pd.DataFrame(entries)
-        print(df.to_csv(index=False))
+        data_name = 'test' if self.txdata.test_mode else 'dev'
+        if len(x):
+            log = self.log_evaluation(x, data_name=data_name)
+            return next(iter(reversed(log.values())))

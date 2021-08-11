@@ -78,7 +78,7 @@ class BaselineSystem(SPRSystem):
 
 if __name__ == '__main__':
     model = SPRDummyModel()
-    data = SPR1DataModule(model=model)
+    data = SPR1DataModule(model=model, combine_train_and_val=True)
     system = BaselineSystem.from_args(
         model, data, defaults=dict(
             # path="./data/notxt.spr1.tar.gz",

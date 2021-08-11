@@ -7,6 +7,7 @@ from typing import cast
 import pytorch_lightning as pl
 import torch
 import torchfactors as tx
+from pytorch_lightning.callbacks import ModelCheckpoint
 from torchfactors.domain import FlexDomain
 
 import myhydra
@@ -55,7 +56,6 @@ class SPRLModel(tx.Model[SPR]):
 
 @myhydra.main(config_path=None)
 def main(cfg):
-    # TODO: pass in other param which is orig dir (to help resolve relative paths)
     args = argparse.Namespace()
     vars(args).update(cfg)
     # parser = argparse.ArgumentParser(add_help=False)
@@ -65,20 +65,20 @@ def main(cfg):
     # args = pl.Trainer.parse_argparser(parser.parse_args(
     #     "--batch_size 3 --auto_lr_find True".split()))
     trainer = pl.Trainer.from_argparse_args(args)
-    model = SPRLModel()
-    data = SPR1DataModule(model=model)
-    system = SPRSystem.from_args(
-        model, data, args=args, defaults=dict(
+    system = SPRSystem.from_some_args(
+        model_class=SPRLModel,
+        data_class=SPR1DataModule,
+        args=args, defaults=dict(
             # path="./data/notxt.spr1.tar.gz",
             path="/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz",
             # split_max_count=100,
             batch_size=-1))
-
-    trainer.tune(system, lr_find_kwargs=dict(
-        update_attr=True,
-        num_training=10,
-    ))
-    print(system.hparams)
+    checkpoint = ModelCheckpoint(save_top_k=1, save_last=True)
+    # trainer.tune(system, lr_find_kwargs=dict(
+    #     update_attr=True,
+    #     num_training=10,
+    # ))
+    print(system.hparams, checkpoint)
     trainer.fit(system)
     trainer.test(system)
 

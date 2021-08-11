@@ -13,6 +13,7 @@ from typing import (Any, Dict, Generic, List, Mapping, Optional, Sized, Union,
 
 import pytorch_lightning as pl
 import torch
+from torch.functional import Tensor
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
@@ -69,10 +70,11 @@ default_inference_kwargs = dict(
     passes=ArgParseArg(int, None, 'number of times each bp message will be sent')
 )
 
-
 lit_init_names = dict(
     optimizer=ArgParseArg(str, default='Adam'),
     inferencer=ArgParseArg(str, default='BP'),
+    in_model=ArgParseArg(str, default=None),
+    out_model=ArgParseArg(str, default='model.pt'),
     penalty_coeff=ArgParseArg(float, 1.0,
                               'multiplied by the exponentiated total KL from previous message'))
 
@@ -269,20 +271,21 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
                  penalty_coeff: float = 1.0,
                  optimizer: str = 'Adam',
                  inferencer: str = 'BP',
+                 in_model: str | None = None,
+                 out_model: str = 'model.pt',
                  optimizer_kwargs: Optional[Dict[str, Any]] = None,
                  inference_kwargs: Optional[Dict[str, Any]] = None,
                  ):
         super().__init__()
+        params = locals()
         self.model = model
         self.optimizer_name = optimizer
         self.data = data
         self.log_info: Dict[str, Any] = {}
         self.penalty_coeff = penalty_coeff
-        self.self_kwargs = dict(
-            penalty_coeff=penalty_coeff,
-            optimizer=optimizer,
-            inferencer=inferencer,
-        )
+        self.self_kwargs = {
+            k: params[k] for k in lit_init_names
+        }
         if optimizer_kwargs is None:
             optimizer_kwargs = {k: v.default for k, v in default_optimizer_kwargs.items()
                                 if v.default is not None}
@@ -312,6 +315,9 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
     def hparams(self):
         return self._hparams
 
+    def on_fit_end(self) -> None:
+        return super().on_fit_end()
+
     def setup(self, stage=None) -> None:
         logging.info(self.optimizer_kwargs)
         logging.info(self.inference_kwargs)
@@ -329,10 +335,9 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
         batch: SubjectType = cast(SubjectType, _batch)
         return batch.to_device(device)
 
-    def training_step(self, *args, **kwargs) -> Union[torch._tensor.Tensor, Dict[str, Any]]:
-        batch: SubjectType = cast(SubjectType, args[0])
+    def training_loss(self, batch: SubjectType) -> Tensor:
         info = dict(status="initializing")
-        with tqdm(total=8, desc="Training Step", postfix=info, delay=0.5, leave=False) as progress:
+        with tqdm(total=7, desc="Training Eval Step", postfix=info, delay=0.5, leave=False) as progress:
             def update(status: str):
                 info['status'] = status
                 progress.set_postfix(info)
@@ -355,8 +360,11 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             if self.penalty_coeff != 0:
                 loss = loss + self.penalty_coeff * penalty.exp()
             self.log('combo', loss)
-            update('starting backward...')
             return loss
+
+    def training_step(self, *args, **kwargs) -> Union[torch._tensor.Tensor, Dict[str, Any]]:
+        batch: SubjectType = cast(SubjectType, args[0])
+        return self.training_loss(batch)
 
     def train_dataloader(self) -> DataLoader[SubjectType] | List[DataLoader[SubjectType]]:
         if self.data is None:
@@ -394,6 +402,9 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
     def forward_(self, x: SubjectType) -> SubjectType:
         return self.system.predict(x)
 
+    @property
+    def txdata(self) -> DataModule[SubjectType]:
+        return cast(DataModule[SubjectType], self.data)
 
 # class DataLoader(Generic[SubjectType]):
 #     def __getitem__(self, ix: Any) -> SubjectType: ...
