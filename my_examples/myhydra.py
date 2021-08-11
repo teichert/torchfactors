@@ -10,7 +10,6 @@ import sys
 import warnings
 from pathlib import Path
 
-import mlflow
 from hydra import main as hydra_main
 from hydra.core.hydra_config import HydraConfig
 from mlflow import log_param
@@ -59,6 +58,7 @@ def main(*args, **kwargs):
 
     def run_with_mlflow(f):
         def run_with_config(cfg):
+            import mlflow
             try:
                 mlruns_root = cfg['exp']['mlruns_path']
             except KeyError:
@@ -72,13 +72,14 @@ def main(*args, **kwargs):
             # disabling becuase sqlite backend leads to many logger info messages and
             # switching log-level doesn't work
             logging.getLogger('alembic.runtime.migration').disabled = True
-            mlflow.set_tracking_uri(f'{mlruns_type}:///{mlruns_path}')
-            mlflow.start_run()
-            for k, v in cfg.items():
-                if isinstance(v, (float, str, int, bool)):
-                    log_param(k, v)
-            f(cfg)
-            mlflow.end_run()
+            mlruns_uri = f'{mlruns_type}:///{mlruns_path}'
+            logging.getLogger(__name__).info(f'mlruns tracked at: {mlruns_uri}')
+            mlflow.set_tracking_uri(mlruns_uri)
+            with mlflow.start_run():
+                for k, v in cfg.items():
+                    if isinstance(v, (float, str, int, bool)):
+                        log_param(k, v)
+                f(cfg)
         run_with_config.__module__ = '__main__'
         return run_with_config
 

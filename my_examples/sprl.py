@@ -92,6 +92,13 @@ class SPR(tx.Subject):
                 num_classes=len(domain) + 1,
                 ignore_index=0)
             for metric_name, metric in metrics.items()}
+
+        entries.append(dict(
+            property='total-00',
+            metric='total-count',
+            value=min(len(all_gold), len(all_pred)),
+        ))
+
         for metric_name, value in micros_preharmonic.items():
             entry = dict(property='total-01-micro-preharmonic')
             entry['metric'] = metric_name
@@ -134,7 +141,7 @@ def missing_required_field(name):
     return raise_error
 
 
-@dataclass
+@ dataclass
 class SPRDataModule(tx.DataModule[SPR]):
     model: tx.Model[SPR] = field(default_factory=missing_required_field("model in SPRDataModule"))
     combine_train_and_val: bool = False
@@ -169,7 +176,7 @@ class SPR1DataModule(SPRDataModule):
 
 class SPRSystem(tx.LitSystem[SPR]):
 
-    @classmethod
+    @ classmethod
     def from_some_args(cls, model_class: Type[Model[SPR]],
                        data_class: Type[SPRDataModule],
                        args: Namespace, defaults: Mapping, **kwargs) -> SPRSystem:
@@ -185,7 +192,8 @@ class SPRSystem(tx.LitSystem[SPR]):
         data = data_class(model=loaded_model)
         return super().from_args(loaded_model, data, args=args, defaults=defaults, **kwargs)
 
-    def log_evaluation(self, x: SPR, data_name: str) -> Dict[str, float]:
+    def log_evaluation(self, x: SPR, data_name: str, step: int | None = None
+                       ) -> Dict[str, float]:
         with torch.set_grad_enabled(False):
             filename = f'{data_name}.binary.csv'
             out = self(x)
@@ -197,8 +205,9 @@ class SPRSystem(tx.LitSystem[SPR]):
                 f"{e['property']}.{data_name}.{e['metric']}": e['value']
                 for e in entries
             }
-            metrics[f'data.{data_name}.training-objective'] = float(self.training_loss(x))
-            log_metrics(metrics)
+            metrics[f'data.{data_name}.training-objective'] = float(
+                self.training_loss(x, data_name))
+            log_metrics(metrics, step=self.current_epoch if step is None else step)
             self.log_dict(metrics)
             return metrics
 
@@ -209,8 +218,13 @@ class SPRSystem(tx.LitSystem[SPR]):
             return next(iter(reversed(log.values())))
 
     def test_step(self, *args, **kwargs):
-        x = cast(SPR, args[0])
-        data_name = 'test' if self.txdata.test_mode else 'dev'
-        if len(x):
-            log = self.log_evaluation(x, data_name=data_name)
-            return next(iter(reversed(log.values())))
+        datasets = {}
+        if self.txdata.val:
+            datasets['val'] = self.txdata.val_dataloader
+        if self.txdata.dev:
+            datasets['dev'] = self.txdata.dev_dataloader
+        if self.txdata.test_mode and self.txdata.test:
+            datasets['test'] = self.txdata.test_dataloader
+        for data_name, dataloader in datasets.items():
+            x: SPR = cast(SPR, next(iter(dataloader)))
+            log = self.log_evaluation(x, data_name=data_name, step=-1)

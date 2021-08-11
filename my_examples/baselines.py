@@ -54,7 +54,7 @@ class BaselineSystem(SPRSystem):
         train: SPR = list(train_dl)[0]
         domain = cast(tx.FlexDomain, train.properties.domain)
         x_train = train.features.tensor.numpy()
-        for prop_id, property in enumerate(tqdm(domain), leave=False, desc="Properties"):
+        for prop_id, property in enumerate(tqdm(domain, leave=False, desc="Properties")):
             y_train = train.binary_labels[..., prop_id].tensor.numpy()
             self.property_to_model[property] = RidgeClassifierCV(
                 alphas=[1e-3, 1e-2, 1e-1, 1],
@@ -69,7 +69,7 @@ class BaselineSystem(SPRSystem):
         domain = cast(tx.FlexDomain, x.properties.domain)
         input_tensor = x.features.tensor
         input = input_tensor.numpy()
-        for prop_id, property in enumerate(tqdm(domain), leave=False, desc="Properties"):
+        for prop_id, property in enumerate(tqdm(domain, leave=False, desc="Properties")):
             model = self.property_to_model[property]
             out.binary_labels[..., prop_id].tensor = input_tensor.new_tensor(
                 model.predict(input))

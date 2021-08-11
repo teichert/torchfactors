@@ -7,7 +7,8 @@ from typing import cast
 import pytorch_lightning as pl
 import torch
 import torchfactors as tx
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
 from torchfactors.domain import FlexDomain
 
 import myhydra
@@ -73,12 +74,22 @@ def main(cfg):
             path="/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz",
             # split_max_count=100,
             batch_size=-1))
-    checkpoint = ModelCheckpoint(save_top_k=1, save_last=True)
+
+    checkpoint = ModelCheckpoint(save_top_k=1, save_last=True,
+                                 monitor='data.val.training-objective',
+                                 save_weights_only=True)
+    early_stopping = EarlyStopping(monitor='data.val.training-objective',
+                                   patience=cfg.get('patience', 3))
+    trainer.callbacks.extend([
+        checkpoint,
+        early_stopping
+    ])
+    trainer.logger = TensorBoardLogger('tb_logs')
     # trainer.tune(system, lr_find_kwargs=dict(
     #     update_attr=True,
     #     num_training=10,
     # ))
-    print(system.hparams, checkpoint)
+    # print(system.hparams, checkpoint)
     trainer.fit(system)
     trainer.test(system)
 

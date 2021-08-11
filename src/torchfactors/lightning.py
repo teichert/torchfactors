@@ -335,9 +335,10 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
         batch: SubjectType = cast(SubjectType, _batch)
         return batch.to_device(device)
 
-    def training_loss(self, batch: SubjectType) -> Tensor:
+    def training_loss(self, batch: SubjectType, data_name: str) -> Tensor:
         info = dict(status="initializing")
-        with tqdm(total=7, desc="Training Eval (forward)", postfix=info, delay=0.5, leave=False) as progress:
+        with tqdm(total=7, desc="Training Eval (forward)",
+                  postfix=info, delay=0.5, leave=False) as progress:
             def update(status: str):
                 info['status'] = status
                 progress.set_postfix(info)
@@ -354,18 +355,18 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             loss = (logz_free - logz_clamped).clamp_min(0).sum()
             update('penalty')
             penalty = penalty.sum()
-            self.log('loss', loss)
-            self.log('penalty', penalty)
+            self.log(f'step.{data_name}.free-energy', loss)
+            self.log(f'step.{data_name}.penalty', penalty)
             update('full loss')
             if self.penalty_coeff != 0:
                 loss = loss + self.penalty_coeff * penalty.exp()
-            self.log('combo', loss)
+            self.log(f'step.{data_name}.loss', loss)
             update('done')
             return loss
 
     def training_step(self, *args, **kwargs) -> Union[torch._tensor.Tensor, Dict[str, Any]]:
         batch: SubjectType = cast(SubjectType, args[0])
-        return self.training_loss(batch)
+        return self.training_loss(batch, 'train')
 
     def train_dataloader(self) -> DataLoader[SubjectType] | List[DataLoader[SubjectType]]:
         if self.data is None:
