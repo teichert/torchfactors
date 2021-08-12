@@ -3,7 +3,8 @@ from __future__ import annotations
 import itertools
 import math
 from itertools import chain
-from typing import Any, List, Optional, Sized, Tuple, Union, cast, overload
+from typing import (Any, List, Optional, Sized, Tuple, Union, cast,
+                    overload)
 
 import torch
 from multimethod import multidispatch

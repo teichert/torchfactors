@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-import argparse
 import os
 from datetime import timedelta
 from pathlib import Path
 from typing import cast
 
-import mlflow
+import mlflow  # type: ignore
 import pytorch_lightning as pl
 import torch
 import torchfactors as tx
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from torchfactors.domain import FlexDomain
+from torchfactors.lightning import Config
 
 import myhydra
 from sprl import SPR, SPR1DataModule, SPRSystem
@@ -61,26 +61,35 @@ class SPRLModel(tx.Model[SPR]):
 
 @myhydra.main(config_path=None)
 def main(cfg):
-    print(os.getcwd())
-    args = argparse.Namespace()
-    vars(args).update(cfg)
+    # print(os.getcwd())
+    # args = argparse.Namespace()
+    # vars(args).update(cfg)
     # parser = argparse.ArgumentParser(add_help=False)
     # parser = SPRSystem.add_argparse_args(parser)
     torch.set_num_threads(1)
     # args = pl.Trainer.parse_argparser(parser.parse_args())
     # args = pl.Trainer.parse_argparser(parser.parse_args(
     #     "--batch_size 3 --auto_lr_find True".split()))
-    trainer = pl.Trainer.from_argparse_args(args)
-    system = SPRSystem.from_some_args(
-        model_class=SPRLModel,
-        data_class=SPR1DataModule,
-        args=args, defaults=dict(
-            # path="./data/notxt.spr1.tar.gz",
-            path="/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz",
-            # in_model="/home/adam/projects/torchfactors/outputs/2021-08-12/00-10-07/tb_logs/default/version_0/checkpoints/epoch=0-step=0.pt",
-            # in_model="/home/adam/projects/torchfactors/outputs/2021-08-11/23-04-40/tb_logs/default/version_0/checkpoints/epoch=0-step=0.pt",
-            # split_max_count=100,
-            batch_size=-1))
+    config = Config(SPRLModel, SPR1DataModule, SPRSystem, pl.Trainer,
+                    raw_args=None, args_dict=cfg, defaults=dict())
+    model = config.create(SPRLModel)
+    data = config.create(SPR1DataModule, model=model)
+    system = config.create(SPRSystem, model=model, data=data)
+    trainer = pl.Trainer.from_argparse_args(config.namespace)
+
+    # # args = config.parser().parse_args()
+    # config.
+    # config = tx.Config(args, defaults)
+    # model = SPRLModel.from_args()
+    # # ppppppgppp
+    # system = SPRSystem.from_some_args(
+    #     model_class=SPRLModel,
+    #     data_class=SPR1DataModule,
+    #     args=args, defaults=dict(
+    #         # path="./data/notxt.spr1.tar.gz",
+    #         path="/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz",
+    #         # split_max_count=100,
+    #         batch_size=-1))
 
     if system.in_model is None:
         timed_checkpoint = ModelCheckpoint(save_top_k=0, save_last=True,

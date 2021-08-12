@@ -14,8 +14,9 @@ class SPRDummyModel(tx.Model[SPR]):
 
     def factors(self, x: SPR) -> Iterable[tx.Factor]:
         n_properties = x.labels.shape[-1]
+        domain = x.properties.flex_domain
         for i in range(n_properties):
-            self.namespace(f'unary-{SPR.property_domain.get_value(i)}')
+            self.namespace(f'unary-{domain.get_value(i)}')
         return []
 
 

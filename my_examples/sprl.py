@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 import torchfactors as tx
 from mlflow import log_artifact  # type: ignore
-from mlflow.tracking.fluent import log_metrics
+from mlflow.tracking.fluent import log_metrics  # type: ignore
 from torchfactors.lightning import LitSystem  # type: ignore
 from torchfactors.model import Model
 from torchmetrics import functional
@@ -20,16 +20,17 @@ import thesis_utils as tu
 
 @tx.dataclass
 class SPR(tx.Subject):
-    property_domain = tx.FlexDomain('spr-properties')
+    # property_domain = tx.FlexDomain('spr-properties')
 
     labels: tx.Var = tx.VarField(tx.ANNOTATED, tx.Range(5))
     binary_labels: tx.Var = tx.VarField(tx.ANNOTATED, tx.Range(2))
-    properties: tx.Var = tx.VarField(tx.OBSERVED, property_domain)
+    properties: tx.Var = tx.VarField(tx.OBSERVED)
     features: tx.Var = tx.VarField(tx.OBSERVED)
 
-    @staticmethod
-    def load_spr1(model: tx.Model[SPR], inputs: pd.DataFrame, labels: pd.DataFrame,
+    @classmethod
+    def load_spr1(cls, model: Model[SPR], inputs: pd.DataFrame, labels: pd.DataFrame,
                   split: str, maxn: int):
+        property_domain = model._domains['spr-properties']
         inputs = inputs[inputs['Split'] == split]  # type: ignore
         labels = labels[labels['Split'] == split]  # type: ignore
         labels = labels.sort_values('Variable.ID').reset_index()
@@ -44,15 +45,15 @@ class SPR(tx.Subject):
                 if len(these_labels) != num_properties:
                     raise RuntimeError("skipping an example becuase not "
                                        "all of the properties there; did you expect that?")
-                properties = model.domain_ids(SPR.property_domain, these_labels['Variable.ID'])
-                domain = model._domains[SPR.property_domain.name]
+                properties = model.domain_ids(property_domain, these_labels['Variable.ID'])
+                # domain = model._domains[SPR.property_domain.name]
                 embed = input_df['embed'].values[0]
                 # embed = embed.unsqueeze(-1).expand(-1, num_properties)
                 labels = torch.tensor(these_labels['Response'].values)
                 yield SPR(
                     labels=tx.TensorVar(labels),
                     binary_labels=tx.TensorVar((labels >= 3).int()),
-                    properties=tx.TensorVar(properties, domain=domain),
+                    properties=tx.TensorVar(properties, domain=property_domain),
                     features=tx.TensorVar(embed)
                 )
         out = list(itertools.islice(examples(), 0, maxn))

@@ -10,7 +10,7 @@ import typing_extensions
 from multimethod import multimethod
 from torch import Size, Tensor
 
-from .domain import Domain
+from .domain import Domain, FlexDomain
 from .types import GeneralizedDimensionDrop, NDSlice, ShapeType
 from .utils import as_ndrange, canonical_ndslice, compose, ndslices_cat
 
@@ -118,6 +118,10 @@ class Var(ABC):
     @property
     def domain(self) -> Domain:
         return self._get_domain()
+
+    @property
+    def flex_domain(self) -> FlexDomain:
+        return cast(FlexDomain, self.domain)
 
     @abstractmethod
     def _get_tensor(self) -> Tensor: ...  # pragma: no cover
