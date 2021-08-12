@@ -9,7 +9,8 @@ import pandas as pd
 import torch
 import torchfactors as tx
 from mlflow import log_artifact  # type: ignore
-from mlflow.tracking.fluent import log_metrics  # type: ignore
+from mlflow.tracking.fluent import log_metrics
+from torchfactors.lightning import LitSystem  # type: ignore
 from torchfactors.model import Model
 from torchmetrics import functional
 from tqdm import tqdm  # type: ignore
@@ -44,13 +45,14 @@ class SPR(tx.Subject):
                     raise RuntimeError("skipping an example becuase not "
                                        "all of the properties there; did you expect that?")
                 properties = model.domain_ids(SPR.property_domain, these_labels['Variable.ID'])
+                domain = model._domains[SPR.property_domain.name]
                 embed = input_df['embed'].values[0]
                 # embed = embed.unsqueeze(-1).expand(-1, num_properties)
                 labels = torch.tensor(these_labels['Response'].values)
                 yield SPR(
                     labels=tx.TensorVar(labels),
                     binary_labels=tx.TensorVar((labels >= 3).int()),
-                    properties=tx.TensorVar(properties),
+                    properties=tx.TensorVar(properties, domain=domain),
                     features=tx.TensorVar(embed)
                 )
         out = list(itertools.islice(examples(), 0, maxn))
@@ -182,17 +184,18 @@ class SPRSystem(tx.LitSystem[SPR]):
                        args: Namespace,
                        defaults: Mapping[str, Any], **kwargs) -> SPRSystem:
         all_args = ChainMap(vars(args), kwargs, defaults)
-        model = all_args.get('model', None)
+        model = all_args.get('in_model', None)
         loaded_model = model_class()
         if model is not None:
-            loaded_model.load_state_dict(torch.load(all_args['model']))
-        # else:
-        #     checkpoint = all_args.get('checkpoint', None)
-        #     if checkpoint is not None:
-        #         cls.load_from_checkpoint(checkpoint)
+            saved = torch.load(all_args['in_model'])
+            # loaded_model.load_state_dict(saved['just-model'], strict=False)
+            system = LitSystem(loaded_model)
+            system.load_state_dict(saved['state_dict'], strict=False)
+            loaded_model = system.model
         data = data_class(model=loaded_model)
-        return cast(SPRSystem,
-                    super().from_args(loaded_model, data, args=args, defaults=defaults, **kwargs))
+        system = cast(SPRSystem,
+                      super().from_args(loaded_model, data, args=args, defaults=defaults, **kwargs))
+        return system
 
     def log_evaluation(self, x: SPR, data_name: str, step: int | None = None
                        ) -> Dict[str, float]:
@@ -240,3 +243,7 @@ class SPRSystem(tx.LitSystem[SPR]):
         for data_name, dataloader in datasets.items():
             x: SPR = cast(SPR, next(iter(dataloader)))
             self.log_evaluation(x, data_name=data_name, step=-1)
+
+    def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        super().on_save_checkpoint(checkpoint)
+        checkpoint['just-model'] = self.model.state_dict()

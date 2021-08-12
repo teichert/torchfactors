@@ -77,10 +77,12 @@ def main(cfg):
         args=args, defaults=dict(
             # path="./data/notxt.spr1.tar.gz",
             path="/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz",
+            # in_model="/home/adam/projects/torchfactors/outputs/2021-08-12/00-10-07/tb_logs/default/version_0/checkpoints/epoch=0-step=0.pt",
+            # in_model="/home/adam/projects/torchfactors/outputs/2021-08-11/23-04-40/tb_logs/default/version_0/checkpoints/epoch=0-step=0.pt",
             # split_max_count=100,
             batch_size=-1))
 
-    if vars(args).get('in_model', None) is None:
+    if system.in_model is None:
         timed_checkpoint = ModelCheckpoint(save_top_k=0, save_last=True,
                                            train_time_interval=timedelta(minutes=30))
         best_model = ModelCheckpoint(save_top_k=1,
@@ -106,7 +108,8 @@ def main(cfg):
         print(f'path to best model: {best_model_path}')
         mlflow.log_artifact(f'{best_model_path}', 'best_model')
     else:
-        system.model.eval()
+        # system.load_from_checkpoint(args.in_model)
+        system.eval()
     trainer.test(system)
 
 

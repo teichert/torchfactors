@@ -190,7 +190,9 @@ class Subject:
                     raise ValueError(
                         "need to specify an actual tensor (or a shape)"
                         "for every variable in the subject")
-                if var_field._domain is not Domain.OPEN:
+                if var_field._domain is not Domain.OPEN and (
+                        var_instance._domain is None or
+                        var_instance._domain is Domain.OPEN):
                     var_instance._domain = var_field._domain
                 if var_field._usage is not None:
                     var_instance.set_usage(var_field._usage)
