@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import argparse
 import os
+from datetime import timedelta
+from pathlib import Path
 from typing import cast
 
+import mlflow
 import pytorch_lightning as pl
 import torch
 import torchfactors as tx
@@ -44,6 +47,7 @@ class SPRLModel(tx.Model[SPR]):
             yield tx.LinearFactor(self.namespace(f'label-{property}'),
                                   x.binary_labels[..., property_id],
                                   input=x.features.tensor)
+
         # for i in range(n):
         #     # if i > 1:
         #     #     yield tx.LinearFactor(self.namespace('rating-pair'),
@@ -57,6 +61,7 @@ class SPRLModel(tx.Model[SPR]):
 
 @myhydra.main(config_path=None)
 def main(cfg):
+    print(os.getcwd())
     args = argparse.Namespace()
     vars(args).update(cfg)
     # parser = argparse.ArgumentParser(add_help=False)
@@ -75,22 +80,33 @@ def main(cfg):
             # split_max_count=100,
             batch_size=-1))
 
-    checkpoint = ModelCheckpoint(save_top_k=1, save_last=True,
-                                 monitor='data.val.training-objective',
-                                 save_weights_only=True)
-    early_stopping = EarlyStopping(monitor='data.val.training-objective',
-                                   patience=cfg.get('patience', 3))
-    trainer.callbacks.extend([
-        checkpoint,
-        early_stopping
-    ])
-    trainer.logger = TensorBoardLogger('tb_logs')
-    # trainer.tune(system, lr_find_kwargs=dict(
-    #     update_attr=True,
-    #     num_training=10,
-    # ))
-    # print(system.hparams, checkpoint)
-    trainer.fit(system)
+    if vars(args).get('in_model', None) is None:
+        timed_checkpoint = ModelCheckpoint(save_top_k=0, save_last=True,
+                                           train_time_interval=timedelta(minutes=30))
+        best_model = ModelCheckpoint(save_top_k=1,
+                                     monitor='data.val.training-objective',
+                                     save_weights_only=True)
+        best_model.FILE_EXTENSION = ".pt"
+        early_stopping = EarlyStopping(monitor='data.val.training-objective',
+                                       patience=cfg.get('patience', 3))
+        trainer.callbacks.extend([
+            timed_checkpoint,
+            best_model,
+            early_stopping
+        ])
+        trainer.logger = TensorBoardLogger('tb_logs')
+        # trainer.tune(system, lr_find_kwargs=dict(
+        #     update_attr=True,
+        #     num_training=10,
+        # ))
+        # print(system.hparams, checkpoint)
+        trainer.fit(system)
+        best_model_path = Path(best_model.best_model_path).resolve()
+        # best_model_path_str = str(best_model_path).replace('=', '\\=')
+        print(f'path to best model: {best_model_path}')
+        mlflow.log_artifact(f'{best_model_path}', 'best_model')
+    else:
+        system.model.eval()
     trainer.test(system)
 
 

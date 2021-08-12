@@ -74,7 +74,7 @@ lit_init_names = dict(
     optimizer=ArgParseArg(str, default='Adam'),
     inferencer=ArgParseArg(str, default='BP'),
     in_model=ArgParseArg(str, default=None),
-    out_model=ArgParseArg(str, default='model.pt'),
+    # out_model=ArgParseArg(str, default='model.pt'),
     penalty_coeff=ArgParseArg(float, 1.0,
                               'multiplied by the exponentiated total KL from previous message'))
 
@@ -272,13 +272,15 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
                  optimizer: str = 'Adam',
                  inferencer: str = 'BP',
                  in_model: str | None = None,
-                 out_model: str = 'model.pt',
+                 #  out_model: str = 'model.pt',
                  optimizer_kwargs: Optional[Dict[str, Any]] = None,
                  inference_kwargs: Optional[Dict[str, Any]] = None,
                  ):
         super().__init__()
         params = locals()
         self.model = model
+        self.in_model = in_model
+        # self.out_model = out_model
         self.optimizer_name = optimizer
         self.data = data
         self.log_info: Dict[str, Any] = {}
