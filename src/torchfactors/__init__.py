@@ -17,13 +17,13 @@ from .factor import Factor
 from .factor_graph import FactorGraph
 from .inferencer import Inferencer
 from .inferencers.bp import BP
-from .lightning import Config, DataModule, ListDataset, LitSystem
+from .lightning import DataModule, ListDataset, LitSystem
 from .model import Model
 from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
 from .subject import Subject
 from .types import GeneralizedDimensionDrop, gdrop
-from .utils import data_len, logsumexp, ndarange, num_trainable
+from .utils import Config, data_len, logsumexp, ndarange, num_trainable
 from .variable import TensorVar, Var, VarField, VarUsage, at, vtensor
 
 logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)

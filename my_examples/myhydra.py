@@ -15,7 +15,7 @@ from hydra.core.hydra_config import HydraConfig
 from mlflow import log_param  # type: ignore
 
 
-def main(*args, **kwargs):
+def main(*args, use_mlflow=False, **kwargs):
     r"""
     The function returned will be a decorator that wraps a function to achieve
     the following functionality:
@@ -58,27 +58,30 @@ def main(*args, **kwargs):
 
     def run_with_mlflow(f):
         def run_with_config(cfg):
-            import mlflow
-            try:
-                mlruns_root = cfg['exp']['mlruns_path']
-            except KeyError:
-                mlruns_root = 'mlruns.db'
-            try:
-                mlruns_type = cfg['exp']['mlruns_type']
-            except KeyError:
-                mlruns_type = 'sqlite'
-            mlruns_path = Path(mlruns_root).resolve()
-            mlruns_path.parent.mkdir(parents=True, exist_ok=True)
-            # disabling becuase sqlite backend leads to many logger info messages and
-            # switching log-level doesn't work
-            logging.getLogger('alembic.runtime.migration').disabled = True
-            mlruns_uri = f'{mlruns_type}:///{mlruns_path}'
-            logging.getLogger(__name__).info(f'mlruns tracked at: {mlruns_uri}')
-            mlflow.set_tracking_uri(mlruns_uri)
-            with mlflow.start_run():
-                for k, v in cfg.items():
-                    if isinstance(v, (float, str, int, bool)):
-                        log_param(k, v)
+            if use_mlflow:
+                import mlflow
+                try:
+                    mlruns_root = cfg['exp']['mlruns_path']
+                except KeyError:
+                    mlruns_root = 'mlruns.db'
+                try:
+                    mlruns_type = cfg['exp']['mlruns_type']
+                except KeyError:
+                    mlruns_type = 'sqlite'
+                mlruns_path = Path(mlruns_root).resolve()
+                mlruns_path.parent.mkdir(parents=True, exist_ok=True)
+                # disabling becuase sqlite backend leads to many logger info messages and
+                # switching log-level doesn't work
+                logging.getLogger('alembic.runtime.migration').disabled = True
+                mlruns_uri = f'{mlruns_type}:///{mlruns_path}'
+                logging.getLogger(__name__).info(f'mlruns tracked at: {mlruns_uri}')
+                mlflow.set_tracking_uri(mlruns_uri)
+                with mlflow.start_run():
+                    for k, v in cfg.items():
+                        if isinstance(v, (float, str, int, bool)):
+                            log_param(k, v)
+                    f(cfg)
+            else:
                 f(cfg)
         run_with_config.__module__ = '__main__'
         return run_with_config

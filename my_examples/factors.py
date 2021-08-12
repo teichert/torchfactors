@@ -1,18 +1,16 @@
 from __future__ import annotations
 
 import os
-from datetime import timedelta
-from pathlib import Path
+import sys
 from typing import cast
 
 import mlflow  # type: ignore
 import pytorch_lightning as pl
 import torch
 import torchfactors as tx
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning.loggers import TensorBoardLogger
 from torchfactors.domain import FlexDomain
 from torchfactors.lightning import Config
+from torchfactors.model import Model
 
 import myhydra
 from sprl import SPR, SPR1DataModule, SPRSystem
@@ -59,7 +57,10 @@ class SPRLModel(tx.Model[SPR]):
 # x.property[..., i])
 
 
-@myhydra.main(config_path=None)
+base_config = Config(Model, SPR1DataModule, SPRSystem, pl.Trainer)
+
+
+@myhydra.main(config_path=None, use_mlflow=False)
 def main(cfg):
     # print(os.getcwd())
     # args = argparse.Namespace()
@@ -70,59 +71,60 @@ def main(cfg):
     # args = pl.Trainer.parse_argparser(parser.parse_args())
     # args = pl.Trainer.parse_argparser(parser.parse_args(
     #     "--batch_size 3 --auto_lr_find True".split()))
-    config = Config(SPRLModel, SPR1DataModule, SPRSystem, pl.Trainer,
-                    raw_args=None, args_dict=cfg, defaults=dict())
+    config = base_config.child(parse_args=None, args_dict=cfg, defaults=dict())
     model = config.create(SPRLModel)
     data = config.create(SPR1DataModule, model=model)
     system = config.create(SPRSystem, model=model, data=data)
     trainer = pl.Trainer.from_argparse_args(config.namespace)
 
-    # # args = config.parser().parse_args()
-    # config.
-    # config = tx.Config(args, defaults)
-    # model = SPRLModel.from_args()
-    # # ppppppgppp
-    # system = SPRSystem.from_some_args(
-    #     model_class=SPRLModel,
-    #     data_class=SPR1DataModule,
-    #     args=args, defaults=dict(
-    #         # path="./data/notxt.spr1.tar.gz",
-    #         path="/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz",
-    #         # split_max_count=100,
-    #         batch_size=-1))
+    # # # args = config.parser().parse_args()
+    # # config.
+    # # config = tx.Config(args, defaults)
+    # # model = SPRLModel.from_args()
+    # # # ppppppgppp
+    # # system = SPRSystem.from_some_args(
+    # #     model_class=SPRLModel,
+    # #     data_class=SPR1DataModule,
+    # #     args=args, defaults=dict(
+    # #         # path="./data/notxt.spr1.tar.gz",
+    # #         path="/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz",
+    # #         # split_max_count=100,
+    # #         batch_size=-1))
 
-    if system.in_model is None:
-        timed_checkpoint = ModelCheckpoint(save_top_k=0, save_last=True,
-                                           train_time_interval=timedelta(minutes=30))
-        best_model = ModelCheckpoint(save_top_k=1,
-                                     monitor='data.val.training-objective',
-                                     save_weights_only=True)
-        best_model.FILE_EXTENSION = ".pt"
-        early_stopping = EarlyStopping(monitor='data.val.training-objective',
-                                       patience=cfg.get('patience', 3))
-        trainer.callbacks.extend([
-            timed_checkpoint,
-            best_model,
-            early_stopping
-        ])
-        trainer.logger = TensorBoardLogger('tb_logs')
-        # trainer.tune(system, lr_find_kwargs=dict(
-        #     update_attr=True,
-        #     num_training=10,
-        # ))
-        # print(system.hparams, checkpoint)
-        trainer.fit(system)
-        best_model_path = Path(best_model.best_model_path).resolve()
-        # best_model_path_str = str(best_model_path).replace('=', '\\=')
-        print(f'path to best model: {best_model_path}')
-        mlflow.log_artifact(f'{best_model_path}', 'best_model')
-    else:
-        # system.load_from_checkpoint(args.in_model)
-        system.eval()
-    trainer.test(system)
+    # if system.in_model is None:
+    #     timed_checkpoint = ModelCheckpoint(save_top_k=0, save_last=True,
+    #                                        train_time_interval=timedelta(minutes=30))
+    #     best_model = ModelCheckpoint(save_top_k=1,
+    #                                  monitor='data.val.training-objective',
+    #                                  save_weights_only=True)
+    #     best_model.FILE_EXTENSION = ".pt"
+    #     early_stopping = EarlyStopping(monitor='data.val.training-objective',
+    #                                    patience=cfg.get('patience', 3))
+    #     trainer.callbacks.extend([
+    #         timed_checkpoint,
+    #         best_model,
+    #         early_stopping
+    #     ])
+    #     trainer.logger = TensorBoardLogger('tb_logs')
+    #     # trainer.tune(system, lr_find_kwargs=dict(
+    #     #     update_attr=True,
+    #     #     num_training=10,
+    #     # ))
+    #     # print(system.hparams, checkpoint)
+    #     trainer.fit(system)
+    #     best_model_path = Path(best_model.best_model_path).resolve()
+    #     # best_model_path_str = str(best_model_path).replace('=', '\\=')
+    #     print(f'path to best model: {best_model_path}')
+    #     mlflow.log_artifact(f'{best_model_path}', 'best_model')
+    # else:
+    #     # system.load_from_checkpoint(args.in_model)
+    #     system.eval()
+    # trainer.test(system)
 
 
 if __name__ == '__main__':
+    if '--help' in sys.argv:
+        base_config.parser.print_help()
     try:
         print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
         torch.tensor(0.0).to("cuda")

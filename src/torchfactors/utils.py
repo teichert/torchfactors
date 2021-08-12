@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import inspect
 import itertools
 import math
+import re
+import sys
+from argparse import ArgumentParser, Namespace
 from itertools import chain
-from typing import (Any, List, Optional, Sized, Tuple, Union, cast,
-                    overload)
+from typing import (Any, ChainMap, Counter, List, Mapping, Optional, Sequence,
+                    Sized, Tuple, Type, TypeVar, Union, cast, overload)
 
 import torch
 from multimethod import multidispatch
@@ -358,3 +362,123 @@ def split_data(data: Dataset, portion: float | None = None,
     first_size = cast(int, count)
     second_size = length - first_size
     return random_split(data, [first_size, second_size], generator=generator)
+
+
+T = TypeVar('T')
+
+
+def str_to_bool(s: str) -> bool:
+    return s.lower() == 'true'
+
+
+legal_arg_types = {
+    str: str,
+    float: float,
+    int: int,
+    bool: str_to_bool,
+    'str': str,
+    'float': float,
+    'int': int,
+    'bool': str_to_bool
+}
+
+
+def DuplicateEntry(orig_name: str, duplicate_name: str):
+    def throw_error(x):
+        raise RuntimeError("--{duplicate_name} is just to help you see "
+                           "that the argument belongs to multiple groups. ",
+                           "Please use --{orig_name} instead to set the "
+                           "argument.")
+    return throw_error
+
+
+def add_arguments(cls: type, parser: ArgumentParser, arg_counts: Counter | None = None):
+    if arg_counts is None:
+        arg_counts = Counter()
+    group = parser.add_argument_group(cls.__name__)
+    for arg, param in inspect.signature(cls.__init__).parameters.items():
+        possible_types = [*re.split('[^a-zA-Z]+', str(param.annotation)),
+                          type(param.default), param.annotation]
+        types = [t for t in possible_types if t in legal_arg_types]
+        if types:
+            use_type = types[-1]
+            if arg in arg_counts:
+                duplicate_name = f'{arg}{arg_counts[arg]}'
+                group.add_argument(f'--{duplicate_name}', type=DuplicateEntry(arg, duplicate_name),
+                                   help=f"(Note --{duplicate_name} is just place-holder to show relevance to this group. Please use --{arg} instead.)")
+            else:
+                group.add_argument(f'--{arg}', type=legal_arg_types[use_type])
+            arg_counts[arg] += 1
+
+
+class Config:
+
+    def __init__(self, *classes: type, parent_parser: ArgumentParser | None = None,
+                 parse_args: Sequence[str] | str | None = None,
+                 args_dict: Mapping[str, Any] | None = None,
+                 defaults: Mapping[str, Any] | None = None):
+        r"""
+        Parameters:
+
+        parse_args:
+          - 'sys' means to get them from sys
+          - None means to not use them
+          - anything else means to use that instead
+        """
+        self.classes = classes
+        if parent_parser is None:
+            parent_parser = ArgumentParser()
+        self._parser = parent_parser
+        arg_counts = Counter()
+        for cls in classes:
+            add_arguments(cls, self.parser, arg_counts=arg_counts)
+        self.parse_args = sys.argv if parse_args == 'sys' else parse_args
+        self.args_dict = args_dict
+        self.defaults = defaults
+        self.parsed_args: Namespace | None = None
+
+    def child(self, *args, **kwargs) -> Config:
+        return Config(*self.classes, *args, **kwargs)
+
+    @property
+    def parser(self):
+        return self._parser
+
+    @property
+    def namespace(self) -> Namespace:
+        r"""
+        Returns an argparse namespace with the contents of the config;
+        1) parse args if there are any
+        2) update the the namespace with a chain of (self, args_dict, defaults)
+        """
+        if self.parsed_args is None:
+            back_off_args: Mapping[str, Any] = ChainMap(*[d for d in [
+                self.args_dict, self.defaults
+            ] if d is not None])
+            if self.parse_args is None:
+                self.parsed_args = Namespace()
+                vars(self.parsed_args).update(back_off_args)
+            else:
+                self.parser.set_defaults(**back_off_args)
+                self.parsed_args = self.parser.parse_args(self.parse_args)
+        return self.parsed_args
+
+    @property
+    def dict(self) -> Mapping[str, Any]:
+        return vars(self.namespace)
+
+    def create_with_help(self, cls: Type[T], **kwargs) -> T:
+        try:
+            return self.create(cls, **kwargs)
+        except TypeError as e:
+            print(e, file=sys.stderr)
+            self.parser.print_help()
+            sys.exit(1)
+
+    def create(self, cls: Type[T], **kwargs) -> T:
+        settings = ChainMap(kwargs, self.dict)
+        known_params = set(
+            inspect.signature(cls.__init__).parameters.keys()
+        ).intersection(settings.keys())
+        params = {k: settings[k] for k in known_params}
+        return cls(**params)  # type: ignore

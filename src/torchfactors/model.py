@@ -73,11 +73,13 @@ class ParamNamespace:
 
 class Model(torch.nn.Module, Generic[SubjectType]):
 
-    def __init__(self):
+    def __init__(self, in_model: str | None = None):
         super(Model, self).__init__()
         self._model_parameters = ParameterDict()
         self._model_modules = ModuleDict()
         self._domains: Dict[str, FlexDomain] = {}
+        if in_model is not None:
+            self.load_state_dict(torch.load(in_model))
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         super()._save_to_state_dict(destination, prefix, keep_vars)

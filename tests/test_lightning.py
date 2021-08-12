@@ -327,3 +327,22 @@ def test_dev_test():
     data3 = Data()  # dev should be default
     data3.setup()
     assert [x.i for x in list(data3.test_dataloader())] == [3, 4, 5]
+
+
+# def test_config():
+#     class A:
+#         def __init__(self, something, a=3, b='hi', c=True):
+#             self.something = something
+#             self.a = a
+#             self.b = b
+#             self.c = c
+
+
+#     @tx.dataclass
+#     class C:
+#         a: str
+#         i: int = 9
+
+
+#     config = tx.Config(A, C)
+#     assert config.parser.argumen

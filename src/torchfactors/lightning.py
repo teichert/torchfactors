@@ -2,20 +2,17 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
-import inspect
 import itertools
 import logging
 import re
-import sys
 from argparse import ArgumentParser, Namespace
 from collections import ChainMap
 from dataclasses import dataclass
-from typing import (Any, Dict, Generic, List, Mapping, Optional, Sequence,
-                    Sized, Type, TypeVar, Union, cast)
+from typing import (Any, Dict, Generic, List, Mapping, Optional, Sized,
+                    Union, cast)
 
 import pytorch_lightning as pl
 import torch
-from pytorch_lightning.utilities.argparse import add_argparse_args
 from torch.functional import Tensor
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataloader import DataLoader
@@ -416,66 +413,3 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
 
 # class DataLoader(Generic[SubjectType]):
 #     def __getitem__(self, ix: Any) -> SubjectType: ...
-
-
-T = TypeVar('T')
-
-
-class Config:
-
-    def __init__(self, *classes: type, parent_parser: argparse.ArgumentParser | None = None,
-                 raw_args: Sequence[str] | str | None = None,
-                 args_dict: Mapping[str, Any] | None = None,
-                 defaults: Mapping[str, Any] | None = None):
-        r"""
-        Parameters:
-
-        raw_args:
-          - 'sys' means to get them from sys
-          - None means to not use them
-          - anything else means to use that instead
-        """
-        if parent_parser is None and raw_args is not None:
-            parent_parser = argparse.ArgumentParser()
-        self._parser = parent_parser
-        for cls in classes:
-            add_argparse_args(cls, self.parser)
-        self.raw_args = sys.argv if raw_args == 'sys' else raw_args
-        self.args_dict = args_dict
-        self.defaults = defaults
-        self.parsed_args: Namespace | None = None
-
-    @property
-    def parser(self):
-        return self._parser
-
-    @property
-    def namespace(self) -> Namespace:
-        r"""
-        Returns an argparse namespace with the contents of the config;
-        1) parse args if there are any
-        2) update the the namespace with a chain of (self, args_dict, defaults)
-        """
-        if self.parsed_args is None:
-            back_off_args: Mapping[str, Any] = ChainMap(*[d for d in [
-                self.args_dict, self.defaults
-            ] if d is not None])
-            if self.parser is None:
-                self.parsed_args = argparse.Namespace()
-                vars(self.parsed_args).update(back_off_args)
-            else:
-                self.parser.set_defaults(**back_off_args)
-                self.parsed_args = self.parser.parse_args(self.raw_args)
-        return self.parsed_args
-
-    @property
-    def dict(self) -> Mapping[str, Any]:
-        return vars(self.namespace)
-
-    def create(self, cls: Type[T], **kwargs) -> T:
-        settings = ChainMap(kwargs, self.dict)
-        known_params = set(
-            inspect.signature(cls.__init__).parameters.keys()
-        ).intersection(settings.keys())
-        params = {k: settings[k] for k in known_params}
-        return cls(**params)  # type: ignore
