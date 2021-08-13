@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import importlib
 import json
+from collections import OrderedDict
 from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, List,
-                    Mapping, Optional, Sequence, Tuple, cast, overload)
+                    Mapping, Optional, Sequence, Tuple, Type, cast, overload)
 
 import torch
 from multimethod import multimethod
@@ -74,24 +75,30 @@ class ParamNamespace:
         return self.model.get_key_repr(self.key)
 
     def module(self, cls: type | None = None, **kwargs) -> Module:
-        def setup_new_module():
-            self.model._module_constructors[self._key_repr] = (cls.__module__, cls.__name__, kwargs)
-            return cls(**kwargs)
-        return self.model._get_module(self.key, None if cls is None else setup_new_module)
+        if cls is None:
+            return self.model._get_module(self.key)
+        else:
+            non_none_cls = cls
+
+            def setup_new_module():
+                self.model._module_constructors[self._key_repr] = (
+                    non_none_cls.__module__, non_none_cls.__name__, kwargs)
+                return non_none_cls(**kwargs)
+            return self.model._get_module(self.key, setup_new_module)
 
 
-def register_module(cls):
-    register_module.known_modules.set_default((cls.__module__, cls.__name__), cls)
+__known_modules: Dict[Tuple[str, str], Type[Module]] = {}
+
+
+def register_module(cls: Type[Module]):
+    __known_modules.setdefault((cls.__module__, cls.__name__), cls)
     return cls
-
-
-register_module.known_modules = cast(Dict[Tuple[str, str], Module], {})
 
 
 def build_module(module: str, name: str, kwargs: Mapping[str, Any]) -> Module:
     cls: type
     try:
-        cls = register_module.known_modules[(module, name)]
+        cls = __known_modules[(module, name)]
     except KeyError:
         cls = getattr(importlib.import_module(module), name)
     built = cls(**kwargs)
@@ -114,14 +121,14 @@ class Model(torch.nn.Module, Generic[SubjectType]):
         elif checkpoint_path is not None:
             check_point = torch.load(checkpoint_path)
             state_dict = check_point['state_dict']
-            only_model_state_dict_items = []
+            only_model_state_dict_items: List[Tuple[str, Any]] = []
             for k, v in state_dict.items():
                 for starting in ['model.']:
                     if k.startswith(starting):
                         k = k[len(starting):]
                         break
                 only_model_state_dict_items.append((k, v))
-            self.load_state_dict(dict(only_model_state_dict_items))
+            self.load_state_dict(OrderedDict(only_model_state_dict_items))  # type: ignore
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         super()._save_to_state_dict(destination, prefix, keep_vars)

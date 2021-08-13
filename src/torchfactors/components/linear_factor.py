@@ -7,11 +7,12 @@ import torch
 from torch.functional import Tensor
 
 from ..factor import Factor
-from ..model import ParamNamespace
+from ..model import ParamNamespace, register_module
 from ..types import ShapeType
 from ..variable import Var
 
 
+@register_module
 class OptionalBiasLinear(torch.nn.Module):
     r"""
     Allows the output to ignore the input (bias-only),
@@ -32,9 +33,9 @@ class OptionalBiasLinear(torch.nn.Module):
         # if not self.initialized:
         if self.input_features == 0:
             if self.bias:
-                bias = torch.empty(self.output_features, **factory_kwargs)
-                torch.nn.init.uniform_(bias, -1., 1.)
-                self.bias_only = torch.nn.parameter.Parameter(bias)
+                new_bias = torch.empty(self.output_features, **factory_kwargs)
+                torch.nn.init.uniform_(new_bias, -1., 1.)
+                self.bias_only = torch.nn.parameter.Parameter(new_bias)
             else:
                 self.bias_only = torch.tensor(0.0, **factory_kwargs).expand(
                     (self.output_features,))
@@ -59,6 +60,7 @@ class OptionalBiasLinear(torch.nn.Module):
 # @register_module_for_state_dict
 
 
+@register_module
 class ShapedLinear(torch.nn.Module):
     r"""
     Like a built-in Linear layer, but the output

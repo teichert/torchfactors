@@ -12,9 +12,8 @@ from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
                           Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.domain import FlexDomain
-from torchfactors.model import ParamNamespace
+from torchfactors.model import ParamNamespace, build_module
 from torchfactors.testing import DummyParamNamespace, DummySubject
-from torchfactors.variable import TensorVar
 
 
 @dataclass
@@ -112,6 +111,9 @@ def test_modules():
     params = list(module2.parameters())
     assert len(params) == 1
     assert params[0].T.shape == (4, 5)
+    module3 = build_module('torch.nn', 'Linear', dict(in_features=4, out_features=5, bias=False))
+    params3 = list(module3.parameters())
+    assert params3[0].T.shape == (4, 5)
 
 
 def test_new_modules():
@@ -309,7 +311,6 @@ def test_model_domain_state_dict_with_params_and_modules():
 
     def init(t: Tensor):
         t[(...,)] = 3
-    v = TensorVar(tx.Range(3), tensor=torch.tensor([3, 4, 1, 5]))
     params = model.namespace('hi').parameter((3, 5), init)
     module = model.namespace('hi2').module(
         tx.ShapedLinear, output_shape=(3, 2), bias=False, input_shape=params.shape)
@@ -322,6 +323,78 @@ def test_model_domain_state_dict_with_params_and_modules():
     loaded_state = torch.load('test_model.pt')
     model2 = Model[DummySubject]()
     model2.load_state_dict(loaded_state)
+    params2 = model2.namespace('hi').parameter()
+    assert (params2 == params).all()
+    assert (params2 == torch.ones(3, 5) * 3).all()
+    module2 = model2.namespace('hi2').module()
+    out_from_module2 = module2(params2)
+    assert (out_from_module2 == out_from_module).all()
+    domain2 = FlexDomain('test', unk=True)
+    out2 = model2.domain_ids(domain2, values2).tolist()
+    assert out2 == ids2
+    out1 = model2.domain_ids(domain2, values1).tolist()
+    assert out1 == ids1
+
+
+def test_load_model1():
+    model = Model[DummySubject]()
+    domain = FlexDomain('test', unk=True)
+    values1 = ['this', 'test', 'is', 'a', 'test', 'of', 'this']
+    values2 = ['test', 'a', 'test', 'of', 'this', 'is', 'this']
+    ids1 = model.domain_ids(domain, values1).tolist()
+    assert ids1 == [1, 2, 3, 4, 2, 5, 1]
+    ids2 = model.domain_ids(domain, values2).tolist()
+    assert ids2 == [2, 4, 2, 5, 1, 3, 1]
+
+    def init(t: Tensor):
+        t[(...,)] = 3
+    params = model.namespace('hi').parameter((3, 5), init)
+    module = model.namespace('hi2').module(
+        tx.ShapedLinear, output_shape=(3, 2), bias=False, input_shape=params.shape)
+    out_from_module = module(params)
+    assert out_from_module.shape == (3, 2)
+    paramsb = model.namespace('hi').parameter()
+    assert (paramsb == params).all()
+    state = model.state_dict()
+    path = '__test_model.pt'
+    torch.save(state, path)
+    model2 = Model[DummySubject](model_state_dict_path=path)
+    params2 = model2.namespace('hi').parameter()
+    assert (params2 == params).all()
+    assert (params2 == torch.ones(3, 5) * 3).all()
+    module2 = model2.namespace('hi2').module()
+    out_from_module2 = module2(params2)
+    assert (out_from_module2 == out_from_module).all()
+    domain2 = FlexDomain('test', unk=True)
+    out2 = model2.domain_ids(domain2, values2).tolist()
+    assert out2 == ids2
+    out1 = model2.domain_ids(domain2, values1).tolist()
+    assert out1 == ids1
+
+
+def test_load_model2():
+    model = Model[DummySubject]()
+    domain = FlexDomain('test', unk=True)
+    values1 = ['this', 'test', 'is', 'a', 'test', 'of', 'this']
+    values2 = ['test', 'a', 'test', 'of', 'this', 'is', 'this']
+    ids1 = model.domain_ids(domain, values1).tolist()
+    assert ids1 == [1, 2, 3, 4, 2, 5, 1]
+    ids2 = model.domain_ids(domain, values2).tolist()
+    assert ids2 == [2, 4, 2, 5, 1, 3, 1]
+
+    def init(t: Tensor):
+        t[(...,)] = 3
+    params = model.namespace('hi').parameter((3, 5), init)
+    module = model.namespace('hi2').module(
+        tx.ShapedLinear, output_shape=(3, 2), bias=False, input_shape=params.shape)
+    out_from_module = module(params)
+    assert out_from_module.shape == (3, 2)
+    paramsb = model.namespace('hi').parameter()
+    assert (paramsb == params).all()
+    state = model.state_dict()
+    path = '__test_model2.pt'
+    torch.save(dict(state_dict=state), path)
+    model2 = Model[DummySubject](checkpoint_path=path)
     params2 = model2.namespace('hi').parameter()
     assert (params2 == params).all()
     assert (params2 == torch.ones(3, 5) * 3).all()

@@ -7,9 +7,9 @@ import re
 import sys
 from argparse import ArgumentParser, Namespace
 from itertools import chain
-from typing import (Any, Callable, ChainMap, Counter, Iterable, List, Mapping,
-                    Optional, Sequence, Sized, Tuple, Type, TypeVar, Union,
-                    cast, overload)
+from typing import (Any, Callable, ChainMap, Counter, Dict, Iterable, List,
+                    Mapping, Optional, Sequence, Sized, Tuple, Type, TypeVar,
+                    Union, cast, overload)
 
 import torch
 from multimethod import multidispatch
@@ -372,7 +372,7 @@ def str_to_bool(s: str) -> bool:
     return s.lower() == 'true'
 
 
-legal_arg_types = {
+legal_arg_types: Dict[Any, Callable] = {
     str: str,
     float: float,
     int: int,
@@ -393,28 +393,32 @@ def DuplicateEntry(orig_name: str, duplicate_name: str):
     return throw_error
 
 
-def simple_arguments(f, with_types=False) -> Iterable[Tuple[str, Callable]] | Iterable[str]:
+def simple_arguments_and_types(f) -> Iterable[Tuple[str, Callable]]:
     for arg, param in inspect.signature(f).parameters.items():
         possible_types = [*re.split('[^a-zA-Z]+', str(param.annotation)),
                           type(param.default), param.annotation]
-        types = [t for t in possible_types if t in legal_arg_types]
-        if types:
-            use_type = types[-1]
-            if with_types:
-                yield arg, use_type
-            else:
-                yield arg
+        try:
+            type_id = next(iter([t for t in possible_types if t in legal_arg_types]))
+            yield arg, legal_arg_types[type_id]
+        except StopIteration:
+            pass
+
+
+def simple_arguments(f) -> Iterable[str]:
+    for arg, _ in simple_arguments_and_types(f):
+        yield arg
 
 
 def add_arguments(cls: type, parser: ArgumentParser, arg_counts: Counter | None = None):
     if arg_counts is None:
         arg_counts = Counter()
     group = parser.add_argument_group(cls.__name__)
-    for arg, use_type in simple_arguments(cls.__init__, with_types=True):
+    for arg, use_type in simple_arguments_and_types(cls.__init__):  # type: ignore
         if arg in arg_counts:
             duplicate_name = f'{arg}{arg_counts[arg]}'
             group.add_argument(f'--{duplicate_name}', type=DuplicateEntry(arg, duplicate_name),
-                               help=f"(Note --{duplicate_name} is just place-holder to show relevance to this group. Please use --{arg} instead.)")
+                               help=f"(Note --{duplicate_name} is just place-holder "
+                               f"to show relevance to this group. Please use --{arg} instead.)")
         else:
             group.add_argument(f'--{arg}', type=legal_arg_types[use_type])
         arg_counts[arg] += 1
@@ -438,7 +442,7 @@ class Config:
         if parent_parser is None:
             parent_parser = ArgumentParser()
         self._parser = parent_parser
-        arg_counts = Counter()
+        arg_counts = Counter[str]()
         for cls in classes:
             add_arguments(cls, self.parser, arg_counts=arg_counts)
         self.parse_args = sys.argv if parse_args == 'sys' else parse_args
