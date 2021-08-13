@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional, Union
+from argparse import ArgumentParser
+from typing import Any, Counter, Optional, Union
 
 import pandas as pd
 import pytest
@@ -9,11 +10,12 @@ import torchfactors as tx
 from torch import arange
 from torchfactors.subject import ListDataset
 from torchfactors.types import gdrop
-from torchfactors.utils import (DuplicateEntry, as_ndrange, canonical_ndslice,
-                                canonical_range_slice, compose, compose_single,
-                                ndarange, ndslices_cat, ndslices_overlap,
-                                outer, simple_arguments_and_types, stereotype,
-                                str_to_bool)
+from torchfactors.utils import (DuplicateEntry, add_arguments, as_ndrange,
+                                canonical_ndslice, canonical_range_slice,
+                                compose, compose_single, ndarange,
+                                ndslices_cat, ndslices_overlap, outer,
+                                simple_arguments, simple_arguments_and_types,
+                                stereotype, str_to_bool)
 
 
 def test_compose_single():
@@ -390,12 +392,66 @@ def test_duplicate_entry():
         my_type("blah")
 
 
+def my_func(a: int | str, b: Optional[str], c: Union[float, bool],
+            d=3, e=4.5, f=None, g: float | int = 5,
+            h=False, i=object()):
+    pass
+
+
 def test_simple_arguments_and_types():
-    def my_func(a: int | str, b: Optional[str], c: Union[float, bool],
-                d=3, e=4.5, f=None, g: float | int = 5,
-                h=False, i=object()):
-        pass
     out = dict(simple_arguments_and_types(my_func))
     assert out == dict(
         a=int, b=str, c=float, d=int, e=float,
         g=int, h=str_to_bool)
+
+
+def test_simple_arguments():
+    out = list(simple_arguments(my_func))
+    assert out == list('abcdegh')
+
+
+class A:
+    def __init__(self, something: int, b: str | None = None, c: bool = True,
+                 d: Any = None):
+        self.something = something
+        self.b = b
+        self.c = c
+
+
+@tx.dataclass
+class C:
+    a: str
+    i: int = 9
+
+
+@tx.dataclass
+class B(C):
+    h: str = 'test'
+
+
+def test_add_arguments1():
+    parser = ArgumentParser()
+    add_arguments(A, parser)
+    args = parser.parse_args([])
+    assert set(vars(args).keys()) == {
+        'something', 'b', 'c'}
+
+
+def test_add_arguments2():
+    counts = Counter[str]()
+    parser = ArgumentParser()
+    add_arguments(A, parser, counts)
+    add_arguments(C, parser, counts)
+    add_arguments(B, parser, counts)
+    count_dict = dict(counts.items())
+    assert count_dict == dict(
+        something=1,
+        b=1,
+        c=1,
+        a=2,
+        i=2,
+        h=1
+    )
+    args = parser.parse_args([])
+    assert set(vars(args).keys()) == {
+        'something', 'b', 'c', 'a', 'i', 'h'}

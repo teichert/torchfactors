@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import inspect
 import itertools
 import math
@@ -409,7 +410,18 @@ def simple_arguments(f) -> Iterable[str]:
         yield arg
 
 
+class _DoNothingAction(argparse.Action):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.default = argparse.SUPPRESS
+
+    def __call__(self, parser, namespace, values, option_string=None):  # pragma: no cover
+        pass
+
+
 def add_arguments(cls: type, parser: ArgumentParser, arg_counts: Counter | None = None):
+    # make sure that the parser knows how to ignore options
+    parser.register('action', 'nothing', _DoNothingAction)
     if arg_counts is None:
         arg_counts = Counter()
     group = parser.add_argument_group(cls.__name__)
@@ -417,10 +429,12 @@ def add_arguments(cls: type, parser: ArgumentParser, arg_counts: Counter | None 
         if arg in arg_counts:
             duplicate_name = f'{arg}{arg_counts[arg]}'
             group.add_argument(f'--{duplicate_name}', type=DuplicateEntry(arg, duplicate_name),
+
+                               action='nothing',
                                help=f"(Note --{duplicate_name} is just place-holder "
                                f"to show relevance to this group. Please use --{arg} instead.)")
         else:
-            group.add_argument(f'--{arg}', type=legal_arg_types[use_type])
+            group.add_argument(f'--{arg}', type=use_type)
         arg_counts[arg] += 1
 
 
