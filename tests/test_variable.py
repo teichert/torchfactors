@@ -584,6 +584,15 @@ def test_flex_domain():
     assert values == input
 
 
+def test_flex_domain2():
+    domain = tx.FlexDomain('property')
+    v = tx.TensorVar(domain)
+    assert v.flex_domain.get_id('test') == 0
+    assert v.flex_domain.get_id('test2') == 1
+    assert len(v.domain) == 2
+    assert v.domain is v.flex_domain
+
+
 def test_frozen_flex_domain():
     domain = tx.FlexDomain('property', unk=True)
     m = tx.Model[tx.Subject]()
