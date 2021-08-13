@@ -375,7 +375,7 @@ def test_load_model3():
     assert out_from_module.shape == (3, 2)
     paramsb = model.namespace('hi').parameter()
     assert (paramsb == params).all()
-    system = tx.LitSystem(model, tx.DataModule(train=[DummySubject()]))
+    system = tx.LitSystem(model, tx.DataModule(train=tx.ListDataset([DummySubject()])))
     trainer = pl.Trainer(system, max_epochs=0)
     with tempfile.TemporaryDirectory() as tb_dir:
         trainer.logger = TensorBoardLogger(tb_dir)
@@ -394,3 +394,12 @@ def test_load_model3():
     assert out2 == ids2
     out1 = model2.domain_ids(domain2, values1).tolist()
     assert out1 == ids1
+
+
+def test_domain():
+    model = Model[DummySubject]()
+    domain_test = model.domain('test')
+    domain_blah = model.domain('blah')
+    domain_test2 = model.domain('test')
+    assert domain_test is domain_test2
+    assert domain_test is not domain_blah
