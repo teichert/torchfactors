@@ -30,7 +30,7 @@ class SPR(tx.Subject):
     @classmethod
     def load_spr1(cls, model: Model[SPR], inputs: pd.DataFrame, labels: pd.DataFrame,
                   split: str, maxn: int):
-        property_domain = model._domains['spr-properties']
+        property_domain = model.domain('spr-properties')
         inputs = inputs[inputs['Split'] == split]  # type: ignore
         labels = labels[labels['Split'] == split]  # type: ignore
         labels = labels.sort_values('Variable.ID').reset_index()

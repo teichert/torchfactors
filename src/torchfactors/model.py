@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import (Callable, Dict, Generic, Hashable, Iterable, List,
+import json
+from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, List,
                     Optional, Sequence, cast, overload)
 
 import torch
@@ -22,7 +23,7 @@ class ParamNamespace:
     with a unique key and the Model that actually stores everything
     """
 
-    def __init__(self, model: 'Model', key: Hashable):
+    def __init__(self, model: Model, key: Hashable):
         self.model = model
         self.key = key
 
@@ -73,13 +74,27 @@ class ParamNamespace:
 
 class Model(torch.nn.Module, Generic[SubjectType]):
 
-    def __init__(self, in_model: str | None = None):
+    def __init__(self,
+                 model_state_dict_path: str | None = None,
+                 checkpoint_path: str | None = None,
+                 ):
         super(Model, self).__init__()
         self._model_parameters = ParameterDict()
         self._model_modules = ModuleDict()
         self._domains: Dict[str, FlexDomain] = {}
-        if in_model is not None:
-            self.load_state_dict(torch.load(in_model))
+        if model_state_dict_path is not None:
+            self.load_state_dict(torch.load(model_state_dict_path))
+        elif checkpoint_path is not None:
+            check_point = torch.load(checkpoint_path)
+            state_dict = check_point['state_dict']
+            only_model_state_dict_items = []
+            for k, v in state_dict.items():
+                for starting in ['model.']:
+                    if k.startswith(starting):
+                        k = k[len(starting):]
+                        break
+                only_model_state_dict_items.append((k, v))
+            self.load_state_dict(dict(only_model_state_dict_items))
 
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         super()._save_to_state_dict(destination, prefix, keep_vars)
@@ -91,8 +106,25 @@ class Model(torch.nn.Module, Generic[SubjectType]):
         domains = state_dict.pop(prefix + '_domains')
         self._domains = {name: FlexDomain.from_list((name, unk, values))
                          for name, unk, values in domains}
+        self._model_parameters = ParameterDict()
+        self._model_modules = ModuleDict()
+        for key in state_dict:
+            param_start = prefix + '_model_parameters.'
+            module_start = prefix + '_model_modules.'
+            if key.startswith(param_start):
+                name = key[len(param_start):].split('.')[0]
+                self._model_parameters[name] = torch.nn.parameter.Parameter(state_dict[key])
+            elif key.startswith(module_start):
+                name = key[len(module_start):].split('.')[0]
+                self._model_modules[name] = torch.nn.Module()  # state_dict[key]
         return super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
                                              missing_keys, unexpected_keys, error_msgs)
+
+    def domain(self, name: str) -> FlexDomain:
+        domain = self._domains.get(name, None)
+        if domain is None:
+            domain = self._domains.setdefault(name, FlexDomain(name))
+        return domain
 
     def domain_ids(self, domain: FlexDomain, values: Sequence[Hashable], warn=True) -> torch.Tensor:
         domain = self._domains.setdefault(domain.name, domain)
@@ -109,10 +141,13 @@ class Model(torch.nn.Module, Generic[SubjectType]):
     def factors(self, subject: SubjectType) -> Iterable[Factor]:
         return []
 
+    def get_key_repr(self, key: Any) -> str:
+        return json.dumps(key)
+
     def _get_param(self, key: Hashable, check_shape: Optional[ShapeType] = None,
                    default_factory: Optional[Callable[[], Parameter]] = None
                    ) -> Parameter:
-        repr = f'{key}:{hash(key)}'
+        repr = self.get_key_repr(key)
         if repr in self._model_modules:
             raise KeyError(
                 "trying to get a parameter with a key "
@@ -135,7 +170,7 @@ class Model(torch.nn.Module, Generic[SubjectType]):
     def _get_module(self, key: Hashable,
                     default_factory: Optional[Callable[[], Module]] = None
                     ) -> Module:
-        repr = f'{key}:{hash(key)}'
+        repr = self.get_key_repr(key)
         if repr in self._model_parameters:
             raise KeyError(
                 "trying to get a module with a key "

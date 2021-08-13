@@ -8,7 +8,7 @@ from torch.nn.functional import one_hot
 from . import skip_some_warnings  # noqa
 from . import learning
 from .clique import CliqueModel
-from .components.linear_factor import LinearFactor
+from .components.linear_factor import LinearFactor, ShapedLinear
 from .components.tensor_factor import TensorFactor
 from .domain import Domain, FlexDomain, Range, SeqDomain
 from .einsum import log_dot
@@ -39,6 +39,7 @@ OPEN = Domain.OPEN
 
 __all__ = [
     'Config',
+    'ShapedLinear',
     'ListDataset', 'DataModule', 'LitSystem', 'with_rep_number',
     'data_len',
     'gdrop', 'GeneralizedDimensionDrop', 'at', 'num_trainable',

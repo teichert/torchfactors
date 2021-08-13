@@ -7,8 +7,9 @@ import re
 import sys
 from argparse import ArgumentParser, Namespace
 from itertools import chain
-from typing import (Any, ChainMap, Counter, List, Mapping, Optional, Sequence,
-                    Sized, Tuple, Type, TypeVar, Union, cast, overload)
+from typing import (Any, Callable, ChainMap, Counter, Iterable, List, Mapping,
+                    Optional, Sequence, Sized, Tuple, Type, TypeVar, Union,
+                    cast, overload)
 
 import torch
 from multimethod import multidispatch
@@ -392,23 +393,31 @@ def DuplicateEntry(orig_name: str, duplicate_name: str):
     return throw_error
 
 
-def add_arguments(cls: type, parser: ArgumentParser, arg_counts: Counter | None = None):
-    if arg_counts is None:
-        arg_counts = Counter()
-    group = parser.add_argument_group(cls.__name__)
-    for arg, param in inspect.signature(cls.__init__).parameters.items():
+def simple_arguments(f, with_types=False) -> Iterable[Tuple[str, Callable]] | Iterable[str]:
+    for arg, param in inspect.signature(f).parameters.items():
         possible_types = [*re.split('[^a-zA-Z]+', str(param.annotation)),
                           type(param.default), param.annotation]
         types = [t for t in possible_types if t in legal_arg_types]
         if types:
             use_type = types[-1]
-            if arg in arg_counts:
-                duplicate_name = f'{arg}{arg_counts[arg]}'
-                group.add_argument(f'--{duplicate_name}', type=DuplicateEntry(arg, duplicate_name),
-                                   help=f"(Note --{duplicate_name} is just place-holder to show relevance to this group. Please use --{arg} instead.)")
+            if with_types:
+                yield arg, use_type
             else:
-                group.add_argument(f'--{arg}', type=legal_arg_types[use_type])
-            arg_counts[arg] += 1
+                yield arg
+
+
+def add_arguments(cls: type, parser: ArgumentParser, arg_counts: Counter | None = None):
+    if arg_counts is None:
+        arg_counts = Counter()
+    group = parser.add_argument_group(cls.__name__)
+    for arg, use_type in simple_arguments(cls.__init__, with_types=True):
+        if arg in arg_counts:
+            duplicate_name = f'{arg}{arg_counts[arg]}'
+            group.add_argument(f'--{duplicate_name}', type=DuplicateEntry(arg, duplicate_name),
+                               help=f"(Note --{duplicate_name} is just place-holder to show relevance to this group. Please use --{arg} instead.)")
+        else:
+            group.add_argument(f'--{arg}', type=legal_arg_types[use_type])
+        arg_counts[arg] += 1
 
 
 class Config:
@@ -476,9 +485,7 @@ class Config:
             sys.exit(1)
 
     def create(self, cls: Type[T], **kwargs) -> T:
-        settings = ChainMap(kwargs, self.dict)
-        known_params = set(
-            inspect.signature(cls.__init__).parameters.keys()
-        ).intersection(settings.keys())
-        params = {k: settings[k] for k in known_params}
+        known_params = set(simple_arguments(cls.__init__)).intersection(self.dict.keys())
+        params = {k: self.dict[k] for k in known_params}
+        params.update(kwargs)
         return cls(**params)  # type: ignore

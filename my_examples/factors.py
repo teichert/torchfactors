@@ -9,7 +9,6 @@ import pytorch_lightning as pl
 import torch
 import torchfactors as tx
 from torchfactors.domain import FlexDomain
-from torchfactors.lightning import Config
 from torchfactors.model import Model
 
 import myhydra
@@ -57,7 +56,13 @@ class SPRLModel(tx.Model[SPR]):
 # x.property[..., i])
 
 
-base_config = Config(Model, SPR1DataModule, SPRSystem, pl.Trainer)
+base_config = tx.Config(Model, SPR1DataModule, SPRSystem, pl.Trainer)
+
+path_to_data = "/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz"
+# path_to_checkpoint = "/home/adam/projects/torchfactors/outputs/2021-08-12/00-00-12/tb_logs/default/version_0/checkpoints/epoch=4-step=4.ckpt"
+
+checkpoint_path = '/home/adam/projects/torchfactors/system.pt'
+model_path = '/home/adam/projects/torchfactors/model.pt'
 
 
 @myhydra.main(config_path=None, use_mlflow=False)
@@ -71,11 +76,28 @@ def main(cfg):
     # args = pl.Trainer.parse_argparser(parser.parse_args())
     # args = pl.Trainer.parse_argparser(parser.parse_args(
     #     "--batch_size 3 --auto_lr_find True".split()))
-    config = base_config.child(parse_args=None, args_dict=cfg, defaults=dict())
+    config = base_config.child(parse_args=None, args_dict=cfg,
+                               defaults=dict(
+                                   path=path_to_data,
+                                   #    model_state_dict_path=model_path,
+                                   # checkpoint_path=path_to_checkpoint
+                               ))
     model = config.create(SPRLModel)
     data = config.create(SPR1DataModule, model=model)
     system = config.create(SPRSystem, model=model, data=data)
-    trainer = pl.Trainer.from_argparse_args(config.namespace)
+    system.setup(None)
+    # trainer = pl.Trainer.from_argparse_args(config.namespace)
+    model_d = model.state_dict()
+    print(model_d)
+    model2 = SPRLModel()
+    model2.load_state_dict(model_d)
+    # torch.save(model_d, model_path)
+    system_d = system.state_dict()
+    print(system_d)
+    # torch.save(dict(state_dict=system_d), checkpoint_path)
+    # torch.save(dict(state_dict=system.state_dict()), "system.pt")
+    # pritn([k for k in d if k.startswith('model.')]
+    # print(d)
 
     # # # args = config.parser().parse_args()
     # # config.
