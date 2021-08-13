@@ -386,9 +386,9 @@ legal_arg_types: Dict[Any, Callable] = {
 
 def DuplicateEntry(orig_name: str, duplicate_name: str):
     def throw_error(x):
-        raise RuntimeError("--{duplicate_name} is just to help you see "
-                           "that the argument belongs to multiple groups. ",
-                           "Please use --{orig_name} instead to set the "
+        raise RuntimeError(f"--{duplicate_name} is just to help you see "
+                           "that the argument belongs to multiple groups. "
+                           f"Please use --{orig_name} instead to set the "
                            "argument.")
     return throw_error
 

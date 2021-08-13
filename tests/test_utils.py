@@ -5,10 +5,10 @@ import torchfactors as tx
 from torch import arange
 from torchfactors.subject import ListDataset
 from torchfactors.types import gdrop
-from torchfactors.utils import (as_ndrange, canonical_ndslice,
+from torchfactors.utils import (DuplicateEntry, as_ndrange, canonical_ndslice,
                                 canonical_range_slice, compose, compose_single,
                                 ndarange, ndslices_cat, ndslices_overlap,
-                                outer, stereotype)
+                                outer, stereotype, str_to_bool)
 
 
 def test_compose_single():
@@ -368,3 +368,18 @@ def test_with_rep_number():
     out = with_rep.to_dict(orient='list')
     assert out == expected
     assert df.to_dict(orient='list') == orig
+
+
+def test_str_to_bool():
+    assert str_to_bool('true') is True
+    assert str_to_bool('True') is True
+    assert str_to_bool('TruE') is True
+    assert str_to_bool('false') is False
+    assert str_to_bool('False') is False
+    assert str_to_bool('FalsE') is False
+
+
+def test_duplicate_entry():
+    my_type = DuplicateEntry("test", "test2")
+    with pytest.raises(RuntimeError, match=r'--test2 is just to help[^-]+--test instead'):
+        my_type("blah")
