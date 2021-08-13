@@ -346,3 +346,46 @@ def test_dev_test():
 
 #     config = tx.Config(A, C)
 #     assert config.parser.argumen
+
+
+# def test_load_model3():
+#     model = Model[DummySubject]()
+#     domain = FlexDomain('test', unk=True)
+#     values1 = ['this', 'test', 'is', 'a', 'test', 'of', 'this']
+#     values2 = ['test', 'a', 'test', 'of', 'this', 'is', 'this']
+#     ids1 = model.domain_ids(domain, values1).tolist()
+#     assert ids1 == [1, 2, 3, 4, 2, 5, 1]
+#     ids2 = model.domain_ids(domain, values2).tolist()
+#     assert ids2 == [2, 4, 2, 5, 1, 3, 1]
+
+#     def init(t: Tensor):
+#         t[(...,)] = 3
+#     params = model.namespace('hi').parameter((3, 5), init)
+#     module = model.namespace('hi2').module(
+#         tx.ShapedLinear, output_shape=(3, 2), bias=False, input_shape=params.shape)
+#     out_from_module = module(params)
+#     assert out_from_module.shape == (3, 2)
+#     paramsb = model.namespace('hi').parameter()
+#     assert (paramsb == params).all()
+#     path = '__test_model3.pt'
+#     system = tx.LitSystem(model, tx.DataModule(train=[DummySubject()]))
+#     checkpoint = ModelCheckpoint(save_on_train_epoch_end=True)
+#     trainer = pl.Trainer(system, max_epochs=0)
+#     trainer.callbacks.append(checkpoint)
+#     trainer.fit(system)
+#     # torch.save(system.state_dict(), path)
+#     # model2 = Model[DummySubject](checkpoint_path=path)
+#     # params2 = model2.namespace('hi').parameter()
+#     # assert (params2 == params).all()
+#     # assert (params2 == torch.ones(3, 5) * 3).all()
+#     # module2 = model2.namespace('hi2').module()
+#     # out_from_module2 = module2(params2)
+#     # assert (out_from_module2 == out_from_module).all()
+#     # domain2 = FlexDomain('test', unk=True)
+#     # out2 = model2.domain_ids(domain2, values2).tolist()
+#     # assert out2 == ids2
+#     # out1 = model2.domain_ids(domain2, values1).tolist()
+#     # assert out1 == ids1
+
+
+# test_load_model3()

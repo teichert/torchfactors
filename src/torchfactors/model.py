@@ -123,10 +123,9 @@ class Model(torch.nn.Module, Generic[SubjectType]):
             state_dict = check_point['state_dict']
             only_model_state_dict_items: List[Tuple[str, Any]] = []
             for k, v in state_dict.items():
-                for starting in ['model.']:
-                    if k.startswith(starting):
-                        k = k[len(starting):]
-                        break
+                starting = 'model.'
+                if k.startswith(starting):
+                    k = k[len(starting):]
                 only_model_state_dict_items.append((k, v))
             self.load_state_dict(OrderedDict(only_model_state_dict_items))  # type: ignore
 
