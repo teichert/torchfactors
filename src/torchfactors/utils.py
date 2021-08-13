@@ -395,8 +395,8 @@ def DuplicateEntry(orig_name: str, duplicate_name: str):
 
 def simple_arguments_and_types(f) -> Iterable[Tuple[str, Callable]]:
     for arg, param in inspect.signature(f).parameters.items():
-        possible_types = [*re.split('[^a-zA-Z]+', str(param.annotation)),
-                          type(param.default), param.annotation]
+        possible_types = [param.annotation, type(param.default),
+                          *re.split('[^a-zA-Z]+', str(param.annotation))]
         try:
             type_id = next(iter([t for t in possible_types if t in legal_arg_types]))
             yield arg, legal_arg_types[type_id]

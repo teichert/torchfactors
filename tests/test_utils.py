@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import Optional, Union
+
 import pandas as pd
 import pytest
 import torch
@@ -8,7 +12,8 @@ from torchfactors.types import gdrop
 from torchfactors.utils import (DuplicateEntry, as_ndrange, canonical_ndslice,
                                 canonical_range_slice, compose, compose_single,
                                 ndarange, ndslices_cat, ndslices_overlap,
-                                outer, stereotype, str_to_bool)
+                                outer, simple_arguments_and_types, stereotype,
+                                str_to_bool)
 
 
 def test_compose_single():
@@ -383,3 +388,14 @@ def test_duplicate_entry():
     my_type = DuplicateEntry("test", "test2")
     with pytest.raises(RuntimeError, match=r'--test2 is just to help[^-]+--test instead'):
         my_type("blah")
+
+
+def test_simple_arguments_and_types():
+    def my_func(a: int | str, b: Optional[str], c: Union[float, bool],
+                d=3, e=4.5, f=None, g: float | int = 5,
+                h=False, i=object()):
+        pass
+    out = dict(simple_arguments_and_types(my_func))
+    assert out == dict(
+        a=int, b=str, c=float, d=int, e=float,
+        g=int, h=str_to_bool)
