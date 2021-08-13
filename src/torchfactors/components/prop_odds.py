@@ -33,9 +33,8 @@ class ProportionalOdds(CliqueModel):
         bin_config_shape = binary_scores.shape[-len(variables):]
 
         # we likewise, want to create a separate bias for each full configuration
-        def bias_module_factory():
-            return ShapedLinear(output_shape=Factor.out_shape_from_variables(variables), bias=True)
-        bias_module = params.namespace('full-bias').module(bias_module_factory)
+        bias_module = params.namespace('full-bias').module(
+            ShapedLinear, output_shape=Factor.out_shape_from_variables(variables), bias=True)
 
         # since it is only a bias, it doesn't matter what we pass in
         bias = bias_module(torch.tensor(0.0))

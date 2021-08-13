@@ -106,18 +106,16 @@ class SPRLModel(tx.Model[SPRL]):
             num_predicates = len(x.predicate.domain)
             embed_size = 5
             for j in range(i + 1, n):
-                def embed_property_constructor():
-                    return torch.nn.Bilinear(num_properties, num_properties, embed_size)
-                embed_property = self.namespace('embed_property').module(embed_property_constructor)
+                embed_property = self.namespace('embed_property').module(
+                    torch.nn.Bilinear, in1_features=num_properties, in2_features=num_properties,
+                    out_features=embed_size)
                 embeded_property = embed_property(
                     tx.one_hot(x.property[..., i].tensor.long(), num_properties).float(),
                     tx.one_hot(x.property[..., j].tensor.long(), num_properties).float()
                 )
-
-                def embed_predicate_constructor():
-                    return torch.nn.Bilinear(num_predicates, num_predicates, embed_size)
-                embed_predicate = self.namespace(
-                    'embed_predicate').module(embed_predicate_constructor)
+                embed_predicate = self.namespace('embed_predicate').module(
+                    torch.nn.Bilinear, in1_features=num_predicates, in2_features=num_predicates,
+                    out_features=embed_size)
                 embeded_predicate = embed_predicate(
                     tx.one_hot(x.predicate[..., i].tensor.long(), num_predicates).float(),
                     tx.one_hot(x.predicate[..., j].tensor.long(), num_predicates).float()

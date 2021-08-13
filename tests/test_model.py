@@ -102,8 +102,8 @@ def test_modules():
     with pytest.raises(KeyError):
         # need to specify a factory if not already built for that key
         m.namespace('root').module()
-
-    module = m.namespace('root').module(lambda: torch.nn.Linear(4, 5, bias=False))
+    module = m.namespace('root').module(
+        torch.nn.Linear, in_features=4, out_features=5, bias=False)
     with pytest.raises(KeyError):
         # this key has been used for a module rather than a param
         m.namespace('root').parameter()
@@ -120,8 +120,9 @@ def test_new_modules():
         # need to specify a factory if not already built for that key
         m.namespace('root').module()
 
-    module = m.namespace('root').new_module(torch.nn.Linear,
-                                            in_features=4, out_features=5, bias=False)
+    module = m.namespace('root').module(
+        torch.nn.Linear, in_features=4, out_features=5, bias=False)
+
     with pytest.raises(KeyError):
         # this key has been used for a module rather than a param
         m.namespace('root').parameter()
@@ -310,7 +311,7 @@ def test_model_domain_state_dict_with_params_and_modules():
         t[(...,)] = 3
     v = TensorVar(tx.Range(3), tensor=torch.tensor([3, 4, 1, 5]))
     params = model.namespace('hi').parameter((3, 5), init)
-    module = model.namespace('hi2').new_module(
+    module = model.namespace('hi2').module(
         tx.ShapedLinear, output_shape=(3, 2), bias=False, input_shape=params.shape)
     out_from_module = module(params)
     assert out_from_module.shape == (3, 2)

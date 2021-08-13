@@ -99,11 +99,8 @@ def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
     if input_shape is None and input is not None:
         num_batch_dims = len(variables[0].shape)
         input_shape = input.shape[num_batch_dims:]
-
-    def factory():
-        out = ShapedLinear(input_shape=input_shape,
-                           output_shape=(2,) * len(variables),
-                           bias=bias)
-        return out
-    out = params.module(factory)
+    out = params.module(
+        ShapedLinear, input_shape=input_shape,
+        output_shape=(2,) * len(variables),
+        bias=bias)
     return cast(ShapedLinear, out)

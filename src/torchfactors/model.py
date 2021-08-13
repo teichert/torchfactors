@@ -69,14 +69,11 @@ class ParamNamespace:
     def parameter(self, *args, **kwargs):
         return self._parameter(*args, **kwargs)
 
-    def module(self, constructor: Optional[Callable[[], torch.nn.Module]] = None) -> Module:
-        return self.model._get_module(self.key, default_factory=constructor)
-
     @property
     def _key_repr(self) -> str:
         return self.model.get_key_repr(self.key)
 
-    def new_module(self, cls: type | None = None, **kwargs) -> Module:
+    def module(self, cls: type | None = None, **kwargs) -> Module:
         def setup_new_module():
             self.model._module_constructors[self._key_repr] = (cls.__module__, cls.__name__, kwargs)
             return cls(**kwargs)

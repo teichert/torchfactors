@@ -146,11 +146,9 @@ class LinearFactor(Factor):
         the variables themselves, then, know how many batch
         dimensions there are.
         """
-        m = self.params.module(lambda:
-                               ShapedLinear(
-                                   output_shape=self.out_shape,
-                                   input_shape=self.in_shape,
-                                   bias=self.bias))
+        m = self.params.module(
+            ShapedLinear, output_shape=self.out_shape,
+            input_shape=self.in_shape, bias=self.bias)
         if self.input is None:
             x = self.variables[0].tensor.new_empty(0, dtype=torch.float)
         else:
