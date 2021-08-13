@@ -10,12 +10,13 @@ import torchfactors as tx
 from torch import arange
 from torchfactors.subject import ListDataset
 from torchfactors.types import gdrop
-from torchfactors.utils import (DuplicateEntry, add_arguments, as_ndrange,
-                                canonical_ndslice, canonical_range_slice,
-                                compose, compose_single, ndarange,
-                                ndslices_cat, ndslices_overlap, outer,
-                                simple_arguments, simple_arguments_and_types,
-                                stereotype, str_to_bool)
+from torchfactors.utils import (Config, DuplicateEntry, add_arguments,
+                                as_ndrange, canonical_ndslice,
+                                canonical_range_slice, compose, compose_single,
+                                ndarange, ndslices_cat, ndslices_overlap,
+                                outer, simple_arguments,
+                                simple_arguments_and_info, stereotype,
+                                str_to_bool)
 
 
 def test_compose_single():
@@ -399,10 +400,15 @@ def my_func(a: int | str, b: Optional[str], c: Union[float, bool],
 
 
 def test_simple_arguments_and_types():
-    out = dict(simple_arguments_and_types(my_func))
-    assert out == dict(
-        a=int, b=str, c=float, d=int, e=float,
-        g=int, h=str_to_bool)
+    out = list(simple_arguments_and_info(my_func))
+    assert out == [
+        ('a', int, None),
+        ('b', str, None),
+        ('c', float, None),
+        ('d', int, 3),
+        ('e', float, 4.5),
+        ('g', int, 5),
+        ('h', str_to_bool, False)]
 
 
 def test_simple_arguments():
@@ -435,6 +441,7 @@ def test_add_arguments1():
     args = parser.parse_args([])
     assert set(vars(args).keys()) == {
         'something', 'b', 'c'}
+    assert args.c is True
 
 
 def test_add_arguments2():
@@ -455,3 +462,54 @@ def test_add_arguments2():
     args = parser.parse_args([])
     assert set(vars(args).keys()) == {
         'something', 'b', 'c', 'a', 'i', 'h'}
+
+
+def test_config_parser1():
+    parser = ArgumentParser()
+    config = Config(A, B, C, parent_parser=parser,
+                    parse_args="--a test --i 89 --h hi".split(' '))
+    assert config.namespace.a == "test"
+    assert config.namespace.i == 89
+    assert config.namespace.h == "hi"
+    assert config.namespace.something is None
+    assert config.namespace.c is True
+
+
+def test_config_parser2():
+    config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
+    assert config.namespace.a == "test"
+    assert config.namespace.i == 89
+    assert config.namespace.h == "hi"
+    assert config.namespace.something is None
+    assert config.namespace.c is True
+
+
+def test_config_parser3():
+    base = Config(A, B, C)
+    config = base.child(parse_args="--a test --i 89 --h hi".split(' '))
+    assert config.namespace.a == "test"
+    assert config.namespace.i == 89
+    assert config.namespace.h == "hi"
+    assert config.namespace.something is None
+    assert config.namespace.c is True
+
+
+# def test_config_parser4():
+#     sys.argv = "--a test --i 89 --h hi".split(' ')
+#     config = Config(A, B, C)
+#     assert config.namespace.a == "test"
+#     assert config.namespace.i == 89
+#     assert config.namespace.h == "hi"
+#     assert config.namespace.something is None
+#     assert config.namespace.c is True
+
+
+# def test_config_parser5():
+#     sys.argv = "--a test --i 89 --h hi".split(' ')
+#     config = Config(A, B, C)
+#     assert config.dict == dict(
+#         a="test",
+#         i=89,
+#         h="hi",
+#         something=None,
+#         c=True)

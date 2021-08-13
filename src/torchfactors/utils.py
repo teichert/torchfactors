@@ -7,6 +7,7 @@ import math
 import re
 import sys
 from argparse import ArgumentParser, Namespace
+from inspect import Signature
 from itertools import chain
 from typing import (Any, Callable, ChainMap, Counter, Dict, Iterable, List,
                     Mapping, Optional, Sequence, Sized, Tuple, Type, TypeVar,
@@ -394,19 +395,20 @@ def DuplicateEntry(orig_name: str, duplicate_name: str):
     return throw_error
 
 
-def simple_arguments_and_types(f) -> Iterable[Tuple[str, Callable]]:
+def simple_arguments_and_info(f) -> Iterable[Tuple[str, Callable, Any]]:
     for arg, param in inspect.signature(f).parameters.items():
         possible_types = [param.annotation, type(param.default),
                           *re.split('[^a-zA-Z]+', str(param.annotation))]
         try:
             type_id = next(iter([t for t in possible_types if t in legal_arg_types]))
-            yield arg, legal_arg_types[type_id]
+            default = None if param.default is Signature.empty else param.default
+            yield arg, legal_arg_types[type_id], default
         except StopIteration:
             pass
 
 
 def simple_arguments(f) -> Iterable[str]:
-    for arg, _ in simple_arguments_and_types(f):
+    for arg, *_ in simple_arguments_and_info(f):
         yield arg
 
 
@@ -425,16 +427,15 @@ def add_arguments(cls: type, parser: ArgumentParser, arg_counts: Counter | None 
     if arg_counts is None:
         arg_counts = Counter()
     group = parser.add_argument_group(cls.__name__)
-    for arg, use_type in simple_arguments_and_types(cls.__init__):  # type: ignore
+    for arg, use_type, default in simple_arguments_and_info(cls.__init__):  # type: ignore
         if arg in arg_counts:
             duplicate_name = f'{arg}{arg_counts[arg]}'
             group.add_argument(f'--{duplicate_name}', type=DuplicateEntry(arg, duplicate_name),
-
                                action='nothing',
                                help=f"(Note --{duplicate_name} is just place-holder "
                                f"to show relevance to this group. Please use --{arg} instead.)")
         else:
-            group.add_argument(f'--{arg}', type=use_type)
+            group.add_argument(f'--{arg}', type=use_type, default=default)
         arg_counts[arg] += 1
 
 
