@@ -19,37 +19,44 @@ class OptionalBiasLinear(torch.nn.Module):
     """
 
     def __init__(self, input_features: int, output_features: int,
-                 bias: bool = True):
+                 bias: bool = True, device=None, dtype=None):
+        factory_kwargs = dict(device=device, dtype=dtype)
         super().__init__()
-        self.initialized = False
+        # self.initialized = False
         self.input_features = input_features
         self.output_features = output_features
         self.bias = bias
         self.bias_only: Union[torch.nn.parameter.Parameter, torch.Tensor, None] = None
         self.with_features: Optional[torch.nn.Module] = None
-
-    def lazy_init(self, exemplar: Tensor):
-        if not self.initialized:
-            if self.input_features == 0:
-                if self.bias:
-                    bias = exemplar.new_empty(self.output_features)
-                    torch.nn.init.uniform_(bias, -1., 1.)
-                    self.bias_only = torch.nn.parameter.Parameter(bias)
-                else:
-                    self.bias_only = exemplar.new_tensor(0.0).expand((self.output_features,))
+        # def lazy_init(self, exemplar: Tensor):
+        # if not self.initialized:
+        if self.input_features == 0:
+            if self.bias:
+                bias = torch.empty(self.output_features, **factory_kwargs)
+                torch.nn.init.uniform_(bias, -1., 1.)
+                self.bias_only = torch.nn.parameter.Parameter(bias)
             else:
-                self.with_features = torch.nn.Linear(
-                    self.input_features, self.output_features, bias=self.bias)
-            self.initialized = True
+                self.bias_only = torch.tensor(0.0, **factory_kwargs).expand(
+                    (self.output_features,))
+        else:
+            self.with_features = torch.nn.Linear(
+                self.input_features, self.output_features, bias=self.bias)
+        # self.initialized = True
 
     def forward(self, x: Tensor) -> Tensor:
-        self.lazy_init(x)
+        # self.lazy_init(x)
         if self.bias_only is not None:
             # out = self.bias_only.expand(*x.shape[:-1], len(self.bias_only))
             out = self.bias_only
         else:
             out = cast(torch.nn.Module, self.with_features)(x)
         return out
+
+# def register_module_for_state_dict(cls):
+#     register_module_for_state_dict.known_classes
+
+# register_module_for_state_dict.known_classes = {}
+# @register_module_for_state_dict
 
 
 class ShapedLinear(torch.nn.Module):

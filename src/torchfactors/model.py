@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import importlib
 import json
 from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, List,
-                    Optional, Sequence, cast, overload)
+                    Mapping, Optional, Sequence, Tuple, cast, overload)
 
 import torch
 from multimethod import multimethod
@@ -71,6 +72,34 @@ class ParamNamespace:
     def module(self, constructor: Optional[Callable[[], torch.nn.Module]] = None) -> Module:
         return self.model._get_module(self.key, default_factory=constructor)
 
+    @property
+    def _key_repr(self) -> str:
+        return self.model.get_key_repr(self.key)
+
+    def new_module(self, cls: type | None = None, **kwargs) -> Module:
+        def setup_new_module():
+            self.model._module_constructors[self._key_repr] = (cls.__module__, cls.__name__, kwargs)
+            return cls(**kwargs)
+        return self.model._get_module(self.key, None if cls is None else setup_new_module)
+
+
+def register_module(cls):
+    register_module.known_modules.set_default((cls.__module__, cls.__name__), cls)
+    return cls
+
+
+register_module.known_modules = cast(Dict[Tuple[str, str], Module], {})
+
+
+def build_module(module: str, name: str, kwargs: Mapping[str, Any]) -> Module:
+    cls: type
+    try:
+        cls = register_module.known_modules[(module, name)]
+    except KeyError:
+        cls = getattr(importlib.import_module(module), name)
+    built = cls(**kwargs)
+    return built
+
 
 class Model(torch.nn.Module, Generic[SubjectType]):
 
@@ -82,6 +111,7 @@ class Model(torch.nn.Module, Generic[SubjectType]):
         self._model_parameters = ParameterDict()
         self._model_modules = ModuleDict()
         self._domains: Dict[str, FlexDomain] = {}
+        self._module_constructors: Dict[str, Tuple[str, str, Dict[str, Any]]] = {}
         if model_state_dict_path is not None:
             self.load_state_dict(torch.load(model_state_dict_path))
         elif checkpoint_path is not None:
@@ -99,24 +129,24 @@ class Model(torch.nn.Module, Generic[SubjectType]):
     def _save_to_state_dict(self, destination, prefix, keep_vars):
         super()._save_to_state_dict(destination, prefix, keep_vars)
         destination[prefix + '_domains'] = [d.to_list() for _, d in self._domains.items()]
+        destination[prefix + '_module_constructors'] = self._module_constructors.copy()
         return destination
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
+        self._model_parameters = ParameterDict()
+        self._model_modules = ModuleDict()
         domains = state_dict.pop(prefix + '_domains')
         self._domains = {name: FlexDomain.from_list((name, unk, values))
                          for name, unk, values in domains}
-        self._model_parameters = ParameterDict()
-        self._model_modules = ModuleDict()
+        self._module_constructors = state_dict.pop(prefix + '_module_constructors')
+        for key, (module, name, kwargs) in self._module_constructors.items():
+            self._model_modules[key] = build_module(module, name, kwargs)
         for key in state_dict:
             param_start = prefix + '_model_parameters.'
-            module_start = prefix + '_model_modules.'
             if key.startswith(param_start):
                 name = key[len(param_start):].split('.')[0]
                 self._model_parameters[name] = torch.nn.parameter.Parameter(state_dict[key])
-            elif key.startswith(module_start):
-                name = key[len(module_start):].split('.')[0]
-                self._model_modules[name] = torch.nn.Module()  # state_dict[key]
         return super()._load_from_state_dict(state_dict, prefix, local_metadata, strict,
                                              missing_keys, unexpected_keys, error_msgs)
 
