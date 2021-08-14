@@ -460,7 +460,12 @@ class Config:
         arg_counts = Counter[str]()
         for cls in classes:
             add_arguments(cls, self.parser, arg_counts=arg_counts)
-        self.parse_args = sys.argv if parse_args == 'sys' else parse_args
+        if parse_args is None:
+            self.parse_args = cast(Sequence[str], [])
+        elif parse_args == 'sys':
+            self.parse_args = sys.argv
+        else:
+            self.parse_args = parse_args
         self.args_dict = args_dict
         self.defaults = defaults
         self.parsed_args: Namespace | None = None
@@ -483,12 +488,8 @@ class Config:
             back_off_args: Mapping[str, Any] = ChainMap(*[d for d in [
                 self.args_dict, self.defaults
             ] if d is not None])
-            if self.parse_args is None:
-                self.parsed_args = Namespace()
-                vars(self.parsed_args).update(back_off_args)
-            else:
-                self.parser.set_defaults(**back_off_args)
-                self.parsed_args = self.parser.parse_args(self.parse_args)
+            self.parser.set_defaults(**back_off_args)
+            self.parsed_args = self.parser.parse_args(self.parse_args)
         return self.parsed_args
 
     @property

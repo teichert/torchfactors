@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from argparse import ArgumentParser
 from typing import Any, Counter, Optional, Union
 
@@ -416,9 +417,13 @@ def test_simple_arguments():
     assert out == list('abcdegh')
 
 
+class D:
+    pass
+
+
 class A:
     def __init__(self, something: int, b: str | None = None, c: bool = True,
-                 d: Any = None):
+                 d: Any = None, e: D = None, f=None):
         self.something = something
         self.b = b
         self.c = c
@@ -442,6 +447,9 @@ def test_add_arguments1():
     assert set(vars(args).keys()) == {
         'something', 'b', 'c'}
     assert args.c is True
+    assert 'd' not in vars(args)
+    assert 'e' not in vars(args)
+    assert 'f' not in vars(args)
 
 
 def test_add_arguments2():
@@ -494,22 +502,34 @@ def test_config_parser3():
     assert config.namespace.c is True
 
 
-# def test_config_parser4():
-#     sys.argv = "--a test --i 89 --h hi".split(' ')
-#     config = Config(A, B, C)
-#     assert config.namespace.a == "test"
-#     assert config.namespace.i == 89
-#     assert config.namespace.h == "hi"
-#     assert config.namespace.something is None
-#     assert config.namespace.c is True
+def test_config_parser4():
+    sys.argv = "--a test --i 89 --h hi".split(' ')
+    config = Config(A, B, C, parse_args='sys')
+    assert config.namespace.a == "test"
+    assert config.namespace.i == 89
+    assert config.namespace.h == "hi"
+    assert config.namespace.something is None
+    assert config.namespace.c is True
 
 
-# def test_config_parser5():
-#     sys.argv = "--a test --i 89 --h hi".split(' ')
-#     config = Config(A, B, C)
-#     assert config.dict == dict(
-#         a="test",
-#         i=89,
-#         h="hi",
-#         something=None,
-#         c=True)
+def test_config_parser5():
+    config = Config(A, B, C, args_dict=dict(
+        a='test', i=89), defaults=dict(
+            i=50, h='hi'
+    ))
+    assert config.namespace.a == "test"
+    assert config.namespace.i == 89
+    assert config.namespace.h == "hi"
+    assert config.namespace.something is None
+    assert config.namespace.c is True
+
+
+def test_config_parser6():
+    config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
+    assert config.dict == dict(
+        a="test",
+        i=89,
+        b=None,
+        h="hi",
+        something=None,
+        c=True)
