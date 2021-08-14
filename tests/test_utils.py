@@ -552,21 +552,6 @@ def test_create1():
     assert c.i == 89
 
 
-def test_create2():
-    config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
-    a = config.create_with_help(A)
-    assert a.b is None
-    assert a.c is True
-    assert a.something is None
-    b = config.create_with_help(B)
-    assert b.a == "test"
-    assert b.h == "hi"
-    assert b.i == 89
-    c = config.create_with_help(C)
-    assert c.a == "test"
-    assert c.i == 89
-
-
 class F:
     def __init__(self, a: int, b: str = 'hi'):
         self.a = a
@@ -575,12 +560,15 @@ class F:
 
 def test_create3():
     config = Config(F, parse_args="--a 5".split(' '))
-    f = config.create_with_help(F)
+    f = config.create(F)
     assert f.a == 5
     assert f.b == 'hi'
 
 
-# def test_create4():
-#     config = Config(F, parse_args="--b end".split(' '))
-#     with pytest.raises(Exit):
-#         config.create_with_help(F)
+def test_create4():
+    config = Config(F, parse_args="--b end".split(' '))
+    with pytest.raises(SystemExit):
+        config.create(F)
+
+
+# test_create4()

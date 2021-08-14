@@ -1,5 +1,4 @@
 from __future__ import annotations
-from inspect import Signature
 
 import argparse
 import inspect
@@ -8,6 +7,7 @@ import math
 import re
 import sys
 from argparse import ArgumentParser, Namespace
+from inspect import Signature
 from itertools import chain
 from typing import (Any, Callable, ChainMap, Counter, Dict, Iterable, List,
                     Mapping, Optional, Sequence, Sized, Tuple, Type, TypeVar,
@@ -498,16 +498,18 @@ class Config:
     def dict(self) -> Mapping[str, Any]:
         return vars(self.namespace)
 
-    def create_with_help(self, cls: Type[T], **kwargs) -> T:
-        try:
-            return self.create(cls, **kwargs)
-        except TypeError as e:
-            print(e, file=sys.stderr)
-            self.parser.print_help()
-            sys.exit(1)
+    # def create_with_help(self, cls: Type[T], **kwargs) -> T:
+    #     try:
+    #         return self.create(cls, **kwargs)
+    #     except Exception as e:
+    #         print(e, file=sys.stderr)
+    #         self.parser.print_help()
+    #         # sys.exit(1)
+    #         raise SystemExit(1)
 
     def create(self, cls: Type[T], **kwargs) -> T:
-        known_params = set(simple_arguments(cls.__init__)).intersection(self.dict.keys())
-        params = {k: self.dict[k] for k in known_params}
+        d = self.dict
+        known_params = set(simple_arguments(cls.__init__)).intersection(d.keys())
+        params = {k: d[k] for k in known_params}
         params.update(kwargs)
         return cls(**params)  # type: ignore
