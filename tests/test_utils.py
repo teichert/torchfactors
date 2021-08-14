@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import sys
 from argparse import ArgumentParser
 from typing import Any, Counter, Optional, Union
@@ -403,9 +404,9 @@ def my_func(a: int | str, b: Optional[str], c: Union[float, bool],
 def test_simple_arguments_and_types():
     out = list(simple_arguments_and_info(my_func))
     assert out == [
-        ('a', int, None),
-        ('b', str, None),
-        ('c', float, None),
+        ('a', int, inspect.Signature.empty),
+        ('b', str, inspect.Signature.empty),
+        ('c', float, inspect.Signature.empty),
         ('d', int, 3),
         ('e', float, 4.5),
         ('g', int, 5),
@@ -422,7 +423,8 @@ class D:
 
 
 class A:
-    def __init__(self, something: int, b: str | None = None, c: bool = True,
+    def __init__(self, something: int | None = None,
+                 b: str | None = None, c: bool = True,
                  d: Any = None, e: D = None, f=None):
         self.something = something
         self.b = b
@@ -431,7 +433,7 @@ class A:
 
 @tx.dataclass
 class C:
-    a: str
+    a: str | None = None
     i: int = 9
 
 
@@ -533,3 +535,52 @@ def test_config_parser6():
         h="hi",
         something=None,
         c=True)
+
+
+def test_create1():
+    config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
+    a = config.create(A)
+    assert a.b is None
+    assert a.c is True
+    assert a.something is None
+    b = config.create(B)
+    assert b.a == "test"
+    assert b.h == "hi"
+    assert b.i == 89
+    c = config.create(C)
+    assert c.a == "test"
+    assert c.i == 89
+
+
+def test_create2():
+    config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
+    a = config.create_with_help(A)
+    assert a.b is None
+    assert a.c is True
+    assert a.something is None
+    b = config.create_with_help(B)
+    assert b.a == "test"
+    assert b.h == "hi"
+    assert b.i == 89
+    c = config.create_with_help(C)
+    assert c.a == "test"
+    assert c.i == 89
+
+
+class F:
+    def __init__(self, a: int, b: str = 'hi'):
+        self.a = a
+        self.b = b
+
+
+def test_create3():
+    config = Config(F, parse_args="--a 5".split(' '))
+    f = config.create_with_help(F)
+    assert f.a == 5
+    assert f.b == 'hi'
+
+
+# def test_create4():
+#     config = Config(F, parse_args="--b end".split(' '))
+#     with pytest.raises(Exit):
+#         config.create_with_help(F)

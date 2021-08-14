@@ -1,4 +1,5 @@
 from __future__ import annotations
+from inspect import Signature
 
 import argparse
 import inspect
@@ -7,7 +8,6 @@ import math
 import re
 import sys
 from argparse import ArgumentParser, Namespace
-from inspect import Signature
 from itertools import chain
 from typing import (Any, Callable, ChainMap, Counter, Dict, Iterable, List,
                     Mapping, Optional, Sequence, Sized, Tuple, Type, TypeVar,
@@ -401,8 +401,8 @@ def simple_arguments_and_info(f) -> Iterable[Tuple[str, Callable, Any]]:
                           *re.split('[^a-zA-Z]+', str(param.annotation))]
         try:
             type_id = next(iter([t for t in possible_types if t in legal_arg_types]))
-            default = None if param.default is Signature.empty else param.default
-            yield arg, legal_arg_types[type_id], default
+            # default = None if param.default is Signature.empty else param.default
+            yield arg, legal_arg_types[type_id], param.default
         except StopIteration:
             pass
 
@@ -435,7 +435,9 @@ def add_arguments(cls: type, parser: ArgumentParser, arg_counts: Counter | None 
                                help=f"(Note --{duplicate_name} is just place-holder "
                                f"to show relevance to this group. Please use --{arg} instead.)")
         else:
-            group.add_argument(f'--{arg}', type=use_type, default=default)
+            used_default = None if default is Signature.empty else default
+            group.add_argument(f'--{arg}', type=use_type, default=used_default,
+                               required=default is Signature.empty)
         arg_counts[arg] += 1
 
 
