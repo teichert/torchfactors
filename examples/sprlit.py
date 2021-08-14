@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import argparse
 import os
 
-import pytorch_lightning as pl
 import torch
 import torchfactors as tx
+from pytorch_lightning.trainer.trainer import Trainer
 
 from spr.data import SPRL, SPRLData_v1_0
 
@@ -106,19 +105,13 @@ if __name__ == '__main__':
         torch.tensor(0.0).to("cuda")
     except KeyError:
         pass
-    parser = argparse.ArgumentParser(add_help=False)
-    parser = tx.LitSystem.add_argparse_args(parser)
     torch.set_num_threads(1)
-    args = pl.Trainer.parse_argparser(parser.parse_args())
-    # args = pl.Trainer.parse_argparser(parser.parse_args(
-    #     "--batch_size 3 --auto_lr_find True".split()))
-    trainer = pl.Trainer.from_argparse_args(args)
+    config = tx.Config(SPRLModel, SPRLData_v1_0, torch.optim.AdamW, tx.BP, Trainer,
+                       defaults=dict(path='./examples/spr/protoroles_eng_ud1.2_11082016.tsv'))
     model = SPRLModel()
-    system = tx.LitSystem.from_args(
-        model=model, data=SPRLData_v1_0(model=model),
-        args=args,
-        defaults=dict(path='./examples/spr/protoroles_eng_ud1.2_11082016.tsv'))
-
+    data = SPRLData_v1_0(model=model)
+    system = config.create(tx.LitSystem, model=model, data=data)
+    trainer = config.create(Trainer)
     # def eval(dataloader: DataLoader[SPRL], gold: SPRL):
     #     predicted = system.predict(train)
     #     logging.info(torchmetrics.functional.f1(

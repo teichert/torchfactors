@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import argparse
 import dataclasses
-import itertools
 import logging
 import re
-from argparse import ArgumentParser, Namespace
 from collections import ChainMap
 from dataclasses import dataclass
-from typing import (Any, Dict, Generic, List, Mapping, Optional, Sized,
-                    Union, cast)
+from typing import (Any, Dict, Generic, List, Mapping, Optional, Sized, Union,
+                    cast)
 
 import pytorch_lightning as pl
 import torch
@@ -19,12 +16,13 @@ from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
 from tqdm import tqdm  # type: ignore
 
+from torchfactors.inferencer import Inferencer
 from torchfactors.inferencers.bp import BP
 
 from .model import Model
 from .model_inferencer import System
 from .subject import ChainDataset, ListDataset, SubjectType
-from .utils import split_data
+from .utils import Config, split_data
 
 optimizers = dict(
     Adam=torch.optim.Adam,
@@ -217,96 +215,103 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
     up into it.
 
     """
-    @ classmethod
-    def get_arg(cls, key: str, args: Dict[str, Any], defaults: Mapping[str, Any]):
-        if key in args:
-            return args[key]
-        else:
-            return defaults[key]
+    # @ classmethod
+    # def get_arg(cls, key: str, args: Dict[str, Any], defaults: Mapping[str, Any]):
+    #     if key in args:
+    #         return args[key]
+    #     else:
+    #         return defaults[key]
 
-    @ classmethod
-    def set_arg(cls, dest: Dict[str, Any], key: str, args: Dict[str, Any],
-                defaults: Mapping[str, Any]):
-        dest[key] = cls.get_arg(key, args, defaults)
+    # @ classmethod
+    # def set_arg(cls, dest: Dict[str, Any], key: str, args: Dict[str, Any],
+    #             defaults: Mapping[str, Any]):
+    #     dest[key] = cls.get_arg(key, args, defaults)
 
-    @ classmethod
-    def from_args(cls,
-                  model: Model[SubjectType],
-                  data: DataModule[SubjectType],
-                  args: Optional[Namespace] = None,
-                  defaults: Mapping[str, Any] | None = None,
-                  **kwargs
-                  ) -> LitSystem[SubjectType]:
-        if args is None:
-            args = argparse.Namespace()
-        args_dict = {k: v for k, v in vars(args).items() if v is not None}
-        base_kwargs: Dict[str, Any] = {}
-        optimizer_kwargs = {k: v.default for k, v in default_optimizer_kwargs.items()
-                            if v.default is not None}
-        inference_kwargs = {k: v.default for k, v in default_inference_kwargs.items()
-                            if v.default is not None}
-        field_names = set(f.name for f in dataclasses.fields(data))
-        if defaults is None:
-            defaults = {}
-        # NOTE: TODO: could check some prefix like _optimizer or _inference
-        # to handle cases where the params are not predeclared or have conflicts
-        for key in set(args_dict.keys()).union(defaults.keys()):
-            if key in default_optimizer_kwargs:
-                cls.set_arg(optimizer_kwargs, key, args_dict, defaults)
-            elif key in default_inference_kwargs:
-                cls.set_arg(inference_kwargs, key, args_dict, defaults)
-            elif key in field_names:
-                v = cls.get_arg(key, args_dict, defaults)
-                setattr(data, key, v)
-            elif key in lit_init_names:
-                cls.set_arg(base_kwargs, key, args_dict, defaults)
-        return cls(model=model, data=data,
-                   optimizer_kwargs=optimizer_kwargs,
-                   inference_kwargs=inference_kwargs,
-                   **base_kwargs, **kwargs)
+    # @ classmethod
+    # def from_args(cls,
+    #               model: Model[SubjectType],
+    #               data: DataModule[SubjectType],
+    #               args: Optional[Namespace] = None,
+    #               defaults: Mapping[str, Any] | None = None,
+    #               **kwargs
+    #               ) -> LitSystem[SubjectType]:
+    #     if args is None:
+    #         args = argparse.Namespace()
+    #     args_dict = {k: v for k, v in vars(args).items() if v is not None}
+    #     base_kwargs: Dict[str, Any] = {}
+    #     optimizer_kwargs = {k: v.default for k, v in default_optimizer_kwargs.items()
+    #                         if v.default is not None}
+    #     inference_kwargs = {k: v.default for k, v in default_inference_kwargs.items()
+    #                         if v.default is not None}
+    #     field_names = set(f.name for f in dataclasses.fields(data))
+    #     if defaults is None:
+    #         defaults = {}
+    #     # NOTE: TODO: could check some prefix like _optimizer or _inference
+    #     # to handle cases where the params are not predeclared or have conflicts
+    #     for key in set(args_dict.keys()).union(defaults.keys()):
+    #         if key in default_optimizer_kwargs:
+    #             cls.set_arg(optimizer_kwargs, key, args_dict, defaults)
+    #         elif key in default_inference_kwargs:
+    #             cls.set_arg(inference_kwargs, key, args_dict, defaults)
+    #         elif key in field_names:
+    #             v = cls.get_arg(key, args_dict, defaults)
+    #             setattr(data, key, v)
+    #         elif key in lit_init_names:
+    #             cls.set_arg(base_kwargs, key, args_dict, defaults)
+    #     return cls(model=model, data=data,
+    #                optimizer_kwargs=optimizer_kwargs,
+    #                inference_kwargs=inference_kwargs,
+    #                **base_kwargs, **kwargs)
 
     def __init__(self,
                  model: Model[SubjectType],
                  data: Optional[pl.LightningDataModule] = None,
                  penalty_coeff: float = 1.0,
-                 optimizer: str = 'Adam',
-                 inferencer: str = 'BP',
-                 in_model: str | None = None,
+                 optimizer: str = 'torch.optim.Adam',
+                 inferencer: str = 'torchfactors.inferencers.bp.BP',
+                 config: Config | None = None,
+                 #  in_model: str | None = None,
                  #  out_model: str = 'model.pt',
-                 optimizer_kwargs: Optional[Dict[str, Any]] = None,
-                 inference_kwargs: Optional[Dict[str, Any]] = None,
+                 #  optimizer_kwargs: Optional[Dict[str, Any]] = None,
+                 #  inference_kwargs: Optional[Dict[str, Any]] = None,
+                 **kwargs
                  ):
         super().__init__()
-        params = locals()
+        if config is None:
+            self.config = Config(defaults=kwargs)
+        else:
+            self.config = config
+        # params = locals()
         self.model = model
-        self.in_model = in_model
+        # self.in_model = in_model
         # self.out_model = out_model
         self.optimizer_name = optimizer
         self.data = data
         self.log_info: Dict[str, Any] = {}
         self.penalty_coeff = penalty_coeff
-        self.self_kwargs = {
-            k: params[k] for k in lit_init_names
-        }
-        if optimizer_kwargs is None:
-            optimizer_kwargs = {k: v.default for k, v in default_optimizer_kwargs.items()
-                                if v.default is not None}
-        self.optimizer_kwargs = optimizer_kwargs
 
-        if inference_kwargs is None:
-            inference_kwargs = {k: v.default for k, v in default_inference_kwargs.items()
-                                if v.default is not None}
-        inferencer_cls = inferencers[inferencer]
-        self.inference_kwargs = inference_kwargs
-        self.inferencer = inferencer_cls(**inference_kwargs)
+        # self.self_kwargs = {
+        #     k: params[k] for k in lit_init_names
+        # }
+        # if optimizer_kwargs is None:
+        #     optimizer_kwargs = {k: v.default for k, v in default_optimizer_kwargs.items()
+        #                         if v.default is not None}
+        # self.optimizer_kwargs = optimizer_kwargs
 
-        self.system: System[SubjectType] = System(
-            self.model, self.inferencer)
+        # if inference_kwargs is None:
+        #     inference_kwargs = {k: v.default for k, v in default_inference_kwargs.items()
+        #                         if v.default is not None}
+        # inferencer_cls = inferencers[inferencer]
+        # self.inference_kwargs = inference_kwargs
+        # self.inferencer = inferencer_cls(**inference_kwargs)
+        self.inferencer = cast(Inferencer, self.config.create_from_name(inferencer))
+        self.system: System[SubjectType] = System(self.model, self.inferencer)
 
         self.primed = False
         if self.data is not None:
             self.data.setup(None)
-        self._hparams = dict(**self.optimizer_kwargs, **self.inference_kwargs, **self.self_kwargs)
+        # self._hparams = dict(**self.optimizer_kwargs, **self.inference_kwargs, **self.self_kwargs)
+        self._hparams = self.config.dict
 
     def get_progress_bar_dict(self) -> Mapping[str, Union[int, str]]:  # type: ignore
         return ChainMap(
@@ -321,9 +326,9 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
         return super().on_fit_end()
 
     def setup(self, stage=None) -> None:
-        logging.info(self.optimizer_kwargs)
-        logging.info(self.inference_kwargs)
-        logging.info(self.self_kwargs)
+        # logging.info(self.optimizer_kwargs)
+        # logging.info(self.inference_kwargs)
+        # logging.info(self.self_kwargs)
         if not self.primed:
             with torch.set_grad_enabled(False):
                 logging.info("priming")
@@ -331,7 +336,8 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             self.primed = True
 
     def configure_optimizers(self) -> Optimizer:
-        return optimizers[self.optimizer_name](self.parameters(), **self.optimizer_kwargs)
+        return cast(Optimizer, self.config.create_from_name(self.optimizer_name,
+                                                            params=self.parameters()))
 
     def transfer_batch_to_device(self, _batch, device, dataloader_idx):
         batch: SubjectType = cast(SubjectType, _batch)
@@ -386,20 +392,20 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
             raise TypeError("did not specify data")
         return cast(DataLoader[SubjectType], self.data.test_dataloader())
 
-    @ classmethod
-    def add_argparse_args(cls, parser: ArgumentParser):
-        parser = pl.Trainer.add_argparse_args(parser)
-        for key, value in itertools.chain(
-                default_optimizer_kwargs.items(),
-                default_inference_kwargs.items(),
-                lit_init_names.items()):
-            parser.add_argument(f'--{key}', type=value.type, help=value.help,
-                                default=value.default)
-        for field in dataclasses.fields(DataModule):
-            field_type = get_type(field.type)  # type: ignore
-            if field_type is not None:
-                parser.add_argument(f'--{field.name}', type=field_type)
-        return parser
+    # @ classmethod
+    # def add_argparse_args(cls, parser: ArgumentParser):
+    #     parser = pl.Trainer.add_argparse_args(parser)
+    #     for key, value in itertools.chain(
+    #             default_optimizer_kwargs.items(),
+    #             default_inference_kwargs.items(),
+    #             lit_init_names.items()):
+    #         parser.add_argument(f'--{key}', type=value.type, help=value.help,
+    #                             default=value.default)
+    #     for field in dataclasses.fields(DataModule):
+    #         field_type = get_type(field.type)  # type: ignore
+    #         if field_type is not None:
+    #             parser.add_argument(f'--{field.name}', type=field_type)
+    #     return parser
 
     def forward(self, *args, **kwargs) -> SubjectType:
         return self.forward_(cast(SubjectType, args[0]))

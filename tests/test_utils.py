@@ -478,52 +478,51 @@ def test_config_parser1():
     parser = ArgumentParser()
     config = Config(A, B, C, parent_parser=parser,
                     parse_args="--a test --i 89 --h hi".split(' '))
-    assert config.namespace.a == "test"
-    assert config.namespace.i == 89
-    assert config.namespace.h == "hi"
-    assert config.namespace.something is None
-    assert config.namespace.c is True
+    assert config.args.a == "test"
+    assert config.args.i == 89
+    assert config.args.h == "hi"
+    assert config.args.something is None
+    assert config.args.c is True
 
 
 def test_config_parser2():
     config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
-    assert config.namespace.a == "test"
-    assert config.namespace.i == 89
-    assert config.namespace.h == "hi"
-    assert config.namespace.something is None
-    assert config.namespace.c is True
+    assert config.args.a == "test"
+    assert config.args.i == 89
+    assert config.args.h == "hi"
+    assert config.args.something is None
+    assert config.args.c is True
 
 
 def test_config_parser3():
     base = Config(A, B, C)
     config = base.child(parse_args="--a test --i 89 --h hi".split(' '))
-    assert config.namespace.a == "test"
-    assert config.namespace.i == 89
-    assert config.namespace.h == "hi"
-    assert config.namespace.something is None
-    assert config.namespace.c is True
+    assert config.args.a == "test"
+    assert config.args.i == 89
+    assert config.args.h == "hi"
+    assert config.args.something is None
+    assert config.args.c is True
 
 
 def test_config_parser4():
     sys.argv = "--a test --i 89 --h hi".split(' ')
     config = Config(A, B, C, parse_args='sys')
-    assert config.namespace.a == "test"
-    assert config.namespace.i == 89
-    assert config.namespace.h == "hi"
-    assert config.namespace.something is None
-    assert config.namespace.c is True
+    assert config.args.a == "test"
+    assert config.args.i == 89
+    assert config.args.h == "hi"
+    assert config.args.something is None
+    assert config.args.c is True
 
 
 def test_config_parser5():
-    config = Config(A, B, C, args_dict=dict(
-        a='test', i=89), defaults=dict(
-            i=50, h='hi'
+    config = Config(A, B, C, defaults=dict(
+        a='test', i=89, h='hi'
     ))
-    assert config.namespace.a == "test"
-    assert config.namespace.i == 89
-    assert config.namespace.h == "hi"
-    assert config.namespace.something is None
-    assert config.namespace.c is True
+    assert config.args.a == "test"
+    assert config.args.i == 89
+    assert config.args.h == "hi"
+    assert config.args.something is None
+    assert config.args.c is True
 
 
 def test_config_parser6():

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import inspect
 import itertools
 import math
@@ -9,9 +10,9 @@ import sys
 from argparse import ArgumentParser, Namespace
 from inspect import Signature
 from itertools import chain
-from typing import (Any, Callable, ChainMap, Counter, Dict, Iterable, List,
-                    Mapping, Optional, Sequence, Sized, Tuple, Type, TypeVar,
-                    Union, cast, overload)
+from typing import (Any, Callable, Counter, Dict, Iterable, List, Mapping,
+                    Optional, Sequence, Sized, Tuple, Type, TypeVar, Union,
+                    cast, overload)
 
 import torch
 from multimethod import multidispatch
@@ -294,6 +295,17 @@ def compose_single(lhs: SliceType, rhs: SliceType, length: int
     return to_slice
 
 
+def get_class(name: str) -> type:
+    r"""
+    Returns the class with the given name:
+    e.g.
+    assert get_class('torchfactors.inferencers.bp.BP') is torchfactors.inferencers.bp.BP
+    """
+    module, bare_name = name.rsplit('.', 1)
+    cls = getattr(importlib.import_module(module), bare_name)
+    return cls
+
+
 def compose(first: NDSlice, second: NDSlice, shape: ShapeType):
     def ensure_tuple(ndslice: NDSlice) -> Tuple[SliceType, ...]:
         return ndslice if isinstance(ndslice, tuple) else (ndslice,)
@@ -445,15 +457,19 @@ class Config:
 
     def __init__(self, *classes: type, parent_parser: ArgumentParser | None = None,
                  parse_args: Sequence[str] | str | None = None,
-                 args_dict: Mapping[str, Any] | None = None,
+                 #  args_dict: Mapping[str, Any] | None = None,
                  defaults: Mapping[str, Any] | None = None):
         r"""
         Parameters:
-
-        parse_args:
-          - 'sys' means to get them from sys
-          - None means to not use them
-          - anything else means to use that instead
+            parent_parser: parser to attach things to and use for parsing
+            parse_args: sequence of arguments to use as if commandline args
+                - 'sys' means to get them from sys
+                - None means to not use them
+                - anything else means to use that instead
+            defaults: values to use if value for given param not
+                specified on the commandline (takes precedence
+                over any defaults specified in the parser
+                and can add vars not recognized by the parser)
         """
         self.classes = classes
         if parent_parser is None:
@@ -468,8 +484,8 @@ class Config:
             self.parse_args = sys.argv
         else:
             self.parse_args = parse_args
-        self.args_dict = args_dict
-        self.defaults = defaults
+        # self.args_dict = args_dict
+        self.defaults = {} if defaults is None else defaults
         self.parsed_args: Namespace | None = None
 
     def child(self, *args, **kwargs) -> Config:
@@ -480,23 +496,30 @@ class Config:
         return self._parser
 
     @property
-    def namespace(self) -> Namespace:
+    def args(self) -> Namespace:
         r"""
         Returns an argparse namespace with the contents of the config;
-        1) parse args if there are any
-        2) update the the namespace with a chain of (self, args_dict, defaults)
+        1) override values given by `defaults` with arguments parsed from `parser_args`
         """
         if self.parsed_args is None:
-            back_off_args: Mapping[str, Any] = ChainMap(*[d for d in [
-                self.args_dict, self.defaults
-            ] if d is not None])
-            self.parser.set_defaults(**back_off_args)
+            # back_off_args: Mapping[str, Any] = ChainMap(*[d for d in [
+            #     self.args_dict, self.defaults
+            # ] if d is not None])
+
+            # Note: we need to do the default thing twice: once for those that
+            # are in the parser (in order to override the parser defaluts) and
+            # one for things that aren't even registered with the parser
+            # (since they won't be included automatically)
+            self.parser.set_defaults(**self.defaults)
             self.parsed_args = self.parser.parse_args(self.parse_args)
+            unused_defaults = {k: v for k, v in self.defaults.items()
+                               if k not in vars(self.parsed_args)}
+            vars(self.parsed_args).update(unused_defaults)
         return self.parsed_args
 
     @property
-    def dict(self) -> Mapping[str, Any]:
-        return vars(self.namespace)
+    def dict(self) -> dict[str, Any]:
+        return vars(self.args)
 
     # def create_with_help(self, cls: Type[T], **kwargs) -> T:
     #     try:
@@ -509,7 +532,20 @@ class Config:
 
     def create(self, cls: Type[T], **kwargs) -> T:
         d = self.dict
+
         known_params = set(simple_arguments(cls.__init__)).intersection(d.keys())
         params = {k: d[k] for k in known_params}
         params.update(kwargs)
+        # what to do if cls accept a config but none is being passed?
+        # it is probably a mistake, so just pass it in
+        # TODO: maybe clean this up a bit
+        all_params = inspect.signature(cls.__init__).parameters.items()
+        if 'config' in dict(list(all_params)):
+            config_type = all_params['config'].type
+            if config_type is Signature.empty or config_type is Config:
+                params['config'] = self
         return cls(**params)  # type: ignore
+
+    def create_from_name(self, classname: str, **kwargs) -> T:
+        cls = get_class(classname)
+        return self.create(cls, **kwargs)

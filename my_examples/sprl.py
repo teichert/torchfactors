@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import itertools
-from argparse import Namespace
 from dataclasses import dataclass, field
-from typing import Any, ChainMap, Dict, Mapping, Type, cast
+from typing import Any, Dict, cast
 
 import pandas as pd
 import torch
 import torchfactors as tx
 from mlflow import log_artifact  # type: ignore
 from mlflow.tracking.fluent import log_metrics  # type: ignore
-from torchfactors.lightning import LitSystem  # type: ignore
 from torchfactors.model import Model
 from torchmetrics import functional
 from tqdm import tqdm  # type: ignore
@@ -179,24 +177,25 @@ class SPR1DataModule(SPRDataModule):
 
 class SPRSystem(tx.LitSystem[SPR]):
 
-    @ classmethod
-    def from_some_args(cls, model_class: Type[Model[SPR]],
-                       data_class: Type[SPRDataModule],
-                       args: Namespace,
-                       defaults: Mapping[str, Any], **kwargs) -> SPRSystem:
-        all_args = ChainMap(vars(args), kwargs, defaults)
-        model = all_args.get('in_model', None)
-        loaded_model = model_class()
-        if model is not None:
-            saved = torch.load(all_args['in_model'])
-            # loaded_model.load_state_dict(saved['just-model'], strict=False)
-            system = LitSystem(loaded_model)
-            system.load_state_dict(saved['state_dict'], strict=False)
-            loaded_model = system.model
-        data = data_class(model=loaded_model)
-        system = cast(SPRSystem,
-                      super().from_args(loaded_model, data, args=args, defaults=defaults, **kwargs))
-        return system
+    # @ classmethod
+    # def from_some_args(cls, model_class: Type[Model[SPR]],
+    #                    data_class: Type[SPRDataModule],
+    #                    args: Namespace,
+    #                    defaults: Mapping[str, Any], **kwargs) -> SPRSystem:
+    #     all_args = ChainMap(vars(args), kwargs, defaults)
+    #     model = all_args.get('in_model', None)
+    #     loaded_model = model_class()
+    #     if model is not None:
+    #         saved = torch.load(all_args['in_model'])
+    #         # loaded_model.load_state_dict(saved['just-model'], strict=False)
+    #         system = LitSystem(loaded_model)
+    #         system.load_state_dict(saved['state_dict'], strict=False)
+    #         loaded_model = system.model
+    #     data = data_class(model=loaded_model)
+    #     system = cast(SPRSystem,
+    #                   super().from_args(loaded_model, data, args=args,
+    #                   defaults=defaults, **kwargs))
+    #     return system
 
     def log_evaluation(self, x: SPR, data_name: str, step: int | None = None
                        ) -> Dict[str, float]:

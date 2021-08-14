@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
+from collections import ChainMap
 from datetime import timedelta
 from typing import cast
 
@@ -82,18 +83,18 @@ def main(cfg):
     # args = pl.Trainer.parse_argparser(parser.parse_args())
     # args = pl.Trainer.parse_argparser(parser.parse_args(
     #     "--batch_size 3 --auto_lr_find True".split()))
-    config = base_config.child(parse_args=None, args_dict=cfg,
-                               defaults=dict(
+    config = base_config.child(parse_args=None,
+                               defaults=ChainMap(cfg, dict(
                                    path=path_to_data,
                                    #    model_state_dict_path=model_path,
                                    # checkpoint_path=path_to_checkpoint
-                               ))
+                               )))
     model = config.create(SPRLModel)
     data = config.create(SPR1DataModule, model=model)
     system = config.create(SPRSystem, model=model, data=data)
-    trainer = pl.Trainer.from_argparse_args(config.namespace)
+    trainer = pl.Trainer.from_argparse_args(config.args)
 
-    if system.in_model is None:
+    if config.args.checkpoint_path is None:
         timed_checkpoint = ModelCheckpoint(save_top_k=0, save_last=True,
                                            train_time_interval=timedelta(minutes=30))
         best_model = ModelCheckpoint(save_top_k=1,
@@ -108,18 +109,11 @@ def main(cfg):
             early_stopping
         ])
         trainer.logger = TensorBoardLogger('tb_logs')
-        # trainer.tune(system, lr_find_kwargs=dict(
-        #     update_attr=True,
-        #     num_training=10,
-        # ))
-        # print(system.hparams, checkpoint)
         trainer.fit(system)
         best_model_path = pathlib.Path(best_model.best_model_path).resolve()
-        # best_model_path_str = str(best_model_path).replace('=', '\\=')
         print(f'path to best model: {best_model_path}')
         mlflow.log_artifact(f'{best_model_path}', 'best_model')
     else:
-        # system.load_from_checkpoint(args.in_model)
         system.eval()
     trainer.test(system)
 

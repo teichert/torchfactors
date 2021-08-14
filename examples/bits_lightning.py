@@ -1,9 +1,9 @@
-import argparse
 from dataclasses import dataclass
 from typing import Optional
 
-import pytorch_lightning as pl
+import torch
 import torchfactors as tx
+from pytorch_lightning.trainer.trainer import Trainer
 from torchfactors.subject import ListDataset
 
 
@@ -80,16 +80,10 @@ class BitsData(tx.lightning.DataModule):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(add_help=False)
-    parser = tx.LitSystem.add_argparse_args(parser)
-    args = pl.Trainer.parse_argparser(parser.parse_args())
-    # args = pl.Trainer.parse_argparser(parser.parse_args("--split_max_count 10".split()))
-    trainer = pl.Trainer.from_argparse_args(args)
+    config = tx.Config(BitsModel, BitsData, torch.optim.AdamW, tx.BP, Trainer)
     model = BitsModel()
-    system = tx.LitSystem.from_args(
-        model=model, data=BitsData(),
-        args=args)
-
+    system = config.create(tx.LitSystem, model=model, data=BitsData())
+    trainer = config.create(Trainer)
     # def eval(dataloader: DataLoader[SPRL], gold: SPRL):
     #     predicted = system.predict(train)
     #     logging.info(torchmetrics.functional.f1(

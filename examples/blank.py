@@ -96,10 +96,11 @@ class MySystem(tx.LitSystem[IncompleteText]):
 
 model = MyModel()
 data = MyData(model)
-system = MySystem.from_args(model, data=data,
-                            defaults=dict(lr=0.1, passes=1,
-                                          penalty_coeff=100.0,
-                                          weight_decay=1.0,
-                                          optimizer='AdamW'))
+config = tx.Config(MySystem, MyData, torch.optim.AdamW, tx.BP, Trainer,
+                   defaults=dict(lr=0.1, passes=1,
+                                 penalty_coeff=100.0,
+                                 weight_decay=1.0,
+                                 optimizer='AdamW'))
+system = config.create(MySystem, model=model, data=data)
 trainer = Trainer()
 trainer.fit(system)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, cast
 
+import torch
 import torchfactors as tx
 from pytorch_lightning.trainer.trainer import Trainer
 from sklearn.linear_model import RidgeClassifierCV  # type: ignore
@@ -78,14 +79,15 @@ class BaselineSystem(SPRSystem):
 
 
 if __name__ == '__main__':
+    config = tx.Config(SPRDummyModel, SPR1DataModule, torch.optim.AdamW,
+                       tx.BP, Trainer, parse_args='sys', defaults=dict(
+                           # path="./data/notxt.spr1.tar.gz",
+                           path="./data/notxt.mini10.spr1.tar.gz",
+                           # split_max_count=100,
+                           batch_size=-1))
     model = SPRDummyModel()
-    data = SPR1DataModule(model=model, combine_train_and_val=True)
-    system = BaselineSystem.from_args(
-        model, data, defaults=dict(
-            # path="./data/notxt.spr1.tar.gz",
-            path="./data/notxt.mini10.spr1.tar.gz",
-            # split_max_count=100,
-            batch_size=-1))
-    trainer = Trainer(max_epochs=0)
+    data = config.create(SPR1DataModule, model=model)
+    system = config.create(BaselineSystem, model=model, data=data)
+    trainer = config.create(Trainer, max_epochs=0)
     trainer.fit(system)
     trainer.test(system)

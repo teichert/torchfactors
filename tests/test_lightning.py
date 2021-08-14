@@ -1,6 +1,5 @@
 
 
-import argparse
 import tempfile
 from typing import cast
 
@@ -12,6 +11,7 @@ from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 from torch.functional import Tensor
 from torchfactors.components.linear_factor import LinearFactor
 from torchfactors.domain import FlexDomain
+from torchfactors.inferencers.bp import BP
 from torchfactors.lightning import DataModule, get_type
 from torchfactors.model import Model
 from torchfactors.subject import ListDataset
@@ -60,14 +60,16 @@ def test_lit_learning_with_no_penalty():
 @pytest.mark.filterwarnings('ignore::UserWarning')
 def test_lit_learning_with_inference_kwargs():
     trainer = pl.Trainer(max_epochs=10)
-    lit = tx.LitSystem(MyModel(), inference_kwargs=dict(passes=10))
+    config = tx.Config(defaults=dict(passes=10))
+    lit = tx.LitSystem(MyModel(), config=config)
     trainer.fit(lit, data_loader)
 
 
 @pytest.mark.filterwarnings('ignore::UserWarning')
 def test_lit_learning_with_optimizers_kwargs():
     trainer = pl.Trainer(max_epochs=10)
-    lit = tx.LitSystem(MyModel(), optimizer_kwargs=dict(lr=0.01))
+    config = tx.Config(defaults=dict(lr=0.01))
+    lit = tx.LitSystem(MyModel(), config=config)
     trainer.fit(lit, data_loader)
 
 
@@ -99,20 +101,26 @@ class MyData_v3_0(DataModule[MySubject]):
 
 
 def test_lightning_args():
-    parser = argparse.ArgumentParser(add_help=False)
-    parser = tx.LitSystem.add_argparse_args(parser)
-    args = parser.parse_args(
-        "--test_mode True --passes 5 --lr 10 --val_max_count 0 "
-        "--batch_size 2 --test_batch_size 1".split())
+    # parser = argparse.ArgumentParser(add_help=False)
+    # parser = tx.LitSystem.add_argparse_args(parser)
+    config = tx.Config(
+        tx.LitSystem, tx.BP, torch.optim.Adam,
+        MyModel, MyData_v1_0,
+        parse_args=(
+            "--test_mode True --passes 5 --lr 10 --val_max_count 0 "
+            "--batch_size 2 --test_batch_size 1".split()))
+    args = config.args
     assert args.passes == 5
     assert args.lr == 10
     assert args.val_max_count == 0
     assert args.batch_size == 2
     assert args.test_batch_size == 1
-    sys = tx.LitSystem.from_args(MyModel(), MyData_v1_0(),
-                                 args)
-    assert sys.inferencer.passes == 5
-    assert sys.optimizer_kwargs['lr'] == 10
+    model = config.create(MyModel)
+    data = config.create(MyData_v1_0)
+    sys = config.create(tx.LitSystem, model=model, data=data, config=config)
+
+    assert cast(BP, sys.inferencer).passes == 5
+    # assert sys.optimizer_kwargs['lr'] == 10
     assert len(sys.train_dataloader()) == 2
     assert len(sys.val_dataloader()) == 0
     assert len(sys.test_dataloader()) == 4
@@ -209,8 +217,8 @@ def test_datamodule9():
 
 def test_args():
     model = MyModel()
-    sys = tx.lightning.LitSystem.from_args(
-        model=model, data=MyData_v1_0())
+    sys = tx.Config().create(tx.lightning.LitSystem,
+                             model=model, data=MyData_v1_0())
     assert len(sys.train_dataloader()) == 4
     assert len(sys.val_dataloader()) == 0
     assert len(sys.test_dataloader()) == 4
@@ -218,9 +226,8 @@ def test_args():
 
 def test_args2():
     model = MyModel()
-    sys = tx.lightning.LitSystem.from_args(
-        model=model, data=MyData_v1_0(),
-        defaults=dict(lr=5.0, optimizer='LBFGS',
+    config = tx.Config(
+        defaults=dict(lr=5.0, optimizer='torch.optim.LBFGS',
                       test_mode=True,
                       path="hello!",
                       val_batch_size=2,
@@ -229,37 +236,45 @@ def test_args2():
                       passes=10,
                       fast_dev_run=True,
                       ))
+    assert config.args.lr == 5.0
+    data = config.create(MyData_v1_0)
+    sys = config.create(tx.LitSystem, model=model, data=data)
+    # should take the first example as validation and the other 3 as train
     assert len(sys.train_dataloader()) == 3
     assert len(sys.val_dataloader()) == 1
     assert len(sys.test_dataloader()) == 4
-    assert sys.optimizer_kwargs['lr'] == 5.0
-    assert sys.optimizer_name == 'LBFGS'
-    assert sys.inferencer.passes == 10
+    # make some params so that we can make an optimizer
+    model.namespace('hi').parameter((3, 4))
+    assert sys.configure_optimizers().param_groups[0]['lr'] == 5.0
+    assert sys.optimizer_name == 'torch.optim.LBFGS'
+    assert cast(BP, sys.inferencer).passes == 10
     assert cast(DataModule, sys.data).path == "hello!"
+
+
+test_args2()
 
 
 def test_args3():
     model = MyModel()
-    namespace = argparse.Namespace()
-    d = vars(namespace)
-    d.update(dict(lr=5.0, optimizer='LBFGS',
-                  path="hello!",
-                  test_mode=True,
-                  val_batch_size=2,
-                  val_max_count=1,
-                  val_portion=1.0,
-                  passes=10,
-                  fast_dev_run=True
-                  ))
-    sys = tx.lightning.LitSystem.from_args(
-        model=model, data=MyData_v1_0(),
-        args=namespace)
+    config = tx.Config(defaults=dict(
+        lr=5.0, optimizer='torch.optim.LBFGS',
+        path="hello!",
+        test_mode=True,
+        val_batch_size=2,
+        val_max_count=1,
+        val_portion=1.0,
+        passes=10,
+        fast_dev_run=True
+    ))
+    data = config.create(MyData_v1_0)
+    sys = config.create(tx.lightning.LitSystem,
+                        model=model, data=data)
     assert len(sys.train_dataloader()) == 3
     assert len(sys.val_dataloader()) == 1
     assert len(sys.test_dataloader()) == 4
-    assert sys.optimizer_kwargs['lr'] == 5.0
-    assert sys.optimizer_name == 'LBFGS'
-    assert sys.inferencer.passes == 10
+    assert sys.configure_optimizers().param_groups[0]['lr'] == 5.0
+    assert sys.optimizer_name == 'torch.optim.LBFGS'
+    assert cast(BP, sys.inferencer).passes == 10
     assert cast(DataModule, sys.data).path == "hello!"
 
 
@@ -289,25 +304,23 @@ def test_get_type():
 
 def test_args4():
     model = MyModel()
-    namespace = argparse.Namespace()
-    d = vars(namespace)
-    d.update(dict(lr=5.0, optimizer='LBFGS',
-                  path="hello!",
-                  batch_size=-1,
-                  test_mode=True,
-                  val_max_count=2,
-                  passes=10,
-                  fast_dev_run=True
-                  ))
-    sys = tx.lightning.LitSystem.from_args(
-        model=model, data=MyData_v1_0(),
-        args=namespace)
+    config = tx.Config(defaults=dict(
+        lr=5.0, optimizer='torch.optim.LBFGS',
+        path="hello!",
+        batch_size=-1,
+        test_mode=True,
+        val_max_count=2,
+        passes=10,
+        fast_dev_run=True
+    ))
+    sys = config.create(tx.lightning.LitSystem,
+                        model=model, data=MyData_v1_0())
     assert len(sys.train_dataloader()) == 1
     assert len(sys.val_dataloader()) == 1
     assert len(sys.test_dataloader()) == 1
-    assert sys.optimizer_kwargs['lr'] == 5.0
-    assert sys.optimizer_name == 'LBFGS'
-    assert sys.inferencer.passes == 10
+    assert sys.configure_optimizers().param_groups[0]['lr'] == 5.0
+    assert sys.optimizer_name == 'torch.optim.LBFGS'
+    assert cast(BP, sys.inferencer).passes == 10
     assert sys.txdata.path == "hello!"
 
 
@@ -403,3 +416,14 @@ def test_domain():
     domain_test2 = model.domain('test')
     assert domain_test is domain_test2
     assert domain_test is not domain_blah
+
+
+@pytest.mark.filterwarnings("ignore")
+def test_lit_learning_new():
+    import pytorch_lightning as pl
+    model = MyModel()
+    sys = tx.LitSystem(model, tx.DataModule(train=tx.ListDataset(examples)))
+    trainer = pl.Trainer(max_epochs=5)
+    trainer.fit(sys)
+    out = sys(stacked_examples)
+    assert out.v.flatten().tolist() == [1, 1]
