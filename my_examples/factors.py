@@ -86,6 +86,9 @@ def main(cfg):
     config = base_config.child(parse_args=None,
                                defaults=ChainMap(cfg, dict(
                                    path=path_to_data,
+                                   batch_size=-1,
+                                   val_batch_size=-1,
+                                   test_batch_size=-1,
                                    #    model_state_dict_path=model_path,
                                    # checkpoint_path=path_to_checkpoint
                                )))
