@@ -12,8 +12,9 @@ from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
                           Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.domain import FlexDomain
-from torchfactors.model import ParamNamespace, build_module
+from torchfactors.model import ParamNamespace
 from torchfactors.testing import DummyParamNamespace, DummySubject
+from torchfactors.utils import build_module
 
 
 @dataclass
@@ -111,7 +112,7 @@ def test_modules():
     params = list(module2.parameters())
     assert len(params) == 1
     assert params[0].T.shape == (4, 5)
-    module3 = build_module('torch.nn.Linear', dict(in_features=4, out_features=5, bias=False))
+    module3 = build_module('torch.nn.Linear', in_features=4, out_features=5, bias=False)
     params3 = list(module3.parameters())
     assert params3[0].T.shape == (4, 5)
 

@@ -13,7 +13,7 @@ from torch import arange
 from torchfactors.subject import ListDataset
 from torchfactors.types import gdrop
 from torchfactors.utils import (Config, DuplicateEntry, add_arguments,
-                                as_ndrange, canonical_ndslice,
+                                as_ndrange, build_module, canonical_ndslice,
                                 canonical_range_slice, compose, compose_single,
                                 ndarange, ndslices_cat, ndslices_overlap,
                                 outer, simple_arguments,
@@ -570,4 +570,14 @@ def test_create4():
         config.create(F)
 
 
-# test_create4()
+def test_register():
+    # not sure why I get:  error: Too many arguments for "Module"
+    # when using this decorator (I think it's because of the
+    # overload-like behavior)
+    @tx.utils.register_module(name="my_name")
+    class MyClass(torch.nn.Module):  # type: ignore
+        def __init__(self, i: int = 10):
+            super().__init__()
+            self.i = i
+    mod = build_module('my_name', i=7)
+    assert mod.i == 7

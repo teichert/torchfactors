@@ -1,10 +1,10 @@
 from __future__ import annotations
-from .utils import get_class
+from .utils import build_module
 
 import json
 from collections import OrderedDict
 from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, List,
-                    Mapping, Optional, Sequence, Tuple, Type, cast, overload)
+                    Optional, Sequence, Tuple, cast, overload)
 
 import torch
 from multimethod import multimethod
@@ -87,32 +87,6 @@ class ParamNamespace:
             return self.model._get_module(self.key, setup_new_module)
 
 
-__known_modules: Dict[str, Type[Module]] = {}
-
-
-def register_module(cls: Type[Module] | None = None, name: str | None = None
-                    ) -> Callable[[Type[Module]], Type[Module]] | Type[Module]:
-    def decorate(nested: Type[Module]) -> Type[Module]:
-        full_name = name if name is not None else '.'.join([nested.__module__, nested.__name__])
-        __known_modules.setdefault(full_name, nested)
-        return nested
-    # if no class given,
-    if cls is None:
-        return decorate
-    else:
-        return decorate(nested=cls)
-
-
-def build_module(name: str, kwargs: Mapping[str, Any]) -> Module:
-    cls: type
-    try:
-        cls = __known_modules[name]
-    except KeyError:
-        cls = get_class(name)
-    built = cls(**kwargs)
-    return built
-
-
 class Model(torch.nn.Module, Generic[SubjectType]):
 
     def __init__(self,
@@ -152,7 +126,7 @@ class Model(torch.nn.Module, Generic[SubjectType]):
                          for name, unk, values in domains}
         self._module_constructors = state_dict.pop(prefix + '_module_constructors')
         for key, (name, kwargs) in self._module_constructors.items():
-            self._model_modules[key] = build_module(name, kwargs)
+            self._model_modules[key] = build_module(name, **kwargs)
         for key in state_dict:
             param_start = prefix + '_model_parameters.'
             if key.startswith(param_start):

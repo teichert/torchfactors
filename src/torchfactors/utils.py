@@ -18,6 +18,7 @@ import torch
 from multimethod import multidispatch
 from torch import Tensor, arange
 from torch._C import Generator
+from torch.nn import Module
 from torch.utils.data.dataset import Dataset, random_split
 
 from .types import (GeneralizedDimensionDrop, NDRangeSlice, NDSlice,
@@ -454,7 +455,7 @@ def add_arguments(cls: type, parser: ArgumentParser, arg_counts: Counter | None 
 
 
 class Config:
-
+    # TODO: change interface: make classes be named param and defaults be first param?
     def __init__(self, *classes: type, parent_parser: ArgumentParser | None = None,
                  parse_args: Sequence[str] | str | None = None,
                  #  args_dict: Mapping[str, Any] | None = None,
@@ -530,22 +531,54 @@ class Config:
     #         # sys.exit(1)
     #         raise SystemExit(1)
 
-    def create(self, cls: Type[T], **kwargs) -> T:
-        d = self.dict
+    # def maybe_add_config(self, cls: Type[T], kwargs: Dict[str, Any]):
 
-        known_params = set(simple_arguments(cls.__init__)).intersection(d.keys())
+    def create(self, cls: Type[T], **kwargs) -> T:
+        r"""
+        returns the instantiated class with the relevant simple settings
+        overridden by the settings of this config;
+        if config is a non-simple argument of the class initializer,
+        then this config will be passed in (unless overridden by kwargs),
+        finally kwargs override
+        """
+        d = self.dict
+        simple_params = set(simple_arguments(cls.__init__))
+        known_params = simple_params.intersection(d.keys())
         params = {k: d[k] for k in known_params}
+        config_param = 'config'
+        all_params = inspect.signature(cls.__init__).parameters.keys()
+        if (config_param in all_params and
+                config_param not in simple_params):
+            params[config_param] = self
         params.update(kwargs)
-        # what to do if cls accept a config but none is being passed?
-        # it is probably a mistake, so just pass it in
-        # TODO: maybe clean this up a bit
-        all_params = inspect.signature(cls.__init__).parameters.items()
-        if 'config' in dict(list(all_params)):
-            config_type = all_params['config'].type
-            if config_type is Signature.empty or config_type is Config:
-                params['config'] = self
         return cls(**params)  # type: ignore
 
     def create_from_name(self, classname: str, **kwargs) -> T:
         cls = get_class(classname)
         return self.create(cls, **kwargs)
+
+
+__known_modules: Dict[str, Type[Module]] = {}
+
+
+def register_module(cls: Type[Module] | None = None, name: str | None = None
+                    ) -> Callable[[Type[Module]], Type[Module]] | Type[Module]:
+    def decorate(nested: Type[Module]) -> Type[Module]:
+        full_name = name if name is not None else '.'.join([nested.__module__, nested.__name__])
+        __known_modules.setdefault(full_name, nested)
+        return nested
+    # if no class given,
+    if cls is None:
+        return decorate
+    else:
+        return decorate(nested=cls)
+
+
+def build_module(name: str, **kwargs) -> Module:
+    cls: type
+    try:
+        cls = __known_modules[name]
+    except KeyError:
+        cls = get_class(name)
+    built = cls(**kwargs)
+    return built

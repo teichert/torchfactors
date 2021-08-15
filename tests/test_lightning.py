@@ -16,6 +16,7 @@ from torchfactors.lightning import DataModule, get_type
 from torchfactors.model import Model
 from torchfactors.subject import ListDataset
 from torchfactors.testing import DummySubject
+from torchfactors.utils import Config
 
 
 @tx.dataclass
@@ -251,9 +252,6 @@ def test_args2():
     assert cast(DataModule, sys.data).path == "hello!"
 
 
-test_args2()
-
-
 def test_args3():
     model = MyModel()
     config = tx.Config(defaults=dict(
@@ -272,6 +270,8 @@ def test_args3():
     assert len(sys.train_dataloader()) == 3
     assert len(sys.val_dataloader()) == 1
     assert len(sys.test_dataloader()) == 4
+    # make some params so that we can make an optimizer
+    model.namespace('hi').parameter((3, 4))
     assert sys.configure_optimizers().param_groups[0]['lr'] == 5.0
     assert sys.optimizer_name == 'torch.optim.LBFGS'
     assert cast(BP, sys.inferencer).passes == 10
@@ -313,11 +313,12 @@ def test_args4():
         passes=10,
         fast_dev_run=True
     ))
-    sys = config.create(tx.lightning.LitSystem,
-                        model=model, data=MyData_v1_0())
+    data = config.create(MyData_v1_0)
+    sys = config.create(tx.lightning.LitSystem, model=model, data=data)
     assert len(sys.train_dataloader()) == 1
     assert len(sys.val_dataloader()) == 1
     assert len(sys.test_dataloader()) == 1
+    model.namespace('hi').parameter((3, 4))
     assert sys.configure_optimizers().param_groups[0]['lr'] == 5.0
     assert sys.optimizer_name == 'torch.optim.LBFGS'
     assert cast(BP, sys.inferencer).passes == 10
@@ -422,7 +423,9 @@ def test_domain():
 def test_lit_learning_new():
     import pytorch_lightning as pl
     model = MyModel()
-    sys = tx.LitSystem(model, tx.DataModule(train=tx.ListDataset(examples)))
+    data = tx.DataModule(train=tx.ListDataset(examples))
+    config = Config(defaults=dict(lr=1.0))
+    sys = tx.LitSystem(model, data, config=config)
     trainer = pl.Trainer(max_epochs=5)
     trainer.fit(sys)
     out = sys(stacked_examples)

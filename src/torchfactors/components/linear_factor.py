@@ -7,8 +7,9 @@ import torch
 from torch.functional import Tensor
 
 from ..factor import Factor
-from ..model import ParamNamespace, register_module
+from ..model import ParamNamespace
 from ..types import ShapeType
+from ..utils import register_module
 from ..variable import Var
 
 
