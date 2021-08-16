@@ -10,9 +10,20 @@ import sys
 import warnings
 from pathlib import Path
 
-from hydra import main as hydra_main
-from hydra.core.hydra_config import HydraConfig
+import hydra
+# @register_resolver("last")
+# def rsplit1(s: str, delim: str):
+#     return s.rpartition(delim)[-1]
+# from hydra.conf import HydraConf
 from mlflow import log_param  # type: ignore
+
+# from omegaconf.omegaconf import Resolver
+
+# def register_resolver(name: str, **kwargs):
+#     def register(resolver: Resolver):
+#         OmegaConf.register_new_resolver(name=name, resolver=resolver, **kwargs)
+#         return resolver
+#     return register
 
 
 def main(*args, use_mlflow=False, **kwargs):
@@ -46,12 +57,23 @@ def main(*args, use_mlflow=False, **kwargs):
         - {script} will be replaced with the path to the python script being run
           (i.e. the one that is producing these files)
         - {cwd} will be replaced with the folder in which the script will be
-          created
-        - {hydra} is the HydraConfig (members can be accessed with e.g.
-          {hydra.job.name} or {hydra.job.id}.
+          created;
+           although {cwd} isn't really needed because you could
+          use ${hydra:sweep.dir}/${hydra:sweep.subdir}
+        # - {hydra} is the HydraConfig (members can be accessed with e.g.
+        #   {hydra.job.name} or {hydra.job.id}.
+        #   (see: https://hydra.cc/docs/configure_hydra/intro for options)
+        # actually, {hydra} isn't needed since the ${hydra:} resolver is
+        # already present
+        # Tips:
+        #  use ${hydra:runtime.cwd} for the dir created by the original sweep
+        #  use ${hydra:runtime.cwd}../ for the dir containing all runs of the sweep
 
         If no `exp.sub.script` is defined, then a basic script will be created
         that simply runs the python file with the appropriate generated config.
+
+      3) Note: to change the output sweep directory, override the `hydra.sweep.dir`
+      setting
     """
 
     running_script = str(pathlib.Path(sys.argv[0]).resolve())
@@ -63,20 +85,32 @@ def main(*args, use_mlflow=False, **kwargs):
                 try:
                     mlruns_root = cfg['exp']['mlruns_path']
                 except KeyError:
-                    mlruns_root = 'mlruns.db'
+                    mlruns_root = 'mlruns'
+                    logging.warn(f"no exp.mlruns_path specified. using: {mlruns_root}")
                 try:
                     mlruns_type = cfg['exp']['mlruns_type']
                 except KeyError:
-                    mlruns_type = 'sqlite'
+                    mlruns_type = ''  # 'file:///' if mlruns_root.startswith('/') else ''
+                # for sqlite use: 'sqlite:///'
                 mlruns_path = Path(mlruns_root).resolve()
                 mlruns_path.parent.mkdir(parents=True, exist_ok=True)
                 # disabling becuase sqlite backend leads to many logger info messages and
                 # switching log-level doesn't work
                 logging.getLogger('alembic.runtime.migration').disabled = True
-                mlruns_uri = f'{mlruns_type}:///{mlruns_path}'
+                mlruns_uri = f'{mlruns_type}{mlruns_path}'
                 logging.getLogger(__name__).info(f'mlruns tracked at: {mlruns_uri}')
+                # try:
+                #     experiment_name = cfg['exp']['name']
+                # except KeyError:
+                #     experiment_name = HydraConf.get()['job']['name']
+                # logging.info(f"Experiment name: {experiment_name}")
+                # mlflow.set_experiment(experiment_name)
                 mlflow.set_tracking_uri(mlruns_uri)
+                # mlflow.set_registry_uri(mlruns_uri)
                 with mlflow.start_run():
+                    # this is a hack; for some reason the _artifact_uri was dropping the first
+                    # two slassh
+                    # mlflow.active_run().info._artifact_uri = mlruns_uri
                     for k, v in cfg.items():
                         if isinstance(v, (float, str, int, bool)):
                             log_param(k, v)
@@ -103,8 +137,8 @@ def main(*args, use_mlflow=False, **kwargs):
             formatted = script_str.format(
                 python=sys.executable,
                 script=running_script,
-                cwd=os.getcwd(),
-                hydra=HydraConfig.get())
+                cwd=os.getcwd())
+            # hydra=HydraConfig.get())
             print(formatted, file=f)
         subprocess.run([run_with, generated_script])
 
@@ -112,7 +146,7 @@ def main(*args, use_mlflow=False, **kwargs):
 
     def run_with_myhydra(f):
         if '-m' in sys.argv or '--multirun' in sys.argv:
-            return hydra_main(*args, **kwargs)(generate_script_with_config)
+            return hydra.main(*args, **kwargs)(generate_script_with_config)
         else:
-            return hydra_main(*args, **kwargs)(run_with_mlflow(f))
+            return hydra.main(*args, **kwargs)(run_with_mlflow(f))
     return run_with_myhydra

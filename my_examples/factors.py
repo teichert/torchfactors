@@ -7,6 +7,7 @@ from collections import ChainMap
 from datetime import timedelta
 from typing import cast
 
+# import mlflow
 import mlflow  # type: ignore
 import pytorch_lightning as pl
 import torch
@@ -61,9 +62,11 @@ class SPRLModel(tx.Model[SPR]):
 # x.property[..., i])
 
 
-base_config = tx.Config(Model, SPR1DataModule, SPRSystem, pl.Trainer)
+base_config = tx.Config(Model, SPR1DataModule, SPRSystem, pl.Trainer,
+                        EarlyStopping)
 
-path_to_data = "/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz"
+# path_to_data = "/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz"
+path_to_data = "/export/fs03/a09/adamteichert/data/thesis/notxt.mini10.spr1.tar.gz"
 # # path_to_checkpoint =
 # "/home/adam/projects/torchfactors/outputs/2021-08-12/00-00-12/"
 # "tb_logs/default/version_0/checkpoints/epoch=4-step=4.ckpt"
@@ -72,7 +75,7 @@ path_to_data = "/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz"
 # model_path = '/home/adam/projects/torchfactors/model.pt'
 
 
-@myhydra.main(config_path=None, use_mlflow=False)
+@myhydra.main(config_path=None, use_mlflow=True)
 def main(cfg):
     # print(os.getcwd())
     # args = argparse.Namespace()
@@ -89,13 +92,14 @@ def main(cfg):
                                    batch_size=-1,
                                    val_batch_size=-1,
                                    test_batch_size=-1,
+                                   patience=2,
                                    #    model_state_dict_path=model_path,
                                    # checkpoint_path=path_to_checkpoint
                                )))
     model = config.create(SPRLModel)
     data = config.create(SPR1DataModule, model=model)
     system = config.create(SPRSystem, model=model, data=data)
-    trainer = pl.Trainer.from_argparse_args(config.args)
+    trainer = config.create(pl.Trainer)
 
     if config.args.checkpoint_path is None:
         timed_checkpoint = ModelCheckpoint(save_top_k=0, save_last=True,
@@ -105,7 +109,7 @@ def main(cfg):
                                      save_weights_only=True)
         best_model.FILE_EXTENSION = ".pt"
         early_stopping = EarlyStopping(monitor='data.val.training-objective',
-                                       patience=cfg.get('patience', 3))
+                                       patience=config.args.patience)
         trainer.callbacks.extend([
             timed_checkpoint,
             best_model,
@@ -115,7 +119,8 @@ def main(cfg):
         trainer.fit(system)
         best_model_path = pathlib.Path(best_model.best_model_path).resolve()
         print(f'path to best model: {best_model_path}')
-        mlflow.log_artifact(f'{best_model_path}', 'best_model')
+        # mlflow.log_artifact(f'{best_model_path}', 'best_model')
+        mlflow.log_param('best_model_path', str(best_model))
     else:
         system.eval()
     trainer.test(system)
@@ -124,9 +129,10 @@ def main(cfg):
 if __name__ == '__main__':
     if '--help' in sys.argv:
         base_config.parser.print_help()
-    try:
-        print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
-        torch.tensor(0.0).to("cuda")
-    except KeyError:
-        pass
+    elif '-m' not in sys.argv and '--multirun' not in sys.argv:
+        try:
+            print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
+            torch.tensor(0.0).to("cuda")
+        except KeyError:
+            pass
     main()

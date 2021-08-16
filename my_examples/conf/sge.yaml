@@ -1,7 +1,9 @@
 exp:
   run_with: bash
-  mlruns_path: ${oc.env:HOME}/mlruns.db
-  mlruns_type: sqlite
+  # mlruns_path: ${oc.env:HOME}/mlruns.db
+  # notice that this will only be used when the app is run,
+  # so the runtime.cwd is the element of the sweep;
+  mlruns_path: ${hydra:runtime.cwd}/../mlruns
   sub:
     mem: 16G
     hosts: b1[123456789]|c0*|c1[123456789]
@@ -10,14 +12,15 @@ exp:
     pre_script_extras: ""
     main_script_extras: ""
     post_script_extras: ""
+    name: ${hydra:job.name}_${now:%Y-%m-%d_%H-%M-%S}
     header: |
       #!/usr/bin/env bash
       ## Job Name
-      #$   -N {hydra.job.name}
+      #$   -N ${exp.sub.name}
       ## Join ERR and OUT
       #$   -j y
       ## Where to send output
-      #$   -o {hydra.job.name}.out
+      #$   -o {cwd}/std_all.txt
       ## Resource Requirements
       #$   -l ram_free=${exp.sub.mem},mem_free=${exp.sub.mem}
       #$   -l gpu=${exp.sub.gpus}

@@ -726,9 +726,15 @@ def test_clone_variable():
         [4, 5, 6],
     ])
 
-    with pytest.raises(TypeError):
-        # should give device rather than name
-        v.clone('cpu')
+    v3b = v.clone('cpu')
+    assert v3b.tensor.device == torch.device('cpu')
+    v3b.tensor[(...,)] = 9
+    assert (v.tensor != 9).all()
+
+    v3c = v.clone('meta')
+    assert v3c.tensor.device == torch.device('meta')
+    v3c.tensor[(...,)] = 9
+    assert (v.tensor != 9).all()
 
     v3 = v.clone()
     assert v3.tensor.device == torch.device('cpu')

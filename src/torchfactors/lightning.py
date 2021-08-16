@@ -341,7 +341,8 @@ class LitSystem(pl.LightningModule, Generic[SubjectType]):
 
     def transfer_batch_to_device(self, _batch, device, dataloader_idx):
         batch: SubjectType = cast(SubjectType, _batch)
-        return batch.to_device(device)
+        on_device = batch.to_device(device)
+        return on_device
 
     def training_loss(self, batch: SubjectType, data_name: str) -> Tensor:
         info = dict(status="initializing")

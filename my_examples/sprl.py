@@ -7,7 +7,7 @@ from typing import Any, Dict, cast
 import pandas as pd
 import torch
 import torchfactors as tx
-from mlflow import log_artifact  # type: ignore
+# from mlflow import log_artifact  # type: ignore
 from mlflow.tracking.fluent import log_metrics  # type: ignore
 from torchfactors.model import Model
 from torchmetrics import functional
@@ -205,7 +205,7 @@ class SPRSystem(tx.LitSystem[SPR]):
             entries = SPR.evaluate_binary(pred=out, gold=x)
             df = pd.DataFrame(entries)
             df.to_csv(filename)
-            log_artifact(filename)
+            # log_artifact(filename, filename)
             metrics = {
                 f"{e['property']}.{data_name}.{e['metric']}": e['value']
                 for e in entries
@@ -242,7 +242,7 @@ class SPRSystem(tx.LitSystem[SPR]):
             datasets['dev'] = self.txdata.test_dataloader()
         for data_name, dataloader in datasets.items():
             x: SPR = cast(SPR, next(iter(dataloader)))
-            self.log_evaluation(x, data_name=data_name, step=-1)
+            self.log_evaluation(x.to_device(self.device), data_name=data_name, step=-1)
 
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
         super().on_save_checkpoint(checkpoint)
