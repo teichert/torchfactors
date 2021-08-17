@@ -5,7 +5,6 @@ import pathlib
 import sys
 from collections import ChainMap
 from datetime import timedelta
-from typing import cast
 
 # import mlflow
 import mlflow  # type: ignore
@@ -14,56 +13,15 @@ import torch
 import torchfactors as tx
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
-from torchfactors.domain import FlexDomain
 from torchfactors.model import Model
 
 import myhydra
-from sprl import SPR, SPR1DataModule, SPRSystem
-
-
-class SPRLModel(tx.Model[SPR]):
-
-    def factors(self, x: SPR):
-        # n = x.property.shape[-1]
-        # x.add_factor(
-        #     tx.LinearFactor(self.namespace('rating-property'),
-        #     x.rating[..., tx.gslice()], x.property))
-        # yield tx.LinearFactor(self.namespace('rating-property'),
-        #                       x.rating, x.property)
-        # yield tx.LinearFactor(
-        #     self.namespace('rating-pair'),
-        #     x.rating[..., :-1], x.rating[..., 1:],
-        #     x.property[..., :-1], x.property[..., 1:])
-
-        # for i in range(n):
-        #     yield tx.LinearFactor(self.namespace('rating-property'),
-        #                           x.rating[..., i], x.property[..., i])
-
-        # #         firsts, seconds = zip(*itertools.combinations(range(n), 2))
-        # #         # yield tx.LinearFactor(
-        # #         #     self.namespace('rating-pair'),
-        # #         #     x.rating[..., tx.gslice(firsts)], x.rating[..., tx.gslice(seconds)],
-        # #         #     x.property[..., tx.gslice(firsts)], x.property[..., tx.gslice(seconds)],
-        # #         #     graph_dims=1)
-        domain = cast(FlexDomain, x.properties.domain)
-        for property_id, property in enumerate(domain):
-            yield tx.LinearFactor(self.namespace(f'label-{property}'),
-                                  x.binary_labels[..., property_id],
-                                  input=x.features.tensor)
-
-        # for i in range(n):
-        #     # if i > 1:
-        #     #     yield tx.LinearFactor(self.namespace('rating-pair'),
-        #     #                           x.rating[..., i - 1], x.rating[..., i],
-        #     #                           x.property[..., i - 1], x.property[..., i])
-        #     # for j in range(i):
-        #         yield tx.LinearFactor(self.namespace('rating-pair'),
-        #                               x.b[..., j], x.rating[..., i])
-# x.property[..., i])
-
+from sprl import SPR1DataModule, SPRSystem
+from sprl.data import SPR
+from sprl.model import SPRLModelChoice
 
 base_config = tx.Config(Model, SPR1DataModule, SPRSystem, pl.Trainer,
-                        EarlyStopping)
+                        EarlyStopping, SPRLModelChoice)
 
 # path_to_data = "/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz"
 # path_to_data = "/export/fs03/a09/adamteichert/data/thesis/notxt.mini10.spr1.tar.gz"
@@ -98,7 +56,8 @@ def main(cfg):
                                    #    model_state_dict_path=model_path,
                                    # checkpoint_path=path_to_checkpoint
                                )))
-    model = config.create(SPRLModel)
+    model_config = config.create(SPRLModelChoice)
+    model: tx.Model[SPR] = config.create_from_name(model_config.model_name)
     data = config.create(SPR1DataModule, model=model)
     system = config.create(SPRSystem, model=model, data=data)
     trainer = config.create(pl.Trainer)
