@@ -2,7 +2,7 @@
 name: CI
 on:
   push:
-    branches-ignore:
+    branches:
       - 'experiments'
 jobs:
   ci:
@@ -23,5 +23,7 @@ jobs:
         uses: abatilo/actions-poetry@v2.1.0
         with:
           poetry-version: ${{ matrix.poetry-version }}
+      - name: Install poetry extras
+        run: "poetry install -E baselines"
       - name: Run Checks
         run: "make check"
