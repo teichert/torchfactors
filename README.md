@@ -95,6 +95,19 @@ logging.info(predicted.bits.tensor.tolist())
 
 ```
 
+## Concepts
+
+### Overview
+
+A "Subject" is a collection of data (specifically "Variables") that we want to
+model jointly (and any other relevant metadata). A "Model" of a subject type
+defines a factorized distribution over that collection of variables by
+specifying "Factors".  Each factor designates the score for each way of
+assigning values to the variables that it touches. Each "Variable" actually
+represents a tensor of variables that share a "Domain" (the set of possible
+values) and individually have a corresponding value from that domain and "usage"
+(e.g. LATENT, OBSERVED, ANNOTATED, or CLAMPED).
+
 # Contributing
 ## Development with `poetry`
 Prereq: install [poetry](https://python-poetry.org/docs/#installation):
