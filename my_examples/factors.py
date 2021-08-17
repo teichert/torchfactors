@@ -66,7 +66,8 @@ base_config = tx.Config(Model, SPR1DataModule, SPRSystem, pl.Trainer,
                         EarlyStopping)
 
 # path_to_data = "/home/adam/projects/torchfactors/data/notxt.mini10.spr1.tar.gz"
-path_to_data = "/export/fs03/a09/adamteichert/data/thesis/notxt.mini10.spr1.tar.gz"
+# path_to_data = "/export/fs03/a09/adamteichert/data/thesis/notxt.mini10.spr1.tar.gz"
+path_to_data = "/export/fs03/a09/adamteichert/data/thesis/notxt.spr1.tar.gz"
 # # path_to_checkpoint =
 # "/home/adam/projects/torchfactors/outputs/2021-08-12/00-00-12/"
 # "tb_logs/default/version_0/checkpoints/epoch=4-step=4.ckpt"
@@ -90,9 +91,10 @@ def main(cfg):
                                defaults=ChainMap(cfg, dict(
                                    path=path_to_data,
                                    batch_size=-1,
+                                   train_batch_size=50,
                                    val_batch_size=-1,
                                    test_batch_size=-1,
-                                   patience=2,
+                                   patience=3,
                                    #    model_state_dict_path=model_path,
                                    # checkpoint_path=path_to_checkpoint
                                )))

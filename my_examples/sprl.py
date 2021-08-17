@@ -121,13 +121,13 @@ class SPR(tx.Subject):
 
         # macro post f1
         entries.append(dict(
-            property='total-03-macro-preharmonic',
+            property='total-03-macro-postharmonic',
             metric='f1',
             value=float(averages['f1'])))
 
         # macro precision and recall
         for metric_name in ['precision', 'recall']:
-            for property in ['total-02-macro-preharmonic', 'total-02-macro-postharmonic']:
+            for property in ['total-02-macro-preharmonic', 'total-03-macro-postharmonic']:
                 entries.append(dict(
                     property=property,
                     metric=metric_name,
