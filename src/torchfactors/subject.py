@@ -230,7 +230,7 @@ class Subject:
         out.__length = len(subjects)
         return out
 
-    def to_device(self: SubjectType, device: torch.device) -> SubjectType:
+    def to_device(self: SubjectType, device: torch.device | str) -> SubjectType:
         if self.variables and self.variables[0].tensor.device != device:
             return self.clone(device=device)
         else:

@@ -162,11 +162,15 @@ class Var(ABC):
         self.set_usage(cast(Union[Tensor, VarUsage], value))
 
     @staticmethod
-    def clone_tensor(t: Tensor, device: Optional[torch.device] = None) -> Tensor:
+    def clone_tensor(t: Tensor, device: torch.device | str | None = None) -> Tensor:
+        device_obj: Optional[torch.device]
         if isinstance(device, str):
-            raise TypeError("expecting actual device rather than name")
-        if device is not None and t.device != device:
-            return t.to(device)
+            device_obj = torch.device(device)
+            # raise TypeError("expecting actual device rather than name")
+        else:
+            device_obj = device
+        if device_obj is not None and t.device != device_obj:
+            return t.to(device_obj)
         else:
             return t.clone()
 
