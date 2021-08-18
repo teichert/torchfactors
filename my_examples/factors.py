@@ -15,7 +15,7 @@ from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from torchfactors.model import Model
 
-import myhydra
+import wrap
 from sprl import SPR1DataModule, SPRSystem
 from sprl.data import SPR
 from sprl.model import SPRLModelChoice
@@ -34,7 +34,7 @@ path_to_data = "/export/fs03/a09/adamteichert/data/thesis/notxt.spr1.tar.gz"
 # model_path = '/home/adam/projects/torchfactors/model.pt'
 
 
-@myhydra.main(config_path=None, use_mlflow=True)
+@wrap.main(config_path=None, use_mlflow=True)
 def main(cfg):
     # print(os.getcwd())
     # args = argparse.Namespace()
