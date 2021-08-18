@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import torch
-import torchfactors as tx
+import torchfactors_lightning as tx
 from pytorch_lightning.trainer.trainer import Trainer
 from torchfactors.subject import ListDataset
 
@@ -69,7 +69,7 @@ data = [Bits(tx.vtensor(bits)) for bits in bit_sequences]
 #     def configure_inferencer(self) -> Inferencer:
 #         return BP(passes=self.passes)
 
-class BitsData(tx.lightning.DataModule):
+class BitsData(tx.DataModule):
 
     def setup(self, stage: Optional[str] = None) -> None:
         if stage in (None, 'fit'):

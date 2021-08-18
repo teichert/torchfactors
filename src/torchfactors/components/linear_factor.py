@@ -4,12 +4,12 @@ import math
 from typing import Optional, Union, cast
 
 import torch
+from config import register_module
 from torch.functional import Tensor
 
 from ..factor import Factor
 from ..model import ParamNamespace
 from ..types import ShapeType
-from ..utils import register_module
 from ..variable import Var
 
 

@@ -6,17 +6,19 @@ from typing import cast
 import pytest
 import pytorch_lightning as pl
 import torch
-import torchfactors as tx
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 from torch.functional import Tensor
 from torchfactors.components.linear_factor import LinearFactor
 from torchfactors.domain import FlexDomain
 from torchfactors.inferencers.bp import BP
-from torchfactors.lightning import DataModule, get_type
 from torchfactors.model import Model
 from torchfactors.subject import ListDataset
 from torchfactors.testing import DummySubject
-from torchfactors.utils import Config
+from torchfactors_lightning.lightning import get_type
+
+import torchfactors_lightning as tx
+from config import Config
+from torchfactors_lightning import DataModule
 
 
 @tx.dataclass
@@ -218,7 +220,7 @@ def test_datamodule9():
 
 def test_args():
     model = MyModel()
-    sys = tx.Config().create(tx.lightning.LitSystem,
+    sys = tx.Config().create(tx.LitSystem,
                              model=model, data=MyData_v1_0())
     assert len(sys.train_dataloader()) == 4
     assert len(sys.val_dataloader()) == 0
@@ -265,7 +267,7 @@ def test_args3():
         fast_dev_run=True
     ))
     data = config.create(MyData_v1_0)
-    sys = config.create(tx.lightning.LitSystem,
+    sys = config.create(tx.LitSystem,
                         model=model, data=data)
     assert len(sys.train_dataloader()) == 3
     assert len(sys.val_dataloader()) == 1
@@ -280,7 +282,7 @@ def test_args3():
 
 def test_nodata():
     model = MyModel()
-    sys = tx.lightning.LitSystem(model=model)
+    sys = tx.LitSystem(model=model)
 
     with pytest.raises(TypeError):
         sys.train_dataloader()
@@ -314,7 +316,7 @@ def test_args4():
         fast_dev_run=True
     ))
     data = config.create(MyData_v1_0)
-    sys = config.create(tx.lightning.LitSystem, model=model, data=data)
+    sys = config.create(tx.LitSystem, model=model, data=data)
     assert len(sys.train_dataloader()) == 1
     assert len(sys.val_dataloader()) == 1
     assert len(sys.test_dataloader()) == 1

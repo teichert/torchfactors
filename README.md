@@ -6,6 +6,10 @@ differentiable generalized belief propagation with pytorch
 ## Prereqs
 - Python `>= 3.8` (if you have `make` and checkout the repo, you can use `make install-python`)
 
+## Dependencies
+Note: many of the heavy dependencies are optional.  In particular, there are four sub packages here that should eventually be split up, but they are together now to keep things simpler.
+
+
 ## Install
 <!--pytest-codeblocks:skip-->
 ```bash
@@ -94,6 +98,19 @@ logging.info(predicted.bits.tensor.tolist())
 # logging.info(predicted2.bits.tensor.tolist())
 
 ```
+
+## Concepts
+
+### Overview
+
+A "Subject" is a collection of data (specifically "Variables") that we want to
+model jointly (and any other relevant metadata). A "Model" of a subject type
+defines a factorized distribution over that collection of variables by
+specifying "Factors".  Each factor designates the score for each way of
+assigning values to the variables that it touches. Each "Variable" actually
+represents a tensor of variables that share a "Domain" (the set of possible
+values) and individually have a corresponding value from that domain and "usage"
+(e.g. LATENT, OBSERVED, ANNOTATED, or CLAMPED).
 
 # Contributing
 ## Development with `poetry`

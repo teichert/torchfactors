@@ -1,5 +1,4 @@
 from __future__ import annotations
-from .utils import build_module
 
 import json
 from collections import OrderedDict
@@ -7,6 +6,7 @@ from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, List,
                     Optional, Sequence, Tuple, cast, overload)
 
 import torch
+from config import build_module
 from multimethod import multimethod
 from torch import Tensor
 from torch.nn import Module, ModuleDict, ParameterDict

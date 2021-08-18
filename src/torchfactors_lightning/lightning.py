@@ -10,19 +10,18 @@ from typing import (Any, Dict, Generic, List, Mapping, Optional, Sized, Union,
 
 import pytorch_lightning as pl
 import torch
+from config import Config
 from torch.functional import Tensor
 from torch.optim.optimizer import Optimizer
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
-from tqdm import tqdm  # type: ignore
-
 from torchfactors.inferencer import Inferencer
 from torchfactors.inferencers.bp import BP
-
-from .model import Model
-from .model_inferencer import System
-from .subject import ChainDataset, ListDataset, SubjectType
-from .utils import Config, split_data
+from torchfactors.model import Model
+from torchfactors.model_inferencer import System
+from torchfactors.subject import ChainDataset, ListDataset, SubjectType
+from torchfactors.utils import split_data
+from tqdm import tqdm  # type: ignore
 
 optimizers = dict(
     Adam=torch.optim.Adam,

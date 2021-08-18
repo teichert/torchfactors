@@ -4,17 +4,18 @@ from typing import Iterable
 
 import pytest
 import torch
-import torchfactors as tx
 from pytest import approx
 from torch.functional import Tensor
 from torch.nn import functional as F
-from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
-                          Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.domain import FlexDomain
 from torchfactors.model import ParamNamespace
 from torchfactors.testing import DummyParamNamespace, DummySubject
-from torchfactors.utils import build_module
+
+import torchfactors as tx
+from config import build_module
+from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
+                          Var, VarField)
 
 
 @dataclass
