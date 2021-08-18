@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 
 import torch
-import torchfactors as tx
+import torchfactors_lightning as tx
 from pytorch_lightning.trainer.trainer import Trainer
 
 from spr.data import SPRL, SPRLData_v1_0

@@ -5,15 +5,14 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, cast
 
 import pandas as pd
+import thesis_utils as tu
 import torch
-import torchfactors as tx
+import torchfactors_lightning as tx
 # from mlflow import log_artifact  # type: ignore
 from mlflow.tracking.fluent import log_metrics  # type: ignore
 from torchfactors.model import Model
 from torchmetrics import functional
 from tqdm import tqdm  # type: ignore
-
-import thesis_utils as tu
 
 
 @tx.dataclass

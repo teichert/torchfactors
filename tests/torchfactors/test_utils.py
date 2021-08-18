@@ -5,20 +5,21 @@ import sys
 from argparse import ArgumentParser
 from typing import Any, Counter, Optional, Union
 
-import pandas as pd
 import pytest
 import torch
-import torchfactors as tx
+from config import Config, config
+from config.config import (DuplicateEntry, add_arguments, build_module,
+                           simple_arguments, simple_arguments_and_info,
+                           str_to_bool)
 from torch import arange
+
+import torchfactors as tx
 from torchfactors.subject import ListDataset
 from torchfactors.types import gdrop
-from torchfactors.utils import (Config, DuplicateEntry, add_arguments,
-                                as_ndrange, build_module, canonical_ndslice,
+from torchfactors.utils import (as_ndrange, canonical_ndslice,
                                 canonical_range_slice, compose, compose_single,
                                 ndarange, ndslices_cat, ndslices_overlap,
-                                outer, simple_arguments,
-                                simple_arguments_and_info, stereotype,
-                                str_to_bool)
+                                outer, stereotype)
 
 
 def test_compose_single():
@@ -359,27 +360,6 @@ def test_data_len():
     assert tx.data_len(data) == 5
 
 
-def test_with_rep_number():
-    orig = dict(
-        sentence=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        property=[1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4],
-        annotator=[1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1],
-        label=[1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2]
-    )
-    df = pd.DataFrame(orig)
-    with_rep = tx.extra_utils.with_rep_number(
-        df, group_key=['sentence', 'property'], name='my_rep')
-    expected = dict(
-        sentence=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        property=[1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4],
-        annotator=[1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1],
-        label=[1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2],
-        my_rep=[0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2])
-    out = with_rep.to_dict(orient='list')
-    assert out == expected
-    assert df.to_dict(orient='list') == orig
-
-
 def test_str_to_bool():
     assert str_to_bool('true') is True
     assert str_to_bool('True') is True
@@ -574,7 +554,7 @@ def test_register():
     # not sure why I get:  error: Too many arguments for "Module"
     # when using this decorator (I think it's because of the
     # overload-like behavior)
-    @tx.utils.register_module(name="my_name")
+    @config.register_module(name="my_name")
     class MyClass(torch.nn.Module):  # type: ignore
         def __init__(self, i: int = 10):
             super().__init__()

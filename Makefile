@@ -19,7 +19,7 @@ install-python:
 
 .PHONY: install-poetry
 install-poetry:
-	python -m pip install --user -U pipx
+	python -m pip install -U pipx
 	python -m pipx ensurepath
 	python -m pipx install poetry
 

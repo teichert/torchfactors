@@ -1,9 +1,6 @@
 # based on template here: https://github.com/marketplace/actions/python-poetry-action
 name: CI
-on:
-  push:
-    branches-ignore:
-      - 'experiments'
+on: [push]
 jobs:
   ci:
     strategy:

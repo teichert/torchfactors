@@ -6,6 +6,10 @@ differentiable generalized belief propagation with pytorch
 ## Prereqs
 - Python `>= 3.8` (if you have `make` and checkout the repo, you can use `make install-python`)
 
+## Dependencies
+Note: many of the heavy dependencies are optional.  In particular, there are four sub packages here that should eventually be split up, but they are together now to keep things simpler.
+
+
 ## Install
 <!--pytest-codeblocks:skip-->
 ```bash

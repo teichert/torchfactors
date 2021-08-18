@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 import pandas as pd
 import torch
-import torchfactors as tx
+import torchfactors_lightning as tx
 from pandas import DataFrame
 from torchfactors.model import Model
 from torchfactors.subject import ListDataset
@@ -79,7 +79,7 @@ class SPRL(tx.Subject):
 
 
 @dataclass
-class SPRLData_v1_0(tx.lightning.DataModule[SPRL]):
+class SPRLData_v1_0(tx.DataModule[SPRL]):
     model: Optional[Model[SPRL]] = None
     _data_splits: dict[str, DataFrame] | None = None
 
