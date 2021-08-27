@@ -12,11 +12,10 @@ exp:
     pre_script_extras: ""
     main_script_extras: ""
     post_script_extras: ""
-    name: ${hydra:job.name}_${now:%Y-%m-%d_%H-%M-%S}
     header: |
       #!/usr/bin/env bash
       ## Job Name
-      #$   -N ${exp.sub.name}
+      #$   -N ${hydra:job.name}_${hydra:sweep.subdir}_${now:%Y-%m-%d_%H-%M-%S}
       ## Join ERR and OUT
       #$   -j y
       ## Where to send output
