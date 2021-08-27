@@ -1,0 +1,12 @@
+defaults:
+  - sge
+gpus: 1
+exp:
+  sub:
+    gpus: ${gpus}
+    header_extras: |
+      ## Submit to GPU queue
+      #$   -q g.q
+    pre_script_extras: |
+      # clsp-specific: assign free gpus
+      source /home/gqin2/scripts/acquire-gpu -n ${gpus}
