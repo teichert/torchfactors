@@ -19,9 +19,11 @@ install-python:
 
 .PHONY: install-poetry
 install-poetry:
-	python -m pip install -U pipx
+	python -m pip install --user -U pipx
+	# installing poetry with pipx allows env to be free of poetry dependencies
 	python -m pipx ensurepath
 	python -m pipx install poetry
+	python -m pipx upgrade poetry
 
 pyproject.lock: pyproject.toml
 	poetry update
