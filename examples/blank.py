@@ -3,7 +3,7 @@
 from typing import Iterable, cast
 
 import torch
-import torchfactors as tx
+import torchfactors_lightning as tx
 from pytorch_lightning.trainer.trainer import Trainer
 from torchfactors.factor import Factor
 

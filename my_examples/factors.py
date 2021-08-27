@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import os
 import pathlib
-import sys
 from collections import ChainMap
 from datetime import timedelta
 
@@ -11,11 +9,11 @@ import mlflow  # type: ignore
 import pytorch_lightning as pl
 import torch
 import torchfactors as tx
+import wrap
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 from torchfactors.model import Model
 
-import myhydra
 from sprl import SPR1DataModule, SPRSystem
 from sprl.data import SPR
 from sprl.model import SPRLModelChoice
@@ -34,7 +32,7 @@ path_to_data = "/export/fs03/a09/adamteichert/data/thesis/notxt.spr1.tar.gz"
 # model_path = '/home/adam/projects/torchfactors/model.pt'
 
 
-@myhydra.main(config_path=None, use_mlflow=True)
+@wrap.main(config_path=None, use_mlflow=True, reserve_gpu=True, )
 def main(cfg):
     # print(os.getcwd())
     # args = argparse.Namespace()
@@ -88,12 +86,4 @@ def main(cfg):
 
 
 if __name__ == '__main__':
-    if '--help' in sys.argv:
-        base_config.parser.print_help()
-    elif '-m' not in sys.argv and '--multirun' not in sys.argv:
-        try:
-            print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
-            torch.tensor(0.0).to("cuda")
-        except KeyError:
-            pass
     main()

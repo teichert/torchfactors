@@ -11,22 +11,12 @@ import warnings
 from pathlib import Path
 
 import hydra
-# @register_resolver("last")
-# def rsplit1(s: str, delim: str):
-#     return s.rpartition(delim)[-1]
-# from hydra.conf import HydraConf
+import torch
+from config import Config
 from mlflow import log_param  # type: ignore
 
-# from omegaconf.omegaconf import Resolver
 
-# def register_resolver(name: str, **kwargs):
-#     def register(resolver: Resolver):
-#         OmegaConf.register_new_resolver(name=name, resolver=resolver, **kwargs)
-#         return resolver
-#     return register
-
-
-def main(*args, use_mlflow=False, **kwargs):
+def main(*args, use_mlflow=False, grab_gpu=True, config: Config = None, **kwargs):
     r"""
     The function returned will be a decorator that wraps a function to achieve
     the following functionality:
@@ -144,9 +134,21 @@ def main(*args, use_mlflow=False, **kwargs):
 
     generate_script_with_config.__module__ = '__main__'
 
-    def run_with_myhydra(f):
+    def wrap_main(f):
         if '-m' in sys.argv or '--multirun' in sys.argv:
-            return hydra.main(*args, **kwargs)(generate_script_with_config)
+            hydra_wrapped = hydra.main(*args, **kwargs)(generate_script_with_config)
         else:
-            return hydra.main(*args, **kwargs)(run_with_mlflow(f))
-    return run_with_myhydra
+            hydra_wrapped = hydra.main(*args, **kwargs)(run_with_mlflow(f))
+
+        def wrapped():
+            if config is not None and '--help' in sys.argv:
+                config.parser.print_help()
+            elif grab_gpu and '-m' not in sys.argv and '--multirun' not in sys.argv:
+                try:
+                    print(f"Available GPU: {os.environ['CUDA_VISIBLE_DEVICES']}")
+                    torch.tensor(0.0).to("cuda")
+                except KeyError:
+                    pass
+            hydra_wrapped()
+        return wrapped
+    return wrap_main

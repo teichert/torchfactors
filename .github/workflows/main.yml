@@ -1,16 +1,13 @@
 # based on template here: https://github.com/marketplace/actions/python-poetry-action
 name: CI
-on:
-  push:
-    branches-ignore:
-      - 'experiments'
+on: [push]
 jobs:
   ci:
     strategy:
       matrix:
         python-version: [3.8]
         os: [ubuntu-latest]
-        poetry-version: [1.1.4]
+        poetry-version: [1.1.7]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -23,5 +20,6 @@ jobs:
         uses: abatilo/actions-poetry@v2.1.0
         with:
           poetry-version: ${{ matrix.poetry-version }}
+      # - name: Setup Poetry (Dependency Manager)
       - name: Run Checks
         run: "make check"
