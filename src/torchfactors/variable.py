@@ -554,8 +554,9 @@ class TensorVar(Var):
             if self._tensor is None:
                 raise TypeError("You need to have a tensor before you can get the usage")
             else:
-                return self._tensor.new_tensor(
+                self._usage = self._tensor.new_tensor(
                     int(self._usage), dtype=torch.int8).expand_as(self._tensor)
+                return self._usage
         else:
             return self._usage
 

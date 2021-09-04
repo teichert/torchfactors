@@ -277,6 +277,20 @@ def test_bad_var_usage3():
     assert (v.usage == ANNOTATED).sum() == 5
 
 
+def test_var_default_usage_mutability():
+    v = tx.TensorVar(torch.ones(2))
+    v.usage[1] = VarUsage.LATENT
+    assert v.origin.usage[1] == VarUsage.LATENT
+    v.usage[1] = VarUsage.ANNOTATED
+    assert v.origin.usage[1] == VarUsage.ANNOTATED
+
+
+def test_var_scalar_usage_mutability():
+    v = tx.TensorVar(torch.ones(2), VarUsage.ANNOTATED)
+    v.usage[1] = VarUsage.LATENT
+    assert (v.origin.usage == torch.tensor([VarUsage.ANNOTATED, VarUsage.LATENT])).all()
+
+
 def test_clamp():
     t = torch.ones(3, 4)
     v = TensorVar(t, Range(4))
