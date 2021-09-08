@@ -155,11 +155,17 @@ class Var(ABC):
     @property
     def usage(self) -> Tensor:
         usage = self._get_usage()
+        self._set_usage(usage)
         return usage
 
     @usage.setter
     def usage(self, value: Any) -> None:
         self.set_usage(cast(Union[Tensor, VarUsage], value))
+
+    @property
+    def usage_readonly(self) -> Tensor:
+        usage = self._get_usage()
+        return usage
 
     @staticmethod
     def clone_tensor(t: Tensor, device: torch.device | str | None = None) -> Tensor:
@@ -177,26 +183,26 @@ class Var(ABC):
     def clone(self, device=None) -> Var:
         return TensorVar(
             domain=self.domain,
-            usage=self.clone_tensor(self.usage, device=device),
+            usage=self.clone_tensor(self.usage_readonly, device=device),
             tensor=self.clone_tensor(self.tensor.as_subclass(torch.Tensor),  # type: ignore
                                      device=device)  # torch bug expects wrong type
         )
 
     def clamp_annotated(self) -> None:
-        storage = self.usage.storage()
+        storage = self.usage_readonly.storage()
         if storage.size() == 1:
             if storage[0] == VarUsage.ANNOTATED:  # type: ignore
                 self.set_usage(VarUsage.CLAMPED)
         else:
-            self.usage[self.usage == VarUsage.ANNOTATED] = VarUsage.CLAMPED
+            self.usage[self.usage_readonly == VarUsage.ANNOTATED] = VarUsage.CLAMPED
 
     def unclamp_annotated(self) -> None:
-        storage = self.usage.storage()
+        storage = self.usage_readonly.storage()
         if storage.size() == 1:
             if storage[0] == VarUsage.CLAMPED:  # type: ignore
                 self.set_usage(VarUsage.ANNOTATED)
         else:
-            self.usage[self.usage == VarUsage.CLAMPED] = VarUsage.ANNOTATED
+            self.usage[self.usage_readonly == VarUsage.CLAMPED] = VarUsage.ANNOTATED
 
     @abstractmethod
     def _get_ndslice(self) -> NDSlice: ...  # pragma: no cover
@@ -232,7 +238,7 @@ class Var(ABC):
         if usage is None:
             return self.tensor.flatten()
         else:
-            return self.tensor[self.usage == usage]
+            return self.tensor[self.usage_readonly == usage]
 
 
 def at(t: Tensor, s: NDSlice, starting=0) -> Tensor:
@@ -293,17 +299,17 @@ class VarBranch(Var):
         at(self.root.tensor, self.ndslice)[(...,)] = value
 
     def _get_usage(self) -> Tensor:
-        return at(self.root.usage, self.ndslice)
+        return at(self.root._get_usage(), self.ndslice)
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
-        root_usage = self.root._usage
+        raw_root_usage = self.root._usage
         if isinstance(value, VarUsage):  # or not value.shape:
-            if isinstance(root_usage, VarUsage) and root_usage == value:
+            if isinstance(raw_root_usage, VarUsage) and raw_root_usage == value:
                 return
             value = self.tensor.new_tensor(int(value))
-        if isinstance(root_usage, VarUsage):  # or len(root_storage) == 1:
+        if isinstance(raw_root_usage, VarUsage):  # or len(root_storage) == 1:
             # make a full version
-            self.root.set_usage(self.root.usage.clone())
+            self.root.set_usage(self.root.usage_readonly.clone())
         expanded = cast(Tensor, value).expand_as(self.tensor)
         at(self.root.usage, self.ndslice)[(...,)] = expanded
 
@@ -554,9 +560,7 @@ class TensorVar(Var):
             if self._tensor is None:
                 raise TypeError("You need to have a tensor before you can get the usage")
             else:
-                self._usage = self._tensor.new_tensor(
-                    int(self._usage), dtype=torch.int8).expand_as(self._tensor)
-                return self._usage
+                return torch.full_like(self._tensor, int(self._usage), dtype=torch.int8)
         else:
             return self._usage
 
