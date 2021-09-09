@@ -176,7 +176,7 @@ class Factor:
         d = self.dense_()
         if d.shape != self.shape:
             d = d[None].expand(self.shape)
-        var_infos = [(v.usage, v.tensor, v.marginal_shape) for v in self.variables]
+        var_infos = [(v.usage_readonly, v.tensor, v.marginal_shape) for v in self.variables]
         return adjust(d, var_infos,
                       VarUsage.ANNOTATED,
                       VarUsage.LATENT,

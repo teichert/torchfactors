@@ -38,9 +38,11 @@ def make_binary_label_variables(env: Environment, *variables: Var, key: Hashable
     """
     def binary_variable(v: Var, label: int):
         if latent:
-            usage = v.usage.clone().masked_fill(v.usage != VarUsage.PADDING, VarUsage.LATENT)
+            usage = v.usage_readonly.clone().masked_fill(
+                v.usage_readonly != VarUsage.PADDING,
+                VarUsage.LATENT)
         else:
-            usage = v.usage.clone()
+            usage = v.usage_readonly.clone()
         if only_equals:
             labels = v.tensor == label
         else:
@@ -70,9 +72,11 @@ def make_binary_threshold_variables(env: Environment, *variables: Var, key: Hash
     # TODO: allow different ways of thresholding
     def binary_variable(v: Var):
         if latent:
-            usage = v.usage.clone().masked_fill(v.usage != VarUsage.PADDING, VarUsage.LATENT)
+            usage = v.usage_readonly.clone().masked_fill(
+                v.usage_readonly != VarUsage.PADDING,
+                VarUsage.LATENT)
         else:
-            usage = v.usage.clone()
+            usage = v.usage_readonly.clone()
         out = TensorVar(
             domain=Range(2),
             usage=usage,
