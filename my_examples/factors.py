@@ -18,6 +18,14 @@ from sprl import SPR1DataModule, SPRSystem
 from sprl.data import SPR
 from sprl.model import SPRLModelChoice
 
+# example usage: python my_examples/factors.py \
+# -cp /home/adamteichert/projects/torchfactors/my_examples/conf \
+# --config-name=sge_gpu \
+# -m +lr=0.001 +weight_decay=1.0,2.0 +penalty_coeff=1.0 \
+# hydra.sweep.dir=/export/c06/adamteichert/experiments/tx/pairs5 exp.run_with=qsub \
+# +model_name=sprl.model.AllPairsSPRLModel
+
+
 base_config = tx.Config(Model, SPR1DataModule, SPRSystem, pl.Trainer,
                         EarlyStopping, SPRLModelChoice)
 
@@ -32,7 +40,7 @@ path_to_data = "/export/fs03/a09/adamteichert/data/thesis/notxt.spr1.tar.gz"
 # model_path = '/home/adam/projects/torchfactors/model.pt'
 
 
-@wrap.main(config_path=None, use_mlflow=True, reserve_gpu=True, )
+@wrap.main(config_path='.', use_mlflow=True, grab_gpu=True)
 def main(cfg):
     # print(os.getcwd())
     # args = argparse.Namespace()
