@@ -133,7 +133,7 @@ class Var(ABC):
     def _set_tensor(self, value: Tensorable): ...  # pragma: no cover
 
     @abstractmethod
-    def _get_usage(self) -> Tensor: ...  # pragma: no cover
+    def _get_usage(self, readonly: bool = False) -> Tensor: ...  # pragma: no cover
 
     @abstractmethod
     def _set_usage(self, value: Union[Tensor, VarUsage]): ...  # pragma: no cover
@@ -164,7 +164,7 @@ class Var(ABC):
 
     @property
     def usage_readonly(self) -> Tensor:
-        usage = self._get_usage()
+        usage = self._get_usage(readonly=True)
         return usage
 
     @staticmethod
@@ -298,8 +298,8 @@ class VarBranch(Var):
     def _set_tensor(self, value: Tensorable):
         at(self.root.tensor, self.ndslice)[(...,)] = value
 
-    def _get_usage(self) -> Tensor:
-        return at(self.root._get_usage(), self.ndslice)
+    def _get_usage(self, readonly: bool = False) -> Tensor:
+        return at(self.root._get_usage(readonly=readonly), self.ndslice)
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
         raw_root_usage = self.root._usage
@@ -386,7 +386,7 @@ class VarField(Var):
     def _set_tensor(self, value: Tensorable):
         raise NotImplementedError("var fields don't actually have a tensor")
 
-    def _get_usage(self) -> Tensor:
+    def _get_usage(self, readonly: bool = False) -> Tensor:
         raise NotImplementedError("need to access _usage directly")
 
     def _set_usage(self, value: Union[Tensor, VarUsage]):
@@ -555,10 +555,13 @@ class TensorVar(Var):
         else:
             at(cast(Tensor, self._tensor), self.ndslice)[(...,)] = value
 
-    def _get_usage(self) -> Tensor:
+    def _get_usage(self, readonly: bool = False) -> Tensor:
         if isinstance(self._usage, VarUsage):
             if self._tensor is None:
                 raise TypeError("You need to have a tensor before you can get the usage")
+            elif readonly:
+                return self._tensor.new_tensor(
+                    int(self._usage), dtype=torch.int8).expand_as(self._tensor)
             else:
                 return torch.full_like(self._tensor, int(self._usage), dtype=torch.int8)
         else:
