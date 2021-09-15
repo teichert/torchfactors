@@ -38,7 +38,7 @@ class SPRL(tx.Subject):
         for pair_df in pairs:
             yield SPRL(
                 rating=tx.TensorVar(torch.tensor(pair_df['Response'].values).int() - 1),
-                applicable=tx.TensorVar(torch.tensor(pair_df['Response'].values) == 'yes'),
+                applicable=tx.TensorVar(torch.tensor(pair_df['Applicable'].values == 'yes')),
                 # the domain mapping needs to be stored in the model so that the parameters
                 # are relevent; it makes sense to declare in the varfield (if you want)
                 # that the variable domain is flexible and which domain it is;
