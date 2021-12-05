@@ -6,7 +6,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import torch
 from torch.functional import Tensor
-from torchmetrics.functional import kldivergence
+from torchmetrics.functional import kl_divergence
 from tqdm import tqdm  # type: ignore
 
 from ..components.tensor_factor import Message, TensorFactor
@@ -50,7 +50,7 @@ class BPInference:
         num_dims = len(old.shape)
         old = old.flatten(0, num_batch_dims - 1).flatten(1)
         new = new.flatten(0, num_batch_dims - 1).flatten(1)
-        out = kldivergence(new, Factor.normalize(
+        out = kl_divergence(new, Factor.normalize(
             old, num_batch_dims=num_batch_dims), log_prob=True)
         return out
 

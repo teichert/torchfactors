@@ -1,11 +1,13 @@
 
 
+import os
 import tempfile
 from typing import cast
 
 import pytest
 import pytorch_lightning as pl
 import torch
+from config import Config
 from pytorch_lightning.loggers.tensorboard import TensorBoardLogger
 from torch.functional import Tensor
 from torchfactors.components.linear_factor import LinearFactor
@@ -14,11 +16,10 @@ from torchfactors.inferencers.bp import BP
 from torchfactors.model import Model
 from torchfactors.subject import ListDataset
 from torchfactors.testing import DummySubject
-from torchfactors_lightning.lightning import get_type
 
 import torchfactors_lightning as tx
-from config import Config
 from torchfactors_lightning import DataModule
+from torchfactors_lightning.lightning import get_type
 
 
 @tx.dataclass
@@ -392,24 +393,24 @@ def test_load_model3():
     paramsb = model.namespace('hi').parameter()
     assert (paramsb == params).all()
     system = tx.LitSystem(model, tx.DataModule(train=tx.ListDataset([DummySubject()])))
-    trainer = pl.Trainer(system, max_epochs=0)
-    with tempfile.TemporaryDirectory() as tb_dir:
-        trainer.logger = TensorBoardLogger(tb_dir)
+    with tempfile.TemporaryDirectory() as test_dir:
+        tb_dir = os.path.join(test_dir, 'tb_dir')
+        trainer = pl.Trainer(system, max_epochs=0, logger=TensorBoardLogger(tb_dir))
         trainer.fit(system)
-    checkpoint_path = '__test_checkpoint.ckpt'
-    trainer.save_checkpoint(checkpoint_path)
-    model2 = Model[DummySubject](checkpoint_path=checkpoint_path)
-    params2 = model2.namespace('hi').parameter()
-    assert (params2 == params).all()
-    assert (params2 == torch.ones(3, 5) * 3).all()
-    module2 = model2.namespace('hi2').module()
-    out_from_module2 = module2(params2)
-    assert (out_from_module2 == out_from_module).all()
-    domain2 = FlexDomain('test', unk=True)
-    out2 = model2.domain_ids(domain2, values2).tolist()
-    assert out2 == ids2
-    out1 = model2.domain_ids(domain2, values1).tolist()
-    assert out1 == ids1
+        checkpoint_path = os.path.join(test_dir, '__test_checkpoint.ckpt')
+        trainer.save_checkpoint(checkpoint_path)
+        model2 = Model[DummySubject](checkpoint_path=checkpoint_path)
+        params2 = model2.namespace('hi').parameter()
+        assert (params2 == params).all()
+        assert (params2 == torch.ones(3, 5) * 3).all()
+        module2 = model2.namespace('hi2').module()
+        out_from_module2 = module2(params2)
+        assert (out_from_module2 == out_from_module).all()
+        domain2 = FlexDomain('test', unk=True)
+        out2 = model2.domain_ids(domain2, values2).tolist()
+        assert out2 == ids2
+        out1 = model2.domain_ids(domain2, values1).tolist()
+        assert out1 == ids1
 
 
 def test_domain():

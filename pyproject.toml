@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "torchfactors"
-version = "0.4.3"
+version = "0.4.4"
 description = "differentiable generalized belief propagation with pytorch"
 authors = ["Adam Teichert"]
 license = "MIT"
@@ -13,20 +13,20 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-torch = "^1.9.0"
+torch = "^1.10.0"
 multimethod = "^1.5"
-torchmetrics = "^0.4.0"
+torchmetrics = "^0.6.0"
 tqdm = "^4.61.1"
 networkx = "^2.6.2"
 
 # [tool.poetry.group.torchfactors_lightning.dependencies]
 pandas = "^1.3.1"
-pytorch-lightning = "^1.3.8"
+pytorch-lightning = "^1.5.4"
 
 
 # [tool.poetry.group.wrap.dependencies]
-hydra-core = "^1.0.7"
-mlflow = "^1.19.0"
+hydra-core = "^1.1.1"
+mlflow = "^1.21.0"
 
 
 # [tool.poetry.group.experiments.dependencies]
@@ -40,7 +40,8 @@ autoflake = "^1.4"
 autopep8 = "^1.5.5"
 flake8 = "^3.8.4"
 ipykernel = "^5.5.5"
-mypy = "^0.910"
+# mypy = "^0.910"
+mypy = { git = "https://github.com/python/mypy", rev = "cee5d3e9a29f43a10a8eeca760976657bf1689c9" }
 pandas-stubs = "^1.2.0"
 pdoc = "^6.3.1"
 py-spy = "^0.3.7"
