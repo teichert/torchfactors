@@ -19,37 +19,18 @@ torchmetrics = "^0.6.0"
 tqdm = "^4.61.1"
 networkx = "^2.6.2"
 
-# [tool.poetry.group.torchfactors_lightning.dependencies]
-pandas = "^1.3.1"
-pytorch-lightning = "^1.5.4"
-jsonargparse = {extras = ["signatures"], version="^4.0.4"}
-
-# [tool.poetry.group.wrap.dependencies]
-hydra-core = "^1.1.1"
-mlflow = "^1.21.0"
-
-
-# [tool.poetry.group.experiments.dependencies]
-scikit-learn = "^0.24.2"
-torch-tb-profiler = "^0.2.1"
-litecli = "^1.6.0"
-
-# [tool.poetry.group.dev.dependencies]
 [tool.poetry.dev-dependencies]
 autoflake = "^1.4"
 autopep8 = "^1.5.5"
 flake8 = "^3.8.4"
 ipykernel = "^5.5.5"
-# mypy = "^0.910"
-mypy = { git = "https://github.com/python/mypy", rev = "cee5d3e9a29f43a10a8eeca760976657bf1689c9" }
-pandas-stubs = "^1.2.0"
+mypy = "^0.930"
+# mypy = { git = "https://github.com/python/mypy", rev = "cee5d3e9a29f43a10a8eeca760976657bf1689c9" }
 pdoc = "^6.3.1"
-py-spy = "^0.3.7"
 pytest = "^6.2.2"
 pytest-codeblocks = "^0.11.1"
 pytest-cov = "^2.11.1"
 rope = "^0.19.0"
-scalene = "^1.3.6"
 
 
 [build-system]
