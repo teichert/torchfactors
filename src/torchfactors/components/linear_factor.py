@@ -4,7 +4,6 @@ import math
 from typing import Optional, Union, cast
 
 import torch
-from config import register_module
 from torch.functional import Tensor
 
 from ..factor import Factor
@@ -13,7 +12,6 @@ from ..types import ShapeType
 from ..variable import Var
 
 
-@register_module
 class OptionalBiasLinear(torch.nn.Module):
     r"""
     Allows the output to ignore the input (bias-only),
@@ -61,7 +59,6 @@ class OptionalBiasLinear(torch.nn.Module):
 # @register_module_for_state_dict
 
 
-@register_module
 class ShapedLinear(torch.nn.Module):
     r"""
     Like a built-in Linear layer, but the output

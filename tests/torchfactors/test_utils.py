@@ -1,16 +1,9 @@
 from __future__ import annotations
 
-import inspect
-import sys
-from argparse import ArgumentParser
-from typing import Any, Counter, Optional, Union
+from typing import Optional, Union
 
 import pytest
 import torch
-from config import Config, config
-from config.config import (DuplicateEntry, add_arguments, build_module,
-                           simple_arguments, simple_arguments_and_info,
-                           str_to_bool)
 from torch import arange
 
 import torchfactors as tx
@@ -360,19 +353,19 @@ def test_data_len():
     assert tx.data_len(data) == 5
 
 
-def test_str_to_bool():
-    assert str_to_bool('true') is True
-    assert str_to_bool('True') is True
-    assert str_to_bool('TruE') is True
-    assert str_to_bool('false') is False
-    assert str_to_bool('False') is False
-    assert str_to_bool('FalsE') is False
+# def test_str_to_bool():
+#     assert str_to_bool('true') is True
+#     assert str_to_bool('True') is True
+#     assert str_to_bool('TruE') is True
+#     assert str_to_bool('false') is False
+#     assert str_to_bool('False') is False
+#     assert str_to_bool('FalsE') is False
 
 
-def test_duplicate_entry():
-    my_type = DuplicateEntry("test", "test2")
-    with pytest.raises(RuntimeError, match=r'--test2 is just to help[^-]+--test instead'):
-        my_type("blah")
+# def test_duplicate_entry():
+#     my_type = DuplicateEntry("test", "test2")
+#     with pytest.raises(RuntimeError, match=r'--test2 is just to help[^-]+--test instead'):
+#         my_type("blah")
 
 
 def my_func(a: int | str, b: Optional[str], c: Union[float, bool],
@@ -381,183 +374,183 @@ def my_func(a: int | str, b: Optional[str], c: Union[float, bool],
     pass
 
 
-def test_simple_arguments_and_types():
-    out = list(simple_arguments_and_info(my_func))
-    assert out == [
-        ('a', int, inspect.Signature.empty),
-        ('b', str, inspect.Signature.empty),
-        ('c', float, inspect.Signature.empty),
-        ('d', int, 3),
-        ('e', float, 4.5),
-        ('g', int, 5),
-        ('h', str_to_bool, False)]
+# def test_simple_arguments_and_types():
+#     out = list(simple_arguments_and_info(my_func))
+#     assert out == [
+#         ('a', int, inspect.Signature.empty),
+#         ('b', str, inspect.Signature.empty),
+#         ('c', float, inspect.Signature.empty),
+#         ('d', int, 3),
+#         ('e', float, 4.5),
+#         ('g', int, 5),
+#         ('h', str_to_bool, False)]
 
 
-def test_simple_arguments():
-    out = list(simple_arguments(my_func))
-    assert out == list('abcdegh')
+# def test_simple_arguments():
+#     out = list(simple_arguments(my_func))
+#     assert out == list('abcdegh')
 
 
-class D:
-    pass
+# class D:
+#     pass
 
 
-class A:
-    def __init__(self, something: int | None = None,
-                 b: str | None = None, c: bool = True,
-                 d: Any = None, e: D = None, f=None):
-        self.something = something
-        self.b = b
-        self.c = c
+# class A:
+#     def __init__(self, something: int | None = None,
+#                  b: str | None = None, c: bool = True,
+#                  d: Any = None, e: D = None, f=None):
+#         self.something = something
+#         self.b = b
+#         self.c = c
 
 
-@tx.dataclass
-class C:
-    a: str | None = None
-    i: int = 9
+# @tx.dataclass
+# class C:
+#     a: str | None = None
+#     i: int = 9
 
 
-@tx.dataclass
-class B(C):
-    h: str = 'test'
+# @tx.dataclass
+# class B(C):
+#     h: str = 'test'
 
 
-def test_add_arguments1():
-    parser = ArgumentParser()
-    add_arguments(A, parser)
-    args = parser.parse_args([])
-    assert set(vars(args).keys()) == {
-        'something', 'b', 'c'}
-    assert args.c is True
-    assert 'd' not in vars(args)
-    assert 'e' not in vars(args)
-    assert 'f' not in vars(args)
+# def test_add_arguments1():
+#     parser = ArgumentParser()
+#     add_arguments(A, parser)
+#     args = parser.parse_args([])
+#     assert set(vars(args).keys()) == {
+#         'something', 'b', 'c'}
+#     assert args.c is True
+#     assert 'd' not in vars(args)
+#     assert 'e' not in vars(args)
+#     assert 'f' not in vars(args)
 
 
-def test_add_arguments2():
-    counts = Counter[str]()
-    parser = ArgumentParser()
-    add_arguments(A, parser, counts)
-    add_arguments(C, parser, counts)
-    add_arguments(B, parser, counts)
-    count_dict = dict(counts.items())
-    assert count_dict == dict(
-        something=1,
-        b=1,
-        c=1,
-        a=2,
-        i=2,
-        h=1
-    )
-    args = parser.parse_args([])
-    assert set(vars(args).keys()) == {
-        'something', 'b', 'c', 'a', 'i', 'h'}
+# def test_add_arguments2():
+#     counts = Counter[str]()
+#     parser = ArgumentParser()
+#     add_arguments(A, parser, counts)
+#     add_arguments(C, parser, counts)
+#     add_arguments(B, parser, counts)
+#     count_dict = dict(counts.items())
+#     assert count_dict == dict(
+#         something=1,
+#         b=1,
+#         c=1,
+#         a=2,
+#         i=2,
+#         h=1
+#     )
+#     args = parser.parse_args([])
+#     assert set(vars(args).keys()) == {
+#         'something', 'b', 'c', 'a', 'i', 'h'}
 
 
-def test_config_parser1():
-    parser = ArgumentParser()
-    config = Config(A, B, C, parent_parser=parser,
-                    parse_args="--a test --i 89 --h hi".split(' '))
-    assert config.args.a == "test"
-    assert config.args.i == 89
-    assert config.args.h == "hi"
-    assert config.args.something is None
-    assert config.args.c is True
+# def test_config_parser1():
+#     parser = ArgumentParser()
+#     config = Config(A, B, C, parent_parser=parser,
+#                     parse_args="--a test --i 89 --h hi".split(' '))
+#     assert config.args.a == "test"
+#     assert config.args.i == 89
+#     assert config.args.h == "hi"
+#     assert config.args.something is None
+#     assert config.args.c is True
 
 
-def test_config_parser2():
-    config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
-    assert config.args.a == "test"
-    assert config.args.i == 89
-    assert config.args.h == "hi"
-    assert config.args.something is None
-    assert config.args.c is True
+# def test_config_parser2():
+#     config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
+#     assert config.args.a == "test"
+#     assert config.args.i == 89
+#     assert config.args.h == "hi"
+#     assert config.args.something is None
+#     assert config.args.c is True
 
 
-def test_config_parser3():
-    base = Config(A, B, C)
-    config = base.child(parse_args="--a test --i 89 --h hi".split(' '))
-    assert config.args.a == "test"
-    assert config.args.i == 89
-    assert config.args.h == "hi"
-    assert config.args.something is None
-    assert config.args.c is True
+# def test_config_parser3():
+#     base = Config(A, B, C)
+#     config = base.child(parse_args="--a test --i 89 --h hi".split(' '))
+#     assert config.args.a == "test"
+#     assert config.args.i == 89
+#     assert config.args.h == "hi"
+#     assert config.args.something is None
+#     assert config.args.c is True
 
 
-def test_config_parser4():
-    sys.argv = "--a test --i 89 --h hi".split(' ')
-    config = Config(A, B, C, parse_args='sys')
-    assert config.args.a == "test"
-    assert config.args.i == 89
-    assert config.args.h == "hi"
-    assert config.args.something is None
-    assert config.args.c is True
+# def test_config_parser4():
+#     sys.argv = "--a test --i 89 --h hi".split(' ')
+#     config = Config(A, B, C, parse_args='sys')
+#     assert config.args.a == "test"
+#     assert config.args.i == 89
+#     assert config.args.h == "hi"
+#     assert config.args.something is None
+#     assert config.args.c is True
 
 
-def test_config_parser5():
-    config = Config(A, B, C, defaults=dict(
-        a='test', i=89, h='hi'
-    ))
-    assert config.args.a == "test"
-    assert config.args.i == 89
-    assert config.args.h == "hi"
-    assert config.args.something is None
-    assert config.args.c is True
+# def test_config_parser5():
+#     config = Config(A, B, C, defaults=dict(
+#         a='test', i=89, h='hi'
+#     ))
+#     assert config.args.a == "test"
+#     assert config.args.i == 89
+#     assert config.args.h == "hi"
+#     assert config.args.something is None
+#     assert config.args.c is True
 
 
-def test_config_parser6():
-    config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
-    assert config.dict == dict(
-        a="test",
-        i=89,
-        b=None,
-        h="hi",
-        something=None,
-        c=True)
+# def test_config_parser6():
+#     config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
+#     assert config.dict == dict(
+#         a="test",
+#         i=89,
+#         b=None,
+#         h="hi",
+#         something=None,
+#         c=True)
 
 
-def test_create1():
-    config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
-    a = config.create(A)
-    assert a.b is None
-    assert a.c is True
-    assert a.something is None
-    b = config.create(B)
-    assert b.a == "test"
-    assert b.h == "hi"
-    assert b.i == 89
-    c = config.create(C)
-    assert c.a == "test"
-    assert c.i == 89
+# def test_create1():
+#     config = Config(A, B, C, parse_args="--a test --i 89 --h hi".split(' '))
+#     a = config.create(A)
+#     assert a.b is None
+#     assert a.c is True
+#     assert a.something is None
+#     b = config.create(B)
+#     assert b.a == "test"
+#     assert b.h == "hi"
+#     assert b.i == 89
+#     c = config.create(C)
+#     assert c.a == "test"
+#     assert c.i == 89
 
 
-class F:
-    def __init__(self, a: int, b: str = 'hi'):
-        self.a = a
-        self.b = b
+# class F:
+#     def __init__(self, a: int, b: str = 'hi'):
+#         self.a = a
+#         self.b = b
 
 
-def test_create3():
-    config = Config(F, parse_args="--a 5".split(' '))
-    f = config.create(F)
-    assert f.a == 5
-    assert f.b == 'hi'
+# def test_create3():
+#     config = Config(F, parse_args="--a 5".split(' '))
+#     f = config.create(F)
+#     assert f.a == 5
+#     assert f.b == 'hi'
 
 
-def test_create4():
-    config = Config(F, parse_args="--b end".split(' '))
-    with pytest.raises(SystemExit):
-        config.create(F)
+# def test_create4():
+#     config = Config(F, parse_args="--b end".split(' '))
+#     with pytest.raises(SystemExit):
+#         config.create(F)
 
 
-def test_register():
-    # not sure why I get:  error: Too many arguments for "Module"
-    # when using this decorator (I think it's because of the
-    # overload-like behavior)
-    @config.register_module(name="my_name")
-    class MyClass(torch.nn.Module):  # type: ignore
-        def __init__(self, i: int = 10):
-            super().__init__()
-            self.i = i
-    mod = build_module('my_name', i=7)
-    assert mod.i == 7
+# def test_register():
+#     # not sure why I get:  error: Too many arguments for "Module"
+#     # when using this decorator (I think it's because of the
+#     # overload-like behavior)
+#     @config.register_module(name="my_name")
+#     class MyClass(torch.nn.Module):  # type: ignore
+#         def __init__(self, i: int = 10):
+#             super().__init__()
+#             self.i = i
+#     mod = build_module('my_name', i=7)
+#     assert mod.i == 7

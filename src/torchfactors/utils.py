@@ -3,13 +3,12 @@ from __future__ import annotations
 import itertools
 import math
 from itertools import chain
-from typing import Any, List, Optional, Sized, Tuple, Union, cast, overload
+from typing import Any, List, Sized, Tuple, Union, cast, overload
 
 import torch
 from multimethod import multidispatch
 from torch import Tensor, arange
-from torch._C import Generator
-from torch.utils.data.dataset import Dataset, random_split
+from torch.utils.data.dataset import Dataset
 
 from .types import (GeneralizedDimensionDrop, NDRangeSlice, NDSlice,
                     RangeSlice, ShapeType, SliceType)
@@ -346,14 +345,3 @@ def num_trainable(m: torch.nn.Module) -> int:
 def data_len(data: Dataset):
     """returns the length of the dataset (to please mypy)"""
     return len(cast(Sized, data))
-
-
-def split_data(data: Dataset, portion: float | None = None,
-               count: int | None = None, generator: Optional[Generator] = None):
-    length = len(cast(Sized, data))
-    if portion is not None:
-        portion_count = int(math.ceil(length * portion))
-        count = portion_count if count is None else min(count, portion_count)
-    first_size = cast(int, count)
-    second_size = length - first_size
-    return random_split(data, [first_size, second_size], generator=generator)

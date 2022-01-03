@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from config import Config
 from torch.nn.functional import one_hot
 
 from . import skip_some_warnings  # noqa

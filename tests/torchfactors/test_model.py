@@ -7,15 +7,14 @@ import torch
 from pytest import approx
 from torch.functional import Tensor
 from torch.nn import functional as F
+
+import torchfactors as tx
+from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
+                          Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.domain import FlexDomain
 from torchfactors.model import ParamNamespace
 from torchfactors.testing import DummyParamNamespace, DummySubject
-
-import torchfactors as tx
-from config import build_module
-from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
-                          Var, VarField)
 
 
 @dataclass
@@ -113,7 +112,7 @@ def test_modules():
     params = list(module2.parameters())
     assert len(params) == 1
     assert params[0].T.shape == (4, 5)
-    module3 = build_module('torch.nn.Linear', in_features=4, out_features=5, bias=False)
+    module3 = tx.model.build_module('torch.nn.Linear', in_features=4, out_features=5, bias=False)
     params3 = list(module3.parameters())
     assert params3[0].T.shape == (4, 5)
 
@@ -299,6 +298,15 @@ def test_model_domain_state_dict_with_params():
     assert out2 == ids2
     out1 = model2.domain_ids(domain2, values1).tolist()
     assert out1 == ids1
+
+    domain3: FlexDomain = model2.domain('testing')
+    assert domain3.get_id('test') == 0
+    assert domain3.get_id('test2') == 1
+    assert domain3.get_id('test') == 0
+
+    domain4: FlexDomain = model2.domain('testing')
+    assert domain4.get_id('test2') == 1
+    assert domain4.get_id('test') == 0
 
 
 def test_model_domain_state_dict_with_params_and_modules():
