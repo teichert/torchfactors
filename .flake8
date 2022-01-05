@@ -1,6 +1,6 @@
 [flake8]
 skip = E128
+ban-relative-imports = True
 max-line-length = 100
 exclude =
     .trash
-                                                                                                

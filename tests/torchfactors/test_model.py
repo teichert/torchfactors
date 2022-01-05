@@ -1,4 +1,6 @@
 import math
+import os
+import tempfile
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -366,20 +368,21 @@ def test_load_model1():
     paramsb = model.namespace('hi').parameter()
     assert (paramsb == params).all()
     state = model.state_dict()
-    path = '__test_model.pt'
-    torch.save(state, path)
-    model2 = Model[DummySubject](model_state_dict_path=path)
-    params2 = model2.namespace('hi').parameter()
-    assert (params2 == params).all()
-    assert (params2 == torch.ones(3, 5) * 3).all()
-    module2 = model2.namespace('hi2').module()
-    out_from_module2 = module2(params2)
-    assert (out_from_module2 == out_from_module).all()
-    domain2 = FlexDomain('test', unk=True)
-    out2 = model2.domain_ids(domain2, values2).tolist()
-    assert out2 == ids2
-    out1 = model2.domain_ids(domain2, values1).tolist()
-    assert out1 == ids1
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = os.path.join(test_dir, '__test_model.pt')
+        torch.save(state, path)
+        model2 = Model[DummySubject](model_state_dict_path=path)
+        params2 = model2.namespace('hi').parameter()
+        assert (params2 == params).all()
+        assert (params2 == torch.ones(3, 5) * 3).all()
+        module2 = model2.namespace('hi2').module()
+        out_from_module2 = module2(params2)
+        assert (out_from_module2 == out_from_module).all()
+        domain2 = FlexDomain('test', unk=True)
+        out2 = model2.domain_ids(domain2, values2).tolist()
+        assert out2 == ids2
+        out1 = model2.domain_ids(domain2, values1).tolist()
+        assert out1 == ids1
 
 
 def test_load_model2():
@@ -402,17 +405,18 @@ def test_load_model2():
     paramsb = model.namespace('hi').parameter()
     assert (paramsb == params).all()
     state = model.state_dict()
-    path = '__test_model2.pt'
-    torch.save(dict(state_dict=state), path)
-    model2 = Model[DummySubject](checkpoint_path=path)
-    params2 = model2.namespace('hi').parameter()
-    assert (params2 == params).all()
-    assert (params2 == torch.ones(3, 5) * 3).all()
-    module2 = model2.namespace('hi2').module()
-    out_from_module2 = module2(params2)
-    assert (out_from_module2 == out_from_module).all()
-    domain2 = FlexDomain('test', unk=True)
-    out2 = model2.domain_ids(domain2, values2).tolist()
-    assert out2 == ids2
-    out1 = model2.domain_ids(domain2, values1).tolist()
-    assert out1 == ids1
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = os.path.join(test_dir, '__test_model2.pt')
+        torch.save(dict(state_dict=state), path)
+        model2 = Model[DummySubject](checkpoint_path=path)
+        params2 = model2.namespace('hi').parameter()
+        assert (params2 == params).all()
+        assert (params2 == torch.ones(3, 5) * 3).all()
+        module2 = model2.namespace('hi2').module()
+        out_from_module2 = module2(params2)
+        assert (out_from_module2 == out_from_module).all()
+        domain2 = FlexDomain('test', unk=True)
+        out2 = model2.domain_ids(domain2, values2).tolist()
+        assert out2 == ids2
+        out1 = model2.domain_ids(domain2, values1).tolist()
+        assert out1 == ids1

@@ -4,12 +4,6 @@ version = "0.4.4"
 description = "differentiable generalized belief propagation with pytorch"
 authors = ["Adam Teichert"]
 license = "MIT"
-packages = [
-    {include="torchfactors", from="src"},
-    {include="config", from="src"},
-    {include="wrap", from="src"},
-    {include="torchfactors_lightning", from="src"},
-]
 
 [tool.poetry.dependencies]
 python = "^3.8"
