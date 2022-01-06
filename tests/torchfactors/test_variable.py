@@ -2,6 +2,7 @@ from typing import Any, Dict, Tuple
 
 import pytest
 import torch
+
 import torchfactors
 import torchfactors as tx
 from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED, Var,
@@ -812,3 +813,16 @@ def test_more_variable_usage6():
     v0.set_usage(torch.full((3, 4), VarUsage.ANNOTATED))
     v.set_usage(VarUsage.CLAMPED)
     assert (v.origin.usage == VarUsage.CLAMPED).all()
+
+
+def test_stacked_variable_with_shared_usage():
+    v0 = tx.TensorVar(torch.ones(3, 4))
+    v0.set_usage(tx.CLAMPED)
+    v1 = tx.TensorVar(torch.zeros(3, 4))
+    stacked = tx.TensorVar.pad_and_stack([v0, v1])
+    stacked.set_usage(tx.ANNOTATED)
+    v0after, v1after = stacked.unstack()
+    assert (v0after.tensor == 1).all()
+    assert v0after.usage == tx.ANNOTATED
+    assert (v1after.tensor == 0).all()
+    assert v1after.usage == tx.ANNOTATED
