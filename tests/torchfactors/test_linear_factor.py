@@ -3,6 +3,7 @@ from typing import Any
 
 import pytest
 import torch
+
 from torchfactors import Range, TensorVar
 from torchfactors.components.linear_factor import LinearFactor
 from torchfactors.model import Model
@@ -42,3 +43,11 @@ def test_no_bias_no_input():
     out = f.dense
     expected = torch.zeros(10, 7)
     assert out.allclose(expected)
+
+
+# def test_linear_factor_with_single_dim_input():
+#     m = Model[Any]()
+#     n = 7
+#     v = TensorVar(Range(10), torch.zeros(n))
+#     f = LinearFactor(m.namespace('root'), v, input=torch.ones(n))
+#     assert f.dense.shape == (10, 1)
