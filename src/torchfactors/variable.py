@@ -592,6 +592,8 @@ class TensorVar(Var):
         dtype = first_tensor.dtype
         stack_shapes = [x.shape for x in batch]
         max_shape = list(max(d) for d in zip(*stack_shapes))
+        # TODO: is it worth leaving single usage if they are all the same?
+        # min_shape = list(min(d) for d in zip(*stack_shapes))
         stacked_tensors = first_tensor.new_full(
             (batch_size, *max_shape), fill_value=pad_value, dtype=dtype)
         stacked_usages = first_tensor.new_full(
@@ -607,19 +609,18 @@ class TensorVar(Var):
     def unstack(self):
         if (self._tensor is None or
             self._usage is None or
-            self._stack_shapes is None or
-                isinstance(self._usage, VarUsage)):
+                self._stack_shapes is None):
             raise ValueError('Cannot unstack a non-stacked variable')
         tensors = self._tensor.unbind()
-        usages = self._usage.unbind()
+        usages = None if isinstance(self._usage, VarUsage) else self._usage.unbind()
         return [
             TensorVar(
                 domain=self.domain,
-                usage=at(usage, as_ndslice(shape)),
+                usage=self._usage if usages is None else at(usages[i], as_ndslice(shape)),
                 tensor=at(tensor, as_ndslice(shape)),
                 info=self._info, ndims=self.ndims)
-            for usage, tensor, shape
-            in zip(usages, tensors, self._stack_shapes)
+            for i, (tensor, shape)
+            in enumerate(zip(tensors, self._stack_shapes))
         ]
 
     def _get_ndslice(self) -> NDSlice:
