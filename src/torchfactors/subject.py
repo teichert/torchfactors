@@ -282,14 +282,12 @@ class Subject:
                           **kwargs)
 
     def clamp_annotated(self: SubjectType):
-        r"""Returns a clone of the input example with annotated variable cells
-        being marked as clamped"""
+        r"""annotated usages go to clamped"""
         for attr_name in tqdm(self.__varset, leave=False, delay=0.5, desc="Clamping ..."):
             cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
 
     def unclamp_annotated(self: SubjectType):
-        r"""Returns a clone of the input example with clamped variable cells
-        being marked as annotated"""
+        r"""clamped usages go to annotated"""
         for attr_name in tqdm(self.__varset, leave=False, delay=0.5, desc="Unclamping ..."):
             cast(TensorVar, getattr(self, attr_name)).unclamp_annotated()
 
