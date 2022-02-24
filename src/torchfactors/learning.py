@@ -62,7 +62,7 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
     system = System(model, BP(passes=passes))
     system.prime(data_loader)
     optimizer = optimizer_cls(model.parameters(), **optimizer_kwargs)
-    logging.info('staring training...')
+    logging.info('starting training...')
     if log_info is None:
         log_info = {}
     elif log_info == 'off':
