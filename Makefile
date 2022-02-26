@@ -11,11 +11,12 @@ install: pyproject.lock
 
 .PHONY: install-python
 install-python:
-	wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+	mkdir -p ~/bin
+	cd ~; curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
 	~/bin/micromamba shell init -s bash -p ~/micromamba
 	echo "micromamba activate"
 	source ~/.bashrc
-	micromamba install python=3.9
+	micromamba -p ~/micromamba install -c conda-forge -y python=3.9
 
 .PHONY: install-poetry
 install-poetry:
