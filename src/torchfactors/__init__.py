@@ -16,6 +16,7 @@ from .factor import Factor
 from .factor_graph import FactorGraph
 from .inferencer import Inferencer
 from .inferencers.bp import BP
+from .inferencers.brute_force import BruteForce
 from .model import Model
 from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
@@ -58,5 +59,6 @@ __all__ = [
     'Inferencer',
     'System',
     'BP',
+    'BruteForce',
     'learning', 'log_dot'
 ]

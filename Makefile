@@ -20,11 +20,15 @@ install-python:
 
 .PHONY: install-poetry
 install-poetry:
-	python -m pip install --user -U pipx
+	echo "if you needed to install python via micromamba, use: micromamba activate"
+	curl -sSL https://install.python-poetry.org/ | POETRY_PREVIEW=1 python
+	. ~/.bashrc
+	# poetry self update --preview
+	# python -m pip install --user -U pipx
 	# installing poetry with pipx allows env to be free of poetry dependencies
-	python -m pipx ensurepath
-	python -m pipx install poetry
-	python -m pipx upgrade poetry
+	# python -m pipx ensurepath
+	# python -m pipx install poetry
+	# python -m pipx upgrade poetry
 
 pyproject.lock: pyproject.toml
 	poetry update
