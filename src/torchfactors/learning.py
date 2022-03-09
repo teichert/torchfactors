@@ -47,6 +47,7 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
                       each_epoch: Optional[SystemRunner] = None,
                       batch_size: int = -1, penalty_coeff=1, passes=3,
                       log_info: Union[None, dict, str] = None,
+                      inferencer=None,
                       optimizer_cls: Type[Optimizer] = torch.optim.Adam,
                       **optimizer_kwargs
                       ) -> System[SubjectType]:
@@ -59,7 +60,9 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
     logging.info('loading...')
     data_loader = examples[0].data_loader(list(examples), batch_size=batch_size)
     logging.info('done loading.')
-    system = System(model, BP(passes=passes))
+    if inferencer is None:
+        inferencer = BP(passes=passes)
+    system = System(model, inferencer)
     system.prime(data_loader)
     optimizer = optimizer_cls(model.parameters(), **optimizer_kwargs)
     logging.info('starting training...')
