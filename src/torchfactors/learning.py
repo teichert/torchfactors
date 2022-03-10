@@ -78,12 +78,9 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
 
         def closure():
             optimizer.zero_grad()
-            data.clamp_annotated()
-            logz_clamped = system.product_marginal(data)
-            data.unclamp_annotated()
-            logz_free, penalty = system.partition_with_change(data)
-            loss = (logz_free - logz_clamped).clamp_min(0).sum()
-            penalty = penalty.sum()
+            ll, change = system.log_likelihood_with_change(data)
+            loss = -ll.sum()
+            penalty = change.sum()
             if isinstance(log_info, dict):
                 log_info['loss'] = float(loss)
                 log_info['penalty'] = float(penalty)

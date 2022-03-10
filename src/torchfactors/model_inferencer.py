@@ -53,6 +53,29 @@ class System(Generic[SubjectType]):
         out = self.inferencer.partition_with_change(factors)
         return out
 
+    def log_likelihood(self, x: SubjectType) -> Tensor:
+        r"""
+        convenience method for the log probability of
+        the annotated variables conditioned on the observed variables
+        (x is clamped and then unclamped)
+        """
+        ll, _ = self.log_likelihood_with_change(x)
+        return ll
+
+    def log_likelihood_with_change(self, x: SubjectType) -> Tuple[Tensor, Tensor]:
+        r"""
+        convenience method for the log probability of the annotated variables
+        conditioned on the observed variables together with the corresponding
+        total kl between the prior messages and the current messages
+        (x is clamped and then unclamped)
+        """
+        x.clamp_annotated()
+        logz_clamped = self.product_marginal(x)
+        x.unclamp_annotated()
+        logz_free, change = self.partition_with_change(x)
+        ll = (logz_clamped - logz_free).clamp_max(0)
+        return ll, change
+
     def product_marginal(self, x: SubjectType, query: Union[Sequence[Var], Var, None] = None,
                          normalize=True) -> Tensor:
         r"""
