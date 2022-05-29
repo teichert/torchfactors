@@ -1,7 +1,7 @@
-from abc import ABC, abstractclassmethod
+from abc import ABC, abstractmethod
 from typing import Iterable, Sequence, Tuple, TypeVar, Union
 
-from torch.functional import Tensor
+from torch import Tensor
 
 from .factor import Factor, check_queries
 from .variable import Var
@@ -10,7 +10,7 @@ T = TypeVar('T')
 
 
 class Inferencer(ABC):
-    @abstractclassmethod
+    @abstractmethod
     def product_marginals_(self, factors: Sequence[Factor], *queries: Sequence[Var],
                            normalize: bool = True, append_total_change: bool = False
                            ) -> Sequence[Tensor]: ...  # pragma: no cover
