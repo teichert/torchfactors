@@ -3,7 +3,7 @@ from __future__ import annotations
 # from functools import lru_cache
 from typing import List, Sequence
 
-from torch.functional import Tensor
+from torch import Tensor
 
 from ..factor import Factor
 from ..inferencer import Inferencer

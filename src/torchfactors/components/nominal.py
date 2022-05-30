@@ -1,7 +1,7 @@
 
 from typing import Optional
 
-from torch.functional import Tensor
+from torch import Tensor
 
 from ..clique import CliqueModel
 from ..model import ParamNamespace

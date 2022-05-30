@@ -3,7 +3,7 @@ from typing import Optional
 
 import torch
 import torchfactors as tx
-from torch.functional import Tensor
+from torch import Tensor
 
 from ..clique import BinaryScoresModule, CliqueModel
 from ..model import ParamNamespace

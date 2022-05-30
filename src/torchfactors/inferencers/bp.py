@@ -5,8 +5,9 @@ import math
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import torch
-from torch.functional import Tensor
-from torch.nn.functional import kl_div
+from torch import Tensor
+# from torch.nn.functional import kl_div
+from torchmetrics.functional import kl_divergence
 from tqdm import tqdm  # type: ignore
 
 from ..components.tensor_factor import Message, TensorFactor
@@ -18,12 +19,11 @@ from ..strategy import Strategy
 from ..utils import sum_tensors
 from ..variable import TensorVar, Var, at
 
-
 # cache = lru_cache(maxsize=None)
 # TODO: implement kl divergence or use from torchmetrics.functional
-def kl_divergence(p, q, log_prob):
-    assert log_prob
-    return kl_div(q, target=p, log_target=True)
+# def kl_divergence(p, q, log_prob):
+#     assert log_prob
+#     return kl_div(q, target=p, log_target=True)
 
 
 class BPInference:
@@ -124,7 +124,7 @@ class BPInference:
             # make a uniform message backed by a single scalar
             def init(shape):
                 num_configs = math.prod(shape[len(variable_shape):])
-                out = (-Tensor(num_configs).float().log()).expand(shape)
+                out = (-torch.tensor(num_configs).float().log()).expand(shape)
                 return out
 
             message = Message(

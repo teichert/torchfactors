@@ -2,7 +2,7 @@ import itertools
 from typing import Optional
 
 import torch
-from torch.functional import Tensor
+from torch import Tensor
 from torchfactors.components.at_least import KIsAtLeastJ
 
 from ..clique import (BinaryScoresModule, CliqueModel, ShapedLinear,

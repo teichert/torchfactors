@@ -7,7 +7,7 @@ from typing import Iterable
 import pytest
 import torch
 from pytest import approx
-from torch.functional import Tensor
+from torch import Tensor
 from torch.nn import functional as F
 
 import torchfactors as tx
@@ -289,28 +289,31 @@ def test_model_domain_state_dict_with_params():
     paramsb = model.namespace('hi').parameter()
     assert (paramsb == params).all()
     state = model.state_dict()
-    torch.save(state, 'test_model.pt')
-    loaded_state = torch.load('test_model.pt')
-    model2 = Model[DummySubject]()
-    model2.load_state_dict(loaded_state)
-    params2 = model2.namespace('hi').parameter()
-    assert (params2 == params).all()
-    assert (params2 == torch.ones(3, 5) * 3).all()
 
-    domain2 = FlexDomain('test', unk=True)
-    out2 = model2.domain_ids(domain2, values2).tolist()
-    assert out2 == ids2
-    out1 = model2.domain_ids(domain2, values1).tolist()
-    assert out1 == ids1
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = os.path.join(test_dir, '__test_model.pt')
+        torch.save(state, path)
+        loaded_state = torch.load(path)
+        model2 = Model[DummySubject]()
+        model2.load_state_dict(loaded_state)
+        params2 = model2.namespace('hi').parameter()
+        assert (params2 == params).all()
+        assert (params2 == torch.ones(3, 5) * 3).all()
 
-    domain3: FlexDomain = model2.domain('testing')
-    assert domain3.get_id('test') == 0
-    assert domain3.get_id('test2') == 1
-    assert domain3.get_id('test') == 0
+        domain2 = FlexDomain('test', unk=True)
+        out2 = model2.domain_ids(domain2, values2).tolist()
+        assert out2 == ids2
+        out1 = model2.domain_ids(domain2, values1).tolist()
+        assert out1 == ids1
 
-    domain4: FlexDomain = model2.domain('testing')
-    assert domain4.get_id('test2') == 1
-    assert domain4.get_id('test') == 0
+        domain3: FlexDomain = model2.domain('testing')
+        assert domain3.get_id('test') == 0
+        assert domain3.get_id('test2') == 1
+        assert domain3.get_id('test') == 0
+
+        domain4: FlexDomain = model2.domain('testing')
+        assert domain4.get_id('test2') == 1
+        assert domain4.get_id('test') == 0
 
 
 def test_model_domain_state_dict_with_params_and_modules():

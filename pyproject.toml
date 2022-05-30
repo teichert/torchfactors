@@ -6,7 +6,7 @@ authors = ["Adam Teichert"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 torch = "^1.11.0"
 multimethod = "^1.5"
 tqdm = "^4.61.1"
@@ -20,7 +20,6 @@ autopep8 = "^1.5.5"
 flake8 = "^3.8.4"
 ipykernel = "^5.5.5"
 mypy = "^0.960"
-# mypy = { git = "https://github.com/python/mypy", rev = "cee5d3e9a29f43a10a8eeca760976657bf1689c9" }
 pdoc = "^6.3.1"
 pytest = "^7.1.2"
 pytest-codeblocks = "^0.11.1"

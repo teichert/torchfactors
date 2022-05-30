@@ -4,7 +4,7 @@ import math
 from typing import Optional, Union, cast
 
 import torch
-from torch.functional import Tensor
+from torch import Tensor
 
 from ..factor import Factor
 from ..model import ParamNamespace

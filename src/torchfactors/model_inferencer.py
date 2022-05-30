@@ -1,7 +1,7 @@
 import copy
 from typing import Generic, Iterable, Sequence, Tuple, Union, cast
 
-from torch.functional import Tensor
+from torch import Tensor
 from tqdm import tqdm  # type: ignore
 
 from .inferencer import Inferencer

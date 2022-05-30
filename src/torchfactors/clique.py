@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Hashable, Optional, Sequence, Tuple, cast
 
-from torch.functional import Tensor
+from torch import Tensor
 
 from torchfactors.types import ShapeType
 
