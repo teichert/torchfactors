@@ -10,6 +10,11 @@ from ..inferencer import Inferencer
 from ..variable import Var
 
 
+# since x.T is for dim != 2 is now deprecated
+def T(x: Tensor):
+    return x.permute(dims=list(range(x.ndim - 1, -1, -1)))
+
+
 class BruteForce(Inferencer):
 
     def product_marginals_(self, factors: Sequence[Factor], *queries: Sequence[Var],
@@ -21,7 +26,7 @@ class BruteForce(Inferencer):
             logz = first.product_marginal(other_factors=others)
             # since it is the first dimension that matches rather than the last,
             # we transpose first and then untranspose
-            marginals = [m if q == () else (m.T - logz.T).T for m, q in zip(marginals, queries)]
+            marginals = [m if q == () else T(T(m) - T(logz)) for m, q in zip(marginals, queries)]
         if append_total_change:
             marginals.append(Tensor(0.0))
         return marginals

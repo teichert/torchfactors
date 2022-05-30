@@ -5,7 +5,6 @@ from dataclasses import dataclass
 
 from torch.nn.functional import one_hot
 
-from . import skip_some_warnings  # noqa
 from . import learning
 from .clique import CliqueModel
 from .components.linear_factor import LinearFactor, ShapedLinear
