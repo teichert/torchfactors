@@ -3,7 +3,7 @@ from __future__ import annotations
 # from functools import lru_cache
 from typing import List, Sequence
 
-from torch import Tensor
+from torch import Tensor, tensor
 
 from ..factor import Factor
 from ..inferencer import Inferencer
@@ -28,5 +28,5 @@ class BruteForce(Inferencer):
             # we transpose first and then untranspose
             marginals = [m if q == () else T(T(m) - T(logz)) for m, q in zip(marginals, queries)]
         if append_total_change:
-            marginals.append(Tensor(0.0))
+            marginals.append(tensor(0.0))
         return marginals
