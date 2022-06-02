@@ -68,14 +68,14 @@ class Inferencer(ABC):
 
     def predict(self, factors: Iterable[Factor]) -> None:
         wrapped_factors = list(factors)
-        all_variables = list(set(list(v.origin for f in wrapped_factors for v in f)))
+        # all_variables = list(set(list(v.origin for f in wrapped_factors for v in f)))
+        all_variables = list(set(v for f in wrapped_factors for v in f))
         self.predict_(wrapped_factors, all_variables)
 
     # TODO: would be nice to have this do max-product inference rather than just independently
     # pick the max of each variable
     def predict_(self, factors: Sequence[Factor], variables: Sequence[Var]) -> None:
         queries = [(v,) for v in variables]
-        print(queries)
         marginals = self.product_marginals_(factors, *queries)
         for marginal, variable in zip(marginals, variables):
             variable.tensor = marginal.argmax(-1)

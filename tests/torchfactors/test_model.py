@@ -15,7 +15,7 @@ from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
                           Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.domain import FlexDomain
-# from torchfactors.inferencers.brute_force import BruteForce
+from torchfactors.inferencers.brute_force import BruteForce
 from torchfactors.model import ParamNamespace
 from torchfactors.testing import DummyParamNamespace, DummySubject
 from torchfactors.variable import VarUsage
@@ -173,53 +173,56 @@ def test_model_inferencer():
     assert (marg.exp() == torch.tensor([0, 0, 0, 1, 0])).all()
 
 
+@dataclass
+class MySubject_inferencer2(Subject):
+    items: Var = VarField(Range(5), LATENT, shape=(7,))
+
+
+class MyModel_inferencer2(Model[MySubject_inferencer2]):
+    def factors(self, s: MySubject_inferencer2):
+        first = s.items[..., 0]
+        dom_size = len(first.domain)
+        # the first one should be likely on 3
+        yield TensorFactor(first,
+                           tensor=(
+                               F.one_hot(torch.tensor(3), dom_size) +
+                               F.one_hot(torch.tensor(1), dom_size))
+                           .log())
+        n = s.items.shape[-1]
+        # all of them should be the same
+        for i in range(n - 1):
+            cur = s.items[..., i]
+            next = s.items[..., i + 1]
+            yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
+
+
 def test_model_inferencer2():
-
-    @dataclass
-    class MySubject(Subject):
-        items: Var = VarField(Range(5), LATENT, shape=(7,))
-
-    class MyModel(Model[MySubject]):
-        def factors(self, s: MySubject):
-            first = s.items[..., 0]
-            dom_size = len(first.domain)
-            # the first one should be likely on 3
-            yield TensorFactor(first,
-                               tensor=(
-                                   F.one_hot(torch.tensor(3), dom_size) +
-                                   F.one_hot(torch.tensor(1), dom_size))
-                               .log())
-            n = s.items.shape[-1]
-            # all of them should be the same
-            for i in range(n - 1):
-                cur = s.items[..., i]
-                next = s.items[..., i + 1]
-                yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
-
-    model = MyModel()
+    model = MyModel_inferencer2()
     system = System(model=model, inferencer=BP())
-    out = system.predict(MySubject())
+    out = system.predict(MySubject_inferencer2())
     out_t = out.items.tensor
     assert (out_t == 1).logical_or(out_t == 3).all()
 
     # there are only 2 options since they all need to be the same
-    logz = system.product_marginal(MySubject())
+    logz = system.product_marginal(MySubject_inferencer2())
     assert float(logz) == approx(math.log(2))
 
-    x = MySubject()
+    x = MySubject_inferencer2()
     marg, = system.product_marginals(x, [x.items[..., 2]])
     assert (marg.exp() == torch.tensor([0, 0.5, 0, 0.5, 0])).all()
 
-    subj = MySubject()
+    subj = MySubject_inferencer2()
     subj.items.set_usage(VarUsage.ANNOTATED)
     subj.items.tensor = torch.tensor(3)
     assert system.log_likelihood(subj).exp() == approx(0.5)
 
-    # model = MyModel()
-    # system = System(model=model, inferencer=BruteForce())
-    # out = system.predict(MySubject())
-    # out_t = out.items.tensor
-    # assert (out_t == 1).logical_or(out_t == 3).all()
+
+def test_model_inferencer2_brute():
+    model = MyModel_inferencer2()
+    system = System(model=model, inferencer=BruteForce())
+    out = system.predict(MySubject_inferencer2())
+    out_t = out.items.tensor
+    assert (out_t == 1).logical_or(out_t == 3).all()
 
 
 @dataclass
