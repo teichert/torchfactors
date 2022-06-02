@@ -3,6 +3,7 @@ import math
 import pytest
 import torch
 from torch import tensor
+
 from torchfactors import ANNOTATED, BP, Range, TensorVar
 from torchfactors.components.tensor_factor import TensorFactor
 

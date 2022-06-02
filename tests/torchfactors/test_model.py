@@ -15,8 +15,10 @@ from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
                           Var, VarField)
 from torchfactors.components.tensor_factor import TensorFactor
 from torchfactors.domain import FlexDomain
+# from torchfactors.inferencers.brute_force import BruteForce
 from torchfactors.model import ParamNamespace
 from torchfactors.testing import DummyParamNamespace, DummySubject
+from torchfactors.variable import VarUsage
 
 
 @dataclass
@@ -207,6 +209,17 @@ def test_model_inferencer2():
     x = MySubject()
     marg, = system.product_marginals(x, [x.items[..., 2]])
     assert (marg.exp() == torch.tensor([0, 0.5, 0, 0.5, 0])).all()
+
+    subj = MySubject()
+    subj.items.set_usage(VarUsage.ANNOTATED)
+    subj.items.tensor = torch.tensor(3)
+    assert system.log_likelihood(subj).exp() == approx(0.5)
+
+    # model = MyModel()
+    # system = System(model=model, inferencer=BruteForce())
+    # out = system.predict(MySubject())
+    # out_t = out.items.tensor
+    # assert (out_t == 1).logical_or(out_t == 3).all()
 
 
 @dataclass

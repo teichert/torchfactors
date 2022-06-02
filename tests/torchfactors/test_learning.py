@@ -3,9 +3,11 @@ import math
 from typing import Dict
 
 import torch
-import torchfactors as tx
 from pytest import approx
+
+import torchfactors as tx
 from torchfactors.components.linear_factor import LinearFactor
+from torchfactors.inferencers.brute_force import BruteForce
 from torchfactors.learning import example_fit_model, tnested
 
 
@@ -129,6 +131,16 @@ def test_learning5():
     log_info: Dict[str, float] = {}
     system = example_fit_model(model, examples=examples1, iterations=5,
                                batch_size=-1, log_info=log_info)
+    out = system.predict(stacked_examples)
+    assert out.v.flatten().tolist() == [1, 1]
+    assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
+
+
+def test_learning5_bruteforce():
+    model = MyModel()
+    log_info: Dict[str, float] = {}
+    system = example_fit_model(model, examples=examples1, iterations=5,
+                               batch_size=-1, log_info=log_info, inferencer=BruteForce())
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
     assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
