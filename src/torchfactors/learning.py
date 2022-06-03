@@ -34,6 +34,27 @@ def tnested(itr: Iterable[T], times: int, log_info=None, leave=True, **kwargs
                 t.set_postfix(**log_info, refresh=False)
 
 
+def inested(itr: Iterable[T], criteria) -> Iterable[Tuple[int, int, T]]:
+    items = list(itr)
+    i = 0
+    while criteria(i):
+        for j, obj in enumerate(items):
+            yield i, j, obj
+        i += 1
+
+
+def tinested(itr: Iterable[T], criteria, log_info=None, leave=True, **kwargs
+             ) -> Iterable[Tuple[int, int, T]]:
+    items = list(itr)
+    if log_info is None:
+        yield from tqdm(inested(items, criteria), leave=leave, **kwargs)
+    else:
+        with tqdm(inested(items, criteria), leave=leave, **kwargs) as t:
+            for i, j, obj in t:
+                yield i, j, obj
+                t.set_postfix(**log_info, refresh=False)
+
+
 class SystemRunner(Protocol):
 
     def __call__(self, system: System[SubjectType],
@@ -43,6 +64,7 @@ class SystemRunner(Protocol):
 
 def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType],
                       iterations: int = 10,
+                      criteria=None,
                       each_step: Optional[SystemRunner] = None,
                       each_epoch: Optional[SystemRunner] = None,
                       batch_size: int = -1, penalty_coeff=1, passes=3,
@@ -71,7 +93,9 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
     elif log_info == 'off':
         log_info = None
     data: SubjectType
-    for i, j, data in tnested(data_loader, iterations, log_info=log_info):
+    itr = tnested(data_loader, iterations, log_info=log_info) if criteria is None else tinested(
+        data_loader, criteria, log_info=log_info)
+    for i, j, data in itr:
         if isinstance(log_info, dict):
             log_info['i'] = i
             log_info['j'] = j
