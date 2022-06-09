@@ -7,7 +7,7 @@ from typing import Iterator, List, Sequence, Tuple, Union
 import torch
 from torch import Tensor
 
-from .einsum import log_dot
+from .einsum import log_dot, slow_log_dot
 from .types import ShapeType
 from .utils import logsumexp, outer_or
 from .variable import Var, VarUsage, possibility
@@ -204,7 +204,10 @@ class Factor:
             (f.dense, with_batch_ids(f.variables)) for f in other_factors]]
         labeled_queries = [with_batch_ids(q) for q in queries]
 
+        # try:
         out = log_dot(input_tensors, labeled_queries, nan_to_num=True)
+        # except:
+        # out = slow_log_dot(input_tensors, labeled_queries, nan_to_num=True)
         return out
 
     @ staticmethod

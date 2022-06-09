@@ -107,9 +107,9 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
             penalty = change.sum()
             if isinstance(log_info, dict):
                 log_info['loss'] = float(loss)
-                log_info['penalty'] = float(penalty)
+                log_info['exp_penalty'] = float(penalty)
             if penalty_coeff != 0:
-                loss = loss + penalty_coeff * penalty.exp()
+                loss = torch.logaddexp(loss, penalty_coeff ** penalty)
             if isinstance(log_info, dict):
                 log_info['combo'] = float(loss)
             if loss.requires_grad:
@@ -121,4 +121,6 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
             each_step(system, data_loader, data)
         if j == 0 and each_epoch is not None:
             each_epoch(system, data_loader, data)
+            # print('params')
+            # print([p.grad for p in system.model.parameters()])
     return system

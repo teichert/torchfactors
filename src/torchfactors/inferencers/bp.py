@@ -151,6 +151,7 @@ class BPInference:
         source = self.strategy.regions[source_id]
         out_messages = [self.message((source_id, target_id)) for target_id in target_ids]
         in_messages = self.in_messages(source_id)
+        # print([t.tensor for t in out_messages], [t.tensor for t in in_messages])
         numerators = source.product_marginals([out.variables for out in out_messages],
                                               other_factors=in_messages)
         updated_messages = []
@@ -236,6 +237,7 @@ class BP(Inferencer):
 
     def __init__(self, strategy: Callable[[FactorGraph, int], Strategy] = BetheGraph,
                  passes: int = 3):
+        super().__init__()
         self.strategy_factory = strategy
         self.passes = passes
 

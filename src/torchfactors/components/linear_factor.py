@@ -89,6 +89,36 @@ class ShapedLinear(torch.nn.Module):
         return reshaped
 
 
+def inner_shape(shape: ShapeType) -> ShapeType:
+    return tuple(s - 1 for s in shape)
+
+
+class MinimalLinear(torch.nn.Module):
+
+    def __init__(self, output_shape: ShapeType,
+                 bias: bool = True, input_shape: ShapeType = None):
+        super().__init__()
+        self.output_shape = output_shape
+        self.inner = ShapedLinear(inner_shape(output_shape), bias=bias, input_shape=input_shape)
+
+    def forward(self, x: Tensor) -> Tensor:
+        t = self.inner(x)
+        for dim in range(len(t.shape)):
+            t = torch.cat((torch.zeros_like(t.select(dim, 0)).unsqueeze(dim), t), dim=dim)
+        return t
+        # flattened_in: Tensor
+        # if self.input_shape is None or not self.input_shape:
+        #     flattened_in = x
+        # else:
+        #     flattened_in = x.flatten(len(x.shape) - len(self.input_shape))
+        # out: Tensor = self.wrapped_linear(flattened_in)
+        # reshaped = out.unflatten(-1, self.output_shape)
+        # for d in range(len(self.output_shape)):
+        #     rest = len(self.output_shape) - d - 1
+        #     reshaped[(None,)*d + (0,) + (None,) * rest] = 0.0
+        # return reshaped
+
+
 class LinearFactor(Factor):
     r"""
     A factor for which the configuration scores come from a
