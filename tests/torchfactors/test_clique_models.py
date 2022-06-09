@@ -165,6 +165,7 @@ def test_binary():
 
     out_params = num_trainable(params.model)
     # binary configs (4) * (features plus bias) + binary to label mapping (for each)
+    # expected_params = 4 * (7 + 1) + 2 * (4 + 3)
     expected_params = 4 * (7 + 1) + 2 * (4 + 3)
     assert out_params == expected_params
 
