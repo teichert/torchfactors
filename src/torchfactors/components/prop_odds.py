@@ -4,7 +4,6 @@ from typing import Optional
 import torch
 from torch import Tensor
 from torchfactors.components.at_least import KIsAtLeastJ
-from torchfactors.components.linear_factor import LinearFactor
 
 from ..clique import (BinaryScoresModule, CliqueModel, ShapedLinear,
                       make_binary_label_variables)
@@ -61,5 +60,7 @@ class ProportionalOdds(CliqueModel):
             # deterministically say that if the binary 'j' is off, then
             # the values k >= j are all impossible
             for label in range(1, len(v.domain)):
-                yield env.factor((v, label, 'prop_odds'), lambda: LinearFactor(params.namespace(f'prop_{i}_{label}'), v, binary_variables[v, label]))
-                # yield KIsAtLeastJ(v, binary_variables[v, label], label)
+                # yield env.factor((v, label, 'prop_odds'),
+                #                  lambda: LinearFactor(params.namespace(f'prop_{i}_{label}'),
+                #                  v, binary_variables[v, label]))
+                yield KIsAtLeastJ(v, binary_variables[v, label], label)

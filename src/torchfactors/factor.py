@@ -7,7 +7,7 @@ from typing import Iterator, List, Sequence, Tuple, Union
 import torch
 from torch import Tensor
 
-from .einsum import log_dot, slow_log_dot
+from .einsum import log_dot
 from .types import ShapeType
 from .utils import logsumexp, outer_or
 from .variable import Var, VarUsage, possibility

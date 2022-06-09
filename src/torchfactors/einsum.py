@@ -2,7 +2,7 @@
 from typing import Dict, List, Tuple
 
 import torch
-from torch import Tensor, prod
+from torch import Tensor
 
 from torchfactors.utils import min_tensors, sum_tensors
 
@@ -110,7 +110,8 @@ def _slow_log_dot(tensors: List[Tuple[Tensor, List[int]]],
     config[-1] = -1  # make it so we can advance on the first one
     num_configs = 0
     while True:
-        # move to the next config by incrementing the last possible dimension and then filling with zeros
+        # move to the next config by incrementing the last possible dimension
+        # and then filling with zeros
         while config:
             dim = len(config) - 1
             if config[dim] < full_shape[dim] - 1:
