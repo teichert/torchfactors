@@ -11,6 +11,12 @@ def float_zeros(shape: ShapeType):
     return torch.zeros(shape).float()
 
 
+def linear_binary_to_ordinal_tensor(num_labels: int):
+    out = float_zeros((2, num_labels))
+    out[1, :] = torch.arange(num_labels) / (num_labels - 1)
+    return out
+
+
 class TensorFactor(Factor):
     r"""
     A factor that is fully specified by a single, fixed tensor. The tensor
