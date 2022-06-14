@@ -12,6 +12,8 @@ from torchfactors.components.binary import Binary
 from torchfactors.components.nominal import Nominal
 from torchfactors.components.prop_odds import ProportionalOdds
 from torchfactors.components.stereotype import Stereotype
+from torchfactors.components.tensor_factor import \
+    linear_binary_to_ordinal_tensor
 from torchfactors.subject import Environment
 from torchfactors.testing import DummyParamNamespace, DummyVar
 from torchfactors.utils import num_trainable
@@ -145,9 +147,13 @@ def test_binary():
     model = Binary(latent=False)
     input = torch.ones(5, 7)
     factors = list(model.factors(env, params, a, b, input=input))
-    # factor for the pair and for each ordinal to binary
     assert len(factors) == 1
-    assert factors[0].shape == (5, 4)
+    # single binary factor
+    assert factors[0].shape == (5, 4, 3)
+    # same for all inputs (which are the same)
+    d = factors[0].dense
+    assert d.allclose(d.mean(dim=0))
+
     # assert factors[1].shape == (5, 4, 2)
     # assert factors[2].shape == (5, 3, 2)
 
@@ -162,11 +168,64 @@ def test_binary():
     # assert tuple(vars2) == (b, bin_b)
 
     [f.dense for f in factors]
-
     out_params = num_trainable(params.model)
     # binary configs (4) * (features plus bias) + binary to label mapping (for each)
     # expected_params = 4 * (7 + 1) + 2 * (4 + 3)
-    expected_params = 4 * (7 + 1) + 2 * (4 + 3)
+    # expected_params = 4 * (7 + 1) + 2 * (4 + 3)
+
+    # just a single param saying how much for both to be on
+    assert out_params == 1
+
+
+def test_linear_binary_to_ordinal_2():
+    assert linear_binary_to_ordinal_tensor(2).allclose(torch.tensor([
+        [0, 0],
+        [0, 1.0]
+    ]))
+
+
+def test_linear_binary_to_ordinal_3():
+    assert linear_binary_to_ordinal_tensor(3).allclose(torch.tensor([
+        [0, 0, 0],
+        [0, 0.5, 1.0]
+    ]))
+
+
+def test_linear_binary_to_ordinal_4():
+    assert linear_binary_to_ordinal_tensor(4).allclose(torch.tensor([
+        [0, 0, 0, 0],
+        [0, 1/3, 2/3, 1.0]
+    ]))
+
+
+def test_linear_binary_to_ordinal_5():
+    assert linear_binary_to_ordinal_tensor(5).allclose(torch.tensor([
+        [0, 0, 0, 0, 0],
+        [0, 0.25, 0.5, 0.75, 1.0]
+    ]))
+
+
+def test_latent_binary():
+    env = Environment()
+    model = Binary(latent=True)
+    params = DummyParamNamespace()
+    input = torch.ones(5, 8)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+
+    def factors():
+        yield from model.factors(env, params, a, b, input=input)
+        yield from model.factors(env, params, a, input=input)
+        yield from model.factors(env, params, b, input=input)
+    factors = list(factors())
+    ts = [f.dense for f in factors]
+    # one pairwise and two unary factors on the latent binary, plus one binary to ordinal for each variable,
+    assert len(ts) == 1 + 2 + 2
+    # input has 8 features times two unary binary + one pairwise = 8 * 3;
+    # also, there are two minimal, bias-only linear factors between each of the two variables and their
+    # laten binary = 3 + 2
+    expected_params = 8 * 3 + 3 + 2
+    out_params = num_trainable(params.model)
     assert out_params == expected_params
 
 

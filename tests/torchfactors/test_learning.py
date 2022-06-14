@@ -1,5 +1,4 @@
 
-import math
 from typing import Dict
 
 import torch
@@ -149,7 +148,8 @@ def test_learning4_with_penalty():
                       batch_size=-1, lr=1.0, penalty_coeff=coeff,
                       log_info=log_info)
     assert log_info['combo'] == approx(
-        log_info['loss'] + coeff * math.exp(log_info['penalty']))
+        torch.logaddexp(torch.tensor(log_info['loss']),
+                        torch.tensor(coeff ** log_info['exp_penalty'])))
 
 
 def test_learning4_without_penalty():
@@ -168,7 +168,7 @@ def test_learning5():
                                batch_size=-1, log_info=log_info)
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
-    assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
+    assert set(log_info.keys()) == {'i', 'j', 'loss', 'exp_penalty', 'combo'}
 
 
 def test_learning5_bruteforce():
@@ -178,7 +178,7 @@ def test_learning5_bruteforce():
                                batch_size=-1, log_info=log_info, inferencer=BruteForce())
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
-    assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
+    assert set(log_info.keys()) == {'i', 'j', 'loss', 'exp_penalty', 'combo'}
 
 
 def test_learning6():
@@ -200,8 +200,8 @@ def test_learning6():
                                batch_size=-1, log_info=log_info)
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
-    assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
-    assert sets == ['i', 'j', 'loss', 'penalty', 'combo'] * num_iters
+    assert set(log_info.keys()) == {'i', 'j', 'loss', 'exp_penalty', 'combo'}
+    assert sets == ['i', 'j', 'loss', 'exp_penalty', 'combo'] * num_iters
 
 
 def test_tnested():

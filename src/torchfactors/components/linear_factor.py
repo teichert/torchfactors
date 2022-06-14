@@ -134,13 +134,15 @@ class LinearFactor(Factor):
                  *variables: Var,
                  input: Optional[Tensor] = None,
                  bias: bool = True,
-                 share: bool = False):
+                 share: bool = False,
+                 minimal: bool = False):
         r"""
         share: if True, then the input will be expanded to match the
         graph_dims of the first variable (i.e. using the same features
         within a particular batch element)
         """
         super().__init__(variables)
+        self.minimal = minimal
         self.bias = bias
         self.params = params
         if input is not None and input.shape:
@@ -177,7 +179,7 @@ class LinearFactor(Factor):
         dimensions there are.
         """
         m = self.params.module(
-            ShapedLinear, output_shape=self.out_shape,
+            (MinimalLinear if self.minimal else ShapedLinear), output_shape=self.out_shape,
             input_shape=self.in_shape, bias=self.bias)
         if self.input is None:
             x = self.variables[0].tensor.new_empty(0, dtype=torch.float)

@@ -20,7 +20,7 @@ class Binary(CliqueModel):
     the mapping from binaries to observed actual lables is also learned
     """
 
-    def __init__(self, latent: bool = True, linear: bool = False, minimal=False):
+    def __init__(self, latent: bool = True, linear: bool = False, minimal=True):
         super().__init__()
         self.latent = latent
         self.linear = linear
@@ -43,7 +43,7 @@ class Binary(CliqueModel):
                     def factor(): return TensorFactor(binary, ordinal, tensor=t)
                 else:
                     def factor(): return LinearFactor(params.namespace((i, 'binary-to-ordinal')),
-                                                      binary, ordinal, bias=True)
+                                                      binary, ordinal, bias=True, minimal=True)
                 yield env.factor((ordinal, 'binary-to-ordinal'), factor)
         else:
             for dim, v in enumerate(variables):
