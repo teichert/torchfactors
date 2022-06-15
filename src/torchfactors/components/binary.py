@@ -27,8 +27,8 @@ class Binary(CliqueModel):
         self.minimal = minimal
 
     # TODO: allow no bias?
-    def factors(self, env: Environment, params: ParamNamespace,
-                *variables: Var, input: Optional[Tensor] = None):
+    def factors_(self, env: Environment, params: ParamNamespace,
+                 *variables: Var, input: Optional[Tensor] = None):
         if self.latent:
             # TODO: no key is being passed here so there there is coupling
             # between  (could be a source of bugs)

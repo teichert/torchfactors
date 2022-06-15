@@ -1,9 +1,8 @@
-
-from abc import ABC, abstractmethod
-from typing import Dict, Hashable, Optional, Sequence, Tuple, cast
+from typing import Dict, Hashable, Iterable, Optional, Sequence, Tuple, cast
 
 from torch import Tensor
 
+from torchfactors.factor import Factor
 from torchfactors.types import ShapeType
 
 from .components.linear_factor import ShapedLinear
@@ -14,16 +13,20 @@ from .variable import TensorVar, Var, VarUsage
 
 
 # TODO: might be good to have sub environments like paramnamespaces
-class CliqueModel(ABC):
+class CliqueModel(object):
 
-    @abstractmethod
-    def factors(self, env: Environment, params: ParamNamespace, *
-                variables: Var, input: Tensor): ...  # pragma: no cover
+    def factors_(self, env: Environment, params: ParamNamespace, *
+                 variables: Var, input: Tensor):
+        raise NotImplementedError()  # pragma: no cover
     # TODO: when needed later, will accept an additional (optional) input map from
     # variable subset (frozenset?) to tensor and the ability to specify `cat` or `add`
     # for the variables subsets that match a subset of interest.  This
     # will allow sufficient generalization as to simulate separate keys per variable
     # and per element of the same batch.
+
+    def factors(self, env: Environment, params: ParamNamespace, *
+                variables: Var, input: Tensor) -> Iterable[Factor]:
+        yield from filter(None, self.factors_(env, params, *variables, input=input))
 
 
 def make_binary_label_variables(env: Environment, *variables: Var, key: Hashable = None,
