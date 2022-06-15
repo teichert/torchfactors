@@ -6,7 +6,7 @@ check:
 check-all:
 	make lint type test --keep-going
 
-.PHONY: install
+.PHONY: installlin
 install: pyproject.lock
 
 
@@ -56,7 +56,8 @@ install-python:
 	source ~/.bashrc
 	micromamba -p ~/micromamba install -c conda-forge -y python=3.9
 
-# actually, I'm doing this (required following a couple of manual instructions with sude so as to avoid doing this command with sudo): curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python - --preview
+# actually, I'm doing this (required following a couple of manual instructions with sude so as to avoid doing this command with sudo):
+# curl -sSL https://install.python-poetry.org | python3 - -preview
 .PHONY: install-poetry
 install-poetry:
 	echo "if you needed to install python via micromamba, use: micromamba activate"
