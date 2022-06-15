@@ -29,23 +29,26 @@ class Binary(CliqueModel):
     # TODO: allow no bias?
     def factors(self, env: Environment, params: ParamNamespace,
                 *variables: Var, input: Optional[Tensor] = None):
-        make_binary_tensor = params.namespace('binary').module(
-            (MinimalLinear if self.minimal else ShapedLinear),
-            output_shape=(2,) * len(variables))
-        binary_tensor = make_binary_tensor(input)
+        # yield
         # print(binary_tensor)
         if self.latent:
             binary_variables = make_binary_threshold_variables(env, *variables, latent=True)
-            yield TensorFactor(*binary_variables.values(), tensor=binary_tensor)
+            yield LinearFactor(params.namespace('latent-binary'), *binary_variables, input=input,
+                               minimal=self.minimal)
+            # yield TensorFactor(*binary_variables.values(), tensor=binary_tensor)
             for i, (ordinal, binary) in enumerate(binary_variables.items()):
                 if self.linear:
                     t = linear_binary_to_ordinal_tensor(len(ordinal.domain))
                     def factor(): return TensorFactor(binary, ordinal, tensor=t)
                 else:
                     def factor(): return LinearFactor(params.namespace((i, 'binary-to-ordinal')),
-                                                      binary, ordinal, bias=True, minimal=True)
+                                                      binary, ordinal, bias=True, minimal=self.minimal)
                 yield env.factor((ordinal, 'binary-to-ordinal'), factor)
         else:
+            make_binary_tensor = params.namespace('binary').module(
+                (MinimalLinear if self.minimal else ShapedLinear),
+                output_shape=(2,) * len(variables))
+            binary_tensor = make_binary_tensor(input)
             for dim, v in enumerate(variables):
                 num_positive = len(v.domain) // 2
                 num_negative = len(v.domain) - num_positive

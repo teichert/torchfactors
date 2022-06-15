@@ -140,6 +140,14 @@ class LinearFactor(Factor):
         share: if True, then the input will be expanded to match the
         graph_dims of the first variable (i.e. using the same features
         within a particular batch element)
+
+        TODO: this is hard for me to make sense of. share=True seems to 
+        do the opposite of what the name indicates.  Rather than having the
+        same parameters reused across the batch elements, it looks like
+        share=True increases the number of parameters by having the extra
+        dimensions represents additional separate outputs that each get their
+        own separate multiplicative parameters, but the bias is still shared across;
+        this seems like a bad name at best
         """
         super().__init__(variables)
         self.minimal = minimal
