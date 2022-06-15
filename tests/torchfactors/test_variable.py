@@ -716,9 +716,11 @@ def test_environment_factors():
     v: Var = tx.vtensor([3, 4, 5])
     f: Factor = tx.LinearFactor(model.namespace('a'), v)
     f2: Factor = tx.LinearFactor(model.namespace('b'), v)
-    assert env.factor('b', lambda: f) is f
-    assert env.factor('b', lambda: f2) is f
-    assert env.factor('b', lambda: f2) is not f2
+    assert f is not f2
+    assert env.factor('b', lambda: f, include_duplicates=True) is f
+    assert env.factor('b', lambda: f2, include_duplicates=True) is f
+    assert env.factor('c', lambda: f, include_duplicates=False) is f
+    assert env.factor('c', lambda: f2, include_duplicates=False) is None
 
 
 def test_list_variable():

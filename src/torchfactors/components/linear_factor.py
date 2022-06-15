@@ -103,7 +103,10 @@ class MinimalLinear(torch.nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         t = self.inner(x)
-        for dim in range(len(t.shape)):
+        out_dims = len(self.output_shape)
+        t_dims = len(t.shape)
+        # for all non-batch dims, extend left with zeros
+        for dim in range(t_dims - out_dims, t_dims):
             t = torch.cat((torch.zeros_like(t.select(dim, 0)).unsqueeze(dim), t), dim=dim)
         return t
         # flattened_in: Tensor
@@ -137,22 +140,23 @@ class LinearFactor(Factor):
                  share: bool = False,
                  minimal: bool = False):
         r"""
-        share: if True, then the input will be expanded to match the
-        graph_dims of the first variable (i.e. using the same features
-        within a particular batch element)
+        share: if True, then the input will be expanded to match the graph_dims
+        of the first variable (i.e. using the same features within a particular
+        batch element)
 
-        TODO: this is hard for me to make sense of. share=True seems to 
-        do the opposite of what the name indicates.  Rather than having the
-        same parameters reused across the batch elements, it looks like
-        share=True increases the number of parameters by having the extra
-        dimensions represents additional separate outputs that each get their
-        own separate multiplicative parameters, but the bias is still shared across;
-        this seems like a bad name at best
+        TODO: this is hard for me to make sense of. share=True seems to do the
+        opposite of what the name indicates.  Rather than having the same
+        parameters reused across the batch elements, it looks like share=True
+        increases the number of parameters by having the extra dimensions
+        represents additional separate outputs that each get their own separate
+        multiplicative parameters, but the bias is still shared across; this
+        seems like a bad name at best
         """
         super().__init__(variables)
         self.minimal = minimal
         self.bias = bias
         self.params = params
+        print('here1', self.minimal)
         if input is not None and input.shape:
             if share:
                 # repeat the input across each replicate in the batch element graph
@@ -186,6 +190,7 @@ class LinearFactor(Factor):
         the variables themselves, then, know how many batch
         dimensions there are.
         """
+        print('here2', self.minimal)
         m = self.params.module(
             (MinimalLinear if self.minimal else ShapedLinear), output_shape=self.out_shape,
             input_shape=self.in_shape, bias=self.bias)
@@ -193,4 +198,6 @@ class LinearFactor(Factor):
             x = self.variables[0].tensor.new_empty(0, dtype=torch.float)
         else:
             x = self.input
+        print('here3', m)
+        print('here4', self.params.module())
         return m(x)

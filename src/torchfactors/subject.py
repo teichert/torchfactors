@@ -86,10 +86,14 @@ class Environment(object):
                 out = factory()
                 return self.variables.setdefault(key, out)
 
-    def factor(self, key: Hashable, factory: Optional[Callable[[], Factor]] = None) -> Factor:
+    def factor(self, key: Hashable, factory: Optional[Callable[[], Factor]] = None,
+               include_duplicates=False) -> Optional[Factor]:
         try:
             out = self.factors[key]
-            return out
+            if include_duplicates:
+                return out
+            else:
+                return None
         except KeyError:
             if factory is None:
                 raise KeyError(f"key {key} not found and no factory provided")

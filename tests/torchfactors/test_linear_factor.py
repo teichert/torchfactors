@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from torchfactors import Range, TensorVar
-from torchfactors.components.linear_factor import LinearFactor, MinimalLinear
+from torchfactors.components.linear_factor import LinearFactor
 from torchfactors.model import Model
 from torchfactors.utils import num_trainable
 
@@ -38,7 +38,8 @@ def test_linear_factor2b():
     p = list(m.parameters())
     print(p)
     assert len(p) == 2
-    # This really doesn't make sense to me, the three separate variables all use the same inputs in the same way
+    # This really doesn't make sense to me, the three separate variables all use
+    # the same inputs in the same way
     expected_params = 10 * 7 * 13 * 8 + 10
     out_params = num_trainable(m)
     assert out_params == expected_params

@@ -214,17 +214,47 @@ def test_latent_binary():
     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
 
     def factors():
-        yield from model.factors(env, params, a, b, input=input)
-        yield from model.factors(env, params, a, input=input)
-        yield from model.factors(env, params, b, input=input)
-    factors = list(factors())
-    ts = [f.dense for f in factors]
-    # one pairwise and two unary factors on the latent binary, plus one binary to ordinal for each variable,
+        yield from model.factors(env, params.namespace('a,b'), a, b, input=input)
+        yield from model.factors(env, params.namespace('a'), a, input=input)
+        yield from model.factors(env, params.namespace('b'), b, input=input)
+    fs = list(factors())
+    ts = [f.dense for f in fs if f is not None]
+    # one pairwise and two unary factors on the latent binary, plus one binary
+    # to ordinal for each variable,
     assert len(ts) == 1 + 2 + 2
-    # input has 8 features times two unary binary + one pairwise = 8 * 3;
-    # also, there are two minimal, bias-only linear factors between each of the two variables and their
-    # laten binary = 3 + 2
-    expected_params = 8 * 3 + 3 + 2
+    expected_params = (
+        8 +  # minimal weight between a and b latent binaries
+        8 +  # minimal weight on a latent binary
+        8 +  # minimal weight on b latent binary
+        3 +  # minimal bias on those three factors
+        3 +  # minimal bias between latent binary and a
+        2)  # minimal bias between latent binary and b
+    out_params = num_trainable(params.model)
+    assert out_params == expected_params
+
+
+def test_latent_binary_linear():
+    env = Environment()
+    model = Binary(latent=True, linear=True)
+    params = DummyParamNamespace()
+    input = torch.ones(5, 8)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+
+    def factors():
+        yield from model.factors(env, params.namespace('a,b'), a, b, input=input)
+        yield from model.factors(env, params.namespace('a'), a, input=input)
+        yield from model.factors(env, params.namespace('b'), b, input=input)
+    fs = list(factors())
+    ts = [f.dense for f in fs if f is not None]
+    # one pairwise and two unary factors on the latent binary, plus one binary
+    # to ordinal for each variable,
+    assert len(ts) == 1 + 2 + 2
+    expected_params = (
+        8 +  # minimal weight between a and b latent binaries
+        8 +  # minimal weight on a latent binary
+        8 +  # minimal weight on b latent binary
+        3)  # minimal bias on those three factors
     out_params = num_trainable(params.model)
     assert out_params == expected_params
 
