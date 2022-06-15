@@ -156,7 +156,6 @@ class LinearFactor(Factor):
         self.minimal = minimal
         self.bias = bias
         self.params = params
-        print('here1', self.minimal)
         if input is not None and input.shape:
             if share:
                 # repeat the input across each replicate in the batch element graph
@@ -190,7 +189,6 @@ class LinearFactor(Factor):
         the variables themselves, then, know how many batch
         dimensions there are.
         """
-        print('here2', self.minimal)
         m = self.params.module(
             (MinimalLinear if self.minimal else ShapedLinear), output_shape=self.out_shape,
             input_shape=self.in_shape, bias=self.bias)
@@ -198,6 +196,4 @@ class LinearFactor(Factor):
             x = self.variables[0].tensor.new_empty(0, dtype=torch.float)
         else:
             x = self.input
-        print('here3', m)
-        print('here4', self.params.module())
         return m(x)
