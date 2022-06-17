@@ -52,8 +52,17 @@ class Binary(CliqueModel):
                 output_shape=(2,) * len(variables))
             binary_tensor = make_binary_tensor(input)
             for dim, v in enumerate(variables):
-                num_positive = len(v.domain) // 2
-                num_negative = len(v.domain) - num_positive
+                num_negative, num_positive = binarization(len(v.domain))
                 repeats = torch.tensor([num_negative, num_positive])
                 binary_tensor = binary_tensor.repeat_interleave(repeats, dim=dim)
             yield TensorFactor(*variables, tensor=binary_tensor)
+
+
+def binarization(domain_size: int):
+    """
+    Returns the number of the labels to be considered as negative and the number
+    to be considered as positive.
+    """
+    num_positive = len(domain_size) // 2
+    num_negative = len(domain_size) - num_positive
+    return num_negative, num_positive

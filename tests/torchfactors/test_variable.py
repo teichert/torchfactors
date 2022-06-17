@@ -829,3 +829,9 @@ def test_stacked_variable_with_shared_usage():
     assert (v0after.usage == tx.ANNOTATED).all()
     assert (v1after.tensor == 0).all()
     assert (v1after.usage == tx.ANNOTATED).all()
+
+
+def test_usage():
+    v = tx.TensorVar(tensor=torch.tensor([5, 3, 3]), domain=tx.Range(5),
+                     usage=torch.tensor([tx.ANNOTATED, tx.OBSERVED, tx.ANNOTATED]))
+    assert v.usage.numpy().tolist() == [tx.ANNOTATED, tx.OBSERVED, tx.ANNOTATED]
