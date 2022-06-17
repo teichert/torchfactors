@@ -63,6 +63,6 @@ def binarization(domain_size: int):
     Returns the number of the labels to be considered as negative and the number
     to be considered as positive.
     """
-    num_positive = len(domain_size) // 2
-    num_negative = len(domain_size) - num_positive
+    num_positive = domain_size // 2
+    num_negative = domain_size - num_positive
     return num_negative, num_positive
