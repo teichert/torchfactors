@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import importlib
 import json
 from collections import OrderedDict
 from typing import (Any, Callable, Dict, Generic, Hashable, Iterable, List,
                     Optional, Sequence, Tuple, cast, overload)
 
 import torch
-from config import build_module
 from multimethod import multimethod
 from torch import Tensor
 from torch.nn import Module, ModuleDict, ParameterDict
@@ -87,6 +87,24 @@ class ParamNamespace:
             return self.model._get_module(self.key, setup_new_module)
 
 
+# TODO: doesn't seem like this should actually be done in this code
+def get_class(name: str) -> type:
+    r"""
+    Returns the class with the given name:
+    e.g.
+    assert get_class('torchfactors.inferencers.bp.BP') is torchfactors.inferencers.bp.BP
+    """
+    module, bare_name = name.rsplit('.', 1)
+    cls = getattr(importlib.import_module(module), bare_name)
+    return cls
+
+
+def build_module(name: str, **kwargs) -> Module:
+    cls: type = get_class(name)
+    built = cls(**kwargs)
+    return built
+
+
 class Model(torch.nn.Module, Generic[SubjectType]):
 
     def __init__(self,
@@ -105,9 +123,9 @@ class Model(torch.nn.Module, Generic[SubjectType]):
             state_dict = check_point['state_dict']
             only_model_state_dict_items: List[Tuple[str, Any]] = []
             for k, v in state_dict.items():
-                starting = 'model.'
-                if k.startswith(starting):
-                    k = k[len(starting):]
+                # starting = 'model.'
+                # if k.startswith(starting):
+                #     k = k[len(starting):]
                 only_model_state_dict_items.append((k, v))
             self.load_state_dict(OrderedDict(only_model_state_dict_items))  # type: ignore
 

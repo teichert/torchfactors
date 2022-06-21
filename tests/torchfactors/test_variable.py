@@ -2,6 +2,7 @@ from typing import Any, Dict, Tuple
 
 import pytest
 import torch
+
 import torchfactors
 import torchfactors as tx
 from torchfactors import (ANNOTATED, CLAMPED, DEFAULT, LATENT, OBSERVED, Var,
@@ -712,12 +713,14 @@ def test_environment_vars():
 def test_environment_factors():
     env = Environment()
     model = tx.Model[Any]()
-    v: Var = tx.vtensor([3, 4, 5])
+    v: Var = tx.TensorVar(torch.tensor([3, 4, 5]), Range(6))
     f: Factor = tx.LinearFactor(model.namespace('a'), v)
     f2: Factor = tx.LinearFactor(model.namespace('b'), v)
-    assert env.factor('b', lambda: f) is f
-    assert env.factor('b', lambda: f2) is f
-    assert env.factor('b', lambda: f2) is not f2
+    assert f is not f2
+    assert env.factor('b', lambda: f, include_duplicates=True) is f
+    assert env.factor('b', lambda: f2, include_duplicates=True) is f
+    assert env.factor('c', lambda: f, include_duplicates=False) is f
+    assert env.factor('c', lambda: f2, include_duplicates=False) is None
 
 
 def test_list_variable():
@@ -812,3 +815,23 @@ def test_more_variable_usage6():
     v0.set_usage(torch.full((3, 4), VarUsage.ANNOTATED))
     v.set_usage(VarUsage.CLAMPED)
     assert (v.origin.usage == VarUsage.CLAMPED).all()
+
+
+def test_stacked_variable_with_shared_usage():
+    v0 = tx.TensorVar(torch.ones(3, 4))
+    v0.set_usage(tx.CLAMPED)
+    v1 = tx.TensorVar(torch.zeros(3, 4))
+    v1.set_usage(tx.OBSERVED)
+    stacked = tx.TensorVar.pad_and_stack([v0, v1])
+    stacked.set_usage(tx.ANNOTATED)
+    v0after, v1after = stacked.unstack()
+    assert (v0after.tensor == 1).all()
+    assert (v0after.usage == tx.ANNOTATED).all()
+    assert (v1after.tensor == 0).all()
+    assert (v1after.usage == tx.ANNOTATED).all()
+
+
+def test_usage():
+    v = tx.TensorVar(tensor=torch.tensor([5, 3, 3]), domain=tx.Range(5),
+                     usage=torch.tensor([tx.ANNOTATED, tx.OBSERVED, tx.ANNOTATED]))
+    assert v.usage.numpy().tolist() == [tx.ANNOTATED, tx.OBSERVED, tx.ANNOTATED]

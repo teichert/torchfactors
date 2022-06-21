@@ -4,8 +4,7 @@ import math
 from typing import Optional, Union, cast
 
 import torch
-from config import register_module
-from torch.functional import Tensor
+from torch import Tensor
 
 from ..factor import Factor
 from ..model import ParamNamespace
@@ -13,7 +12,6 @@ from ..types import ShapeType
 from ..variable import Var
 
 
-@register_module
 class OptionalBiasLinear(torch.nn.Module):
     r"""
     Allows the output to ignore the input (bias-only),
@@ -61,7 +59,6 @@ class OptionalBiasLinear(torch.nn.Module):
 # @register_module_for_state_dict
 
 
-@register_module
 class ShapedLinear(torch.nn.Module):
     r"""
     Like a built-in Linear layer, but the output
@@ -92,6 +89,66 @@ class ShapedLinear(torch.nn.Module):
         return reshaped
 
 
+def inner_shape(shape: ShapeType) -> ShapeType:
+    return tuple(s - 1 for s in shape)
+
+
+class MinimalLinear(torch.nn.Module):
+
+    def __init__(self, output_shape: ShapeType,
+                 bias: bool = True, input_shape: ShapeType = None):
+        super().__init__()
+        self.output_shape = output_shape
+        self.inner = ShapedLinear(inner_shape(output_shape), bias=bias, input_shape=input_shape)
+
+    def forward(self, x: Tensor) -> Tensor:
+        t = self.inner(x)
+        out_dims = len(self.output_shape)
+        t_dims = len(t.shape)
+        # for all non-batch dims, extend left with zeros
+        for dim in range(t_dims - out_dims, t_dims):
+            t = torch.cat((torch.zeros_like(t.select(dim, 0)).unsqueeze(dim), t), dim=dim)
+        return t
+        # flattened_in: Tensor
+        # if self.input_shape is None or not self.input_shape:
+        #     flattened_in = x
+        # else:
+        #     flattened_in = x.flatten(len(x.shape) - len(self.input_shape))
+        # out: Tensor = self.wrapped_linear(flattened_in)
+        # reshaped = out.unflatten(-1, self.output_shape)
+        # for d in range(len(self.output_shape)):
+        #     rest = len(self.output_shape) - d - 1
+        #     reshaped[(None,)*d + (0,) + (None,) * rest] = 0.0
+        # return reshaped
+
+
+def LinearTensor(params: ParamNamespace,
+                 *variables: Var,
+                 bias: bool = True,
+                 minimal: bool = False):
+    return LinearTensorAux(params, *variables, out_shape=Factor.out_shape_from_variables(variables),
+                           bias=bias, minimal=minimal)
+
+
+def LinearTensorAux(params: ParamNamespace,
+                    *variables_for_in_shape: Var,
+                    out_shape: ShapeType,
+                    bias: bool = True,
+                    minimal: bool = False):
+    def f(input: Optional[Tensor]) -> Tensor:
+        batch_shape = Factor.batch_shape_from_variables(variables_for_in_shape)
+        in_shape = None if input is None else input.shape[len(batch_shape):]
+        m = params.module(
+            (MinimalLinear if minimal else ShapedLinear), output_shape=out_shape,
+            input_shape=in_shape, bias=bias)
+        if input is None:
+            x = variables_for_in_shape[0].tensor.new_empty(0, dtype=torch.float)
+        else:
+            x = input
+        return m(x)
+    return f
+
+
 class LinearFactor(Factor):
     r"""
     A factor for which the configuration scores come from a
@@ -107,15 +164,26 @@ class LinearFactor(Factor):
                  *variables: Var,
                  input: Optional[Tensor] = None,
                  bias: bool = True,
-                 share: bool = False):
+                 share: bool = False,
+                 minimal: bool = False):
         r"""
-        share: if True, then the input will be expanded to match the
-        graph_dims of the first variable (i.e. using the same features
-        within a particular batch element)
+        share: if True, then the input will be expanded to match the graph_dims
+        of the first variable (i.e. using the same features within a particular
+        batch element)
+
+        TODO: this is hard for me to make sense of. share=True seems to do the
+        opposite of what the name indicates.  Rather than having the same
+        parameters reused across the batch elements, it looks like share=True
+        increases the number of parameters by having the extra dimensions
+        represents additional separate outputs that each get their own separate
+        multiplicative parameters, but the bias is still shared across; this
+        seems like a bad name at best
         """
         super().__init__(variables)
+        self.minimal = minimal
         self.bias = bias
         self.params = params
+        self.get_tensor = LinearTensor(params, *variables, minimal=minimal, bias=bias)
         if input is not None and input.shape:
             if share:
                 # repeat the input across each replicate in the batch element graph
@@ -134,12 +202,12 @@ class LinearFactor(Factor):
                 raise ValueError("prefix dimensions of input must match batch_dims")
         self.input = input
 
-    @property
-    def in_shape(self) -> Optional[ShapeType]:
-        if self.input is None:
-            return None
-        else:
-            return self.input.shape[len(self.batch_shape):]
+    # @property
+    # def in_shape(self) -> Optional[ShapeType]:
+    #     if self.input is None:
+    #         return None
+    #     else:
+    #         return self.input.shape[len(self.batch_shape):]
 
     def dense_(self) -> torch.Tensor:
         r"""returns a tensor that characterizes this factor;
@@ -149,11 +217,12 @@ class LinearFactor(Factor):
         the variables themselves, then, know how many batch
         dimensions there are.
         """
-        m = self.params.module(
-            ShapedLinear, output_shape=self.out_shape,
-            input_shape=self.in_shape, bias=self.bias)
-        if self.input is None:
-            x = self.variables[0].tensor.new_empty(0, dtype=torch.float)
-        else:
-            x = self.input
-        return m(x)
+        # m = self.params.module(
+        #     (MinimalLinear if self.minimal else ShapedLinear), output_shape=self.out_shape,
+        #     input_shape=self.in_shape, bias=self.bias)
+        # if self.input is None:
+        #     x = self.variables[0].tensor.new_empty(0, dtype=torch.float)
+        # else:
+        #     x = self.input
+        # return m(x)
+        return self.get_tensor(self.input)

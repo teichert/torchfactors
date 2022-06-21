@@ -1,12 +1,12 @@
+from typing import Dict, Hashable, Iterable, Optional, Sequence, Tuple
 
-from abc import ABC, abstractmethod
-from typing import Dict, Hashable, Optional, Sequence, Tuple, cast
+from torch import Tensor
+import torch
 
-from torch.functional import Tensor
-
+from torchfactors.factor import Factor
 from torchfactors.types import ShapeType
 
-from .components.linear_factor import ShapedLinear
+from .components.linear_factor import MinimalLinear, ShapedLinear
 from .domain import Range
 from .model import ParamNamespace
 from .subject import Environment
@@ -14,16 +14,20 @@ from .variable import TensorVar, Var, VarUsage
 
 
 # TODO: might be good to have sub environments like paramnamespaces
-class CliqueModel(ABC):
+class CliqueModel(object):
 
-    @abstractmethod
-    def factors(self, env: Environment, params: ParamNamespace, *
-                variables: Var, input: Tensor): ...  # pragma: no cover
+    def factors_(self, env: Environment, params: ParamNamespace, *
+                 variables: Var, input: Tensor):
+        raise NotImplementedError()  # pragma: no cover
     # TODO: when needed later, will accept an additional (optional) input map from
     # variable subset (frozenset?) to tensor and the ability to specify `cat` or `add`
     # for the variables subsets that match a subset of interest.  This
     # will allow sufficient generalization as to simulate separate keys per variable
     # and per element of the same batch.
+
+    def factors(self, env: Environment, params: ParamNamespace, *
+                variables: Var, input: Tensor) -> Iterable[Factor]:
+        yield from filter(None, self.factors_(env, params, *variables, input=input))
 
 
 def make_binary_label_variables(env: Environment, *variables: Var, key: Hashable = None,
@@ -93,18 +97,20 @@ def make_binary_threshold_variables(env: Environment, *variables: Var, key: Hash
 def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
                        input_shape: Optional[ShapeType] = None,
                        input: Optional[Tensor] = None,
-                       bias: bool = False) -> ShapedLinear:
+                       bias: bool = False,
+                       minimal: bool = False) -> torch.nn.Module:
     r"""
     Returns a module that will create a score for each binary configuration of
     the given variables (i.e. if there are 7 variables, will produce 2**7
     scores) as a function of the given input_shape (if input in provided, the
     batch_dimensions are removed from it).
     """
+    module_type = MinimalLinear if minimal else ShapedLinear
     if input_shape is None and input is not None:
         num_batch_dims = len(variables[0].shape)
         input_shape = input.shape[num_batch_dims:]
     out = params.module(
-        ShapedLinear, input_shape=input_shape,
+        module_type, input_shape=input_shape,
         output_shape=(2,) * len(variables),
         bias=bias)
-    return cast(ShapedLinear, out)
+    return out

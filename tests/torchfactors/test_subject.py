@@ -3,8 +3,9 @@ from typing import ClassVar, List
 
 import pytest
 import torch
-import torchfactors as tx
 from torch.utils.data import Dataset
+
+import torchfactors as tx
 from torchfactors import (ANNOTATED, CLAMPED, LATENT, OBSERVED, Range, Subject,
                           TensorFactor, TensorVar, VarField)
 from torchfactors.subject import ChainDataset, Environment, ListDataset
@@ -302,7 +303,8 @@ def test_good_env2():
     env = Environment()
     v = tx.TensorVar(torch.tensor([1, 2, 3]), tx.Range(5))
     f = env.factor('test', lambda: TensorFactor(v, tensor=torch.ones(3, 5)))
-    assert env.factor('test') is f
+    assert env.factor('test', include_duplicates=True) is f
+    assert env.factor('test') is None
 
 
 def test_subject_shape1():

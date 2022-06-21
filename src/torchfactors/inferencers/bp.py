@@ -5,8 +5,9 @@ import math
 from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union, cast
 
 import torch
-from torch.functional import Tensor
-from torchmetrics.functional import kldivergence
+from torch import Tensor
+# from torch.nn.functional import kl_div
+from torchmetrics.functional import kl_divergence
 from tqdm import tqdm  # type: ignore
 
 from ..components.tensor_factor import Message, TensorFactor
@@ -19,6 +20,10 @@ from ..utils import sum_tensors
 from ..variable import TensorVar, Var, at
 
 # cache = lru_cache(maxsize=None)
+# TODO: implement kl divergence or use from torchmetrics.functional
+# def kl_divergence(p, q, log_prob):
+#     assert log_prob
+#     return kl_div(q, target=p, log_target=True)
 
 
 class BPInference:
@@ -50,11 +55,11 @@ class BPInference:
         num_dims = len(old.shape)
         old = old.flatten(0, num_batch_dims - 1).flatten(1)
         new = new.flatten(0, num_batch_dims - 1).flatten(1)
-        out = kldivergence(new, Factor.normalize(
+        out = kl_divergence(new, Factor.normalize(
             old, num_batch_dims=num_batch_dims), log_prob=True)
         return out
 
-    def logz(self) -> torch.Tensor:
+    def logz(self) -> Tensor:
         region_free_energies = []
         for rid, r in enumerate(tqdm(self.strategy.regions, desc="Computing region energies...",
                                      delay=0.5, leave=False)):
@@ -76,13 +81,13 @@ class BPInference:
         else:
             # TODO: there is some waste here
             full = torch.zeros(
-                variable.origin.marginal_shape).as_subclass(torch.Tensor)  # type: ignore
+                variable.origin.marginal_shape).as_subclass(Tensor)  # type: ignore
             for sub_var in self.strategy.root_to_subs[variable.origin]:
                 sub_belief = self.region_belief(sub_var)
                 at(full, sub_var.out_slice)[(...,)] = sub_belief
             return full
 
-    def belief(self, variables: Union[Var, Sequence[Var]]) -> torch.Tensor:
+    def belief(self, variables: Union[Var, Sequence[Var]]) -> Tensor:
         r"""
         Each input variable has a tensor and an ndslice (or None to represent a
         request for the estimate of log Z); for each, we will return a tensor
@@ -146,6 +151,7 @@ class BPInference:
         source = self.strategy.regions[source_id]
         out_messages = [self.message((source_id, target_id)) for target_id in target_ids]
         in_messages = self.in_messages(source_id)
+        # print([t.tensor for t in out_messages], [t.tensor for t in in_messages])
         numerators = source.product_marginals([out.variables for out in out_messages],
                                               other_factors=in_messages)
         updated_messages = []
@@ -231,13 +237,14 @@ class BP(Inferencer):
 
     def __init__(self, strategy: Callable[[FactorGraph, int], Strategy] = BetheGraph,
                  passes: int = 3):
+        super().__init__()
         self.strategy_factory = strategy
         self.passes = passes
 
     # TODO: handle queries that are not in the graph
     def product_marginals_(self, factors: Sequence[Factor], *queries: Sequence[Var],
                            normalize: bool = True, append_total_change: bool = False
-                           ) -> Sequence[torch.Tensor]:
+                           ) -> Sequence[Tensor]:
         fg = FactorGraph(factors)
         strategy = self.strategy_factory(fg, self.passes)
         bp = BPInference(fg, strategy, compute_change=append_total_change)
@@ -245,7 +252,7 @@ class BP(Inferencer):
 
         if () in queries or not normalize:
             logz = bp.logz()
-        responses: List[torch.Tensor] = []
+        responses: List[Tensor] = []
         for query in queries:
             if query == ():
                 responses.append(logz)

@@ -1,11 +1,12 @@
 
-import math
 from typing import Dict
 
 import torch
-import torchfactors as tx
 from pytest import approx
+
+import torchfactors as tx
 from torchfactors.components.linear_factor import LinearFactor
+from torchfactors.inferencers.brute_force import BruteForce
 from torchfactors.learning import example_fit_model, tnested
 
 
@@ -40,6 +41,25 @@ def test_learning():
     assert out.v.flatten().tolist() == [0, 0]
 
 
+def test_ilearning():
+    model = MyModel()
+    num_steps = 0
+    iters = 5
+
+    def each_step(system, loader, example):
+        nonlocal num_steps
+        num_steps += 1
+
+    def criteria(i):
+        return i < iters
+
+    system = example_fit_model(model, examples=examples0, each_step=each_step, criteria=criteria,
+                               batch_size=1)
+    assert num_steps == iters * len(examples0)
+    out = system.predict(stacked_examples)
+    assert out.v.flatten().tolist() == [0, 0]
+
+
 def test_learning2():
     model = MyModel()
     num_counted = 0
@@ -61,6 +81,22 @@ def test_learning3():
     system = example_fit_model(model, examples=examples1, iterations=5,
                                batch_size=-1, log_info='off')
     out = system.predict(stacked_examples)
+    assert out.v.flatten().tolist() == [1, 1]
+
+
+def test_learning3i():
+    model = MyModel()
+    num_counted = 0
+    iters = 5
+
+    def each_epoch(system, loader, example):
+        nonlocal num_counted
+        num_counted += 1
+
+    system = example_fit_model(model, examples=examples1, criteria=lambda i: i < iters,
+                               batch_size=-1, log_info='off', each_epoch=each_epoch)
+    out = system.predict(stacked_examples)
+    assert num_counted == iters
     assert out.v.flatten().tolist() == [1, 1]
 
 
@@ -112,7 +148,8 @@ def test_learning4_with_penalty():
                       batch_size=-1, lr=1.0, penalty_coeff=coeff,
                       log_info=log_info)
     assert log_info['combo'] == approx(
-        log_info['loss'] + coeff * math.exp(log_info['penalty']))
+        torch.logaddexp(torch.tensor(log_info['loss']),
+                        torch.tensor(coeff ** log_info['exp_penalty'])))
 
 
 def test_learning4_without_penalty():
@@ -131,7 +168,17 @@ def test_learning5():
                                batch_size=-1, log_info=log_info)
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
-    assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
+    assert set(log_info.keys()) == {'i', 'j', 'loss', 'exp_penalty', 'combo'}
+
+
+def test_learning5_bruteforce():
+    model = MyModel()
+    log_info: Dict[str, float] = {}
+    system = example_fit_model(model, examples=examples1, iterations=5,
+                               batch_size=-1, log_info=log_info, inferencer=BruteForce())
+    out = system.predict(stacked_examples)
+    assert out.v.flatten().tolist() == [1, 1]
+    assert set(log_info.keys()) == {'i', 'j', 'loss', 'exp_penalty', 'combo'}
 
 
 def test_learning6():
@@ -153,8 +200,8 @@ def test_learning6():
                                batch_size=-1, log_info=log_info)
     out = system.predict(stacked_examples)
     assert out.v.flatten().tolist() == [1, 1]
-    assert set(log_info.keys()) == {'i', 'j', 'loss', 'penalty', 'combo'}
-    assert sets == ['i', 'j', 'loss', 'penalty', 'combo'] * num_iters
+    assert set(log_info.keys()) == {'i', 'j', 'loss', 'exp_penalty', 'combo'}
+    assert sets == ['i', 'j', 'loss', 'exp_penalty', 'combo'] * num_iters
 
 
 def test_tnested():

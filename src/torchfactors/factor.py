@@ -204,7 +204,10 @@ class Factor:
             (f.dense, with_batch_ids(f.variables)) for f in other_factors]]
         labeled_queries = [with_batch_ids(q) for q in queries]
 
+        # try:
         out = log_dot(input_tensors, labeled_queries, nan_to_num=True)
+        # except:
+        # out = slow_log_dot(input_tensors, labeled_queries, nan_to_num=True)
         return out
 
     @ staticmethod

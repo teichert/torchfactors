@@ -2,15 +2,19 @@
 
 import pytest
 import torch
+
 import torchfactors as tx
 from torchfactors.clique import (BinaryScoresModule,
                                  make_binary_label_variables,
                                  make_binary_threshold_variables)
 from torchfactors.components.at_least import KIsAtLeastJ
 from torchfactors.components.binary import Binary
+from torchfactors.components.collapsed_prop_odds import CollapsedProporionalOdds
 from torchfactors.components.nominal import Nominal
 from torchfactors.components.prop_odds import ProportionalOdds
 from torchfactors.components.stereotype import Stereotype
+from torchfactors.components.tensor_factor import \
+    linear_binary_to_ordinal_tensor
 from torchfactors.subject import Environment
 from torchfactors.testing import DummyParamNamespace, DummyVar
 from torchfactors.utils import num_trainable
@@ -144,27 +148,115 @@ def test_binary():
     model = Binary(latent=False)
     input = torch.ones(5, 7)
     factors = list(model.factors(env, params, a, b, input=input))
-    # factor for the pair and for each ordinal to binary
-    assert len(factors) == 3
-    assert factors[0].shape == (5, 2, 2)
-    assert factors[1].shape == (5, 4, 2)
-    assert factors[2].shape == (5, 3, 2)
+    assert len(factors) == 1
+    # single binary factor
+    assert factors[0].shape == (5, 4, 3)
+    # same for all inputs (which are the same)
+    d = factors[0].dense
+    assert d.allclose(d.mean(dim=0))
 
-    assert len(factors[0]) == 2
-    bin_a, bin_b = factors[0].variables
-    assert len(bin_a.domain) == 2
-    assert tuple(bin_a.marginal_shape) == (5, 2)
-    assert tuple(bin_b.marginal_shape) == (5, 2)
-    vars1 = factors[1].variables
-    assert tuple(vars1) == (a, bin_a)
-    vars2 = factors[2].variables
-    assert tuple(vars2) == (b, bin_b)
+    # assert factors[1].shape == (5, 4, 2)
+    # assert factors[2].shape == (5, 3, 2)
+
+    # assert len(factors[0]) == 2
+    # bin_a, bin_b = factors[0].variables
+    # assert len(bin_a.domain) == 2
+    # # assert tuple(bin_a.marginal_shape) == (5, 2)
+    # assert tuple(bin_b.marginal_shape) == (5, 2)
+    # vars1 = factors[1].variables
+    # assert tuple(vars1) == (a, bin_a)
+    # vars2 = factors[2].variables
+    # assert tuple(vars2) == (b, bin_b)
 
     [f.dense for f in factors]
-
     out_params = num_trainable(params.model)
     # binary configs (4) * (features plus bias) + binary to label mapping (for each)
-    expected_params = 4 * (7 + 1) + 2 * (4 + 3)
+    # expected_params = 4 * (7 + 1) + 2 * (4 + 3)
+    # expected_params = 4 * (7 + 1) + 2 * (4 + 3)
+
+    # 7 features + 1 bias
+    assert out_params == 8
+
+
+def test_linear_binary_to_ordinal_2():
+    assert linear_binary_to_ordinal_tensor(2).allclose(torch.tensor([
+        [0, 0],
+        [0, 1.0]
+    ]))
+
+
+def test_linear_binary_to_ordinal_3():
+    assert linear_binary_to_ordinal_tensor(3).allclose(torch.tensor([
+        [0, 0, 0],
+        [0, 0.5, 1.0]
+    ]))
+
+
+def test_linear_binary_to_ordinal_4():
+    assert linear_binary_to_ordinal_tensor(4).allclose(torch.tensor([
+        [0, 0, 0, 0],
+        [0, 1/3, 2/3, 1.0]
+    ]))
+
+
+def test_linear_binary_to_ordinal_5():
+    assert linear_binary_to_ordinal_tensor(5).allclose(torch.tensor([
+        [0, 0, 0, 0, 0],
+        [0, 0.25, 0.5, 0.75, 1.0]
+    ]))
+
+
+def test_latent_binary():
+    env = Environment()
+    model = Binary(latent=True)
+    params = DummyParamNamespace()
+    input = torch.ones(5, 8)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+
+    def factors():
+        yield from model.factors(env, params.namespace('a,b'), a, b, input=input)
+        yield from model.factors(env, params.namespace('a'), a, input=input)
+        yield from model.factors(env, params.namespace('b'), b, input=input)
+    fs = list(factors())
+    ts = [f.dense for f in fs if f is not None]
+    # one pairwise and two unary factors on the latent binary, plus one binary
+    # to ordinal for each variable,
+    assert len(ts) == 1 + 2 + 2
+    expected_params = (
+        8 +  # minimal weight between a and b latent binaries
+        8 +  # minimal weight on a latent binary
+        8 +  # minimal weight on b latent binary
+        3 +  # minimal bias on those three factors
+        3 +  # minimal bias between latent binary and a
+        2)  # minimal bias between latent binary and b
+    out_params = num_trainable(params.model)
+    assert out_params == expected_params
+
+
+def test_latent_binary_linear():
+    env = Environment()
+    model = Binary(latent=True, linear=True)
+    params = DummyParamNamespace()
+    input = torch.ones(5, 8)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+
+    def factors():
+        yield from model.factors(env, params.namespace('a,b'), a, b, input=input)
+        yield from model.factors(env, params.namespace('a'), a, input=input)
+        yield from model.factors(env, params.namespace('b'), b, input=input)
+    fs = list(factors())
+    ts = [f.dense for f in fs if f is not None]
+    # one pairwise and two unary factors on the latent binary, plus one binary
+    # to ordinal for each variable,
+    assert len(ts) == 1 + 2 + 2
+    expected_params = (
+        8 +  # minimal weight between a and b latent binaries
+        8 +  # minimal weight on a latent binary
+        8 +  # minimal weight on b latent binary
+        3)  # minimal bias on those three factors
+    out_params = num_trainable(params.model)
     assert out_params == expected_params
 
 
@@ -191,6 +283,88 @@ def test_nominal():
     assert v2 is b
 
 
+def test_collapsed_prop_odds_single():
+    env = Environment()
+    model = CollapsedProporionalOdds()
+    params = DummyParamNamespace()
+    input = torch.ones(5, 9)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    factors = list(model.factors(env, params, a, input=input))
+    densed = [f.dense for f in factors]
+    # one weight and one bias for for the entire thing (the bias doesn't
+    # look at input and the weight doesn't look at the configuration);
+    assert len(factors) == 2
+    assert len(factors) == len(densed)
+    assert all(f.shape == (5, 4) for f in factors[:2])
+    out_params = num_trainable(params.model)
+    # features * num_bin_configs + num_full_configs for bias
+    expected_params = 9 + 3
+    assert out_params == expected_params
+    inferencer = tx.BruteForce()
+    # sys = tx.System(model, )
+    loglikelihood, _ = inferencer.partition_with_change(factors)
+    print(loglikelihood)
+    loglikelihood.mean().backward()
+    print(list(params.model.parameters()))
+    print('done')
+
+
+def test_collapsed_prop_odds_double():
+    env = Environment()
+    model = CollapsedProporionalOdds()
+    params = DummyParamNamespace()
+    input = torch.ones(5, 9)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+    factors = list(model.factors(env, params, a, b, input=input))
+    densed = [f.dense for f in factors]
+    # one weight and one bias for for the entire thing (the bias doesn't look at
+    # input and the weight doesn't look at the configuration);
+    assert len(factors) == 2
+    assert len(factors) == len(densed)
+    assert all(f.shape == (5, 4, 3) for f in factors[:2])
+    out_params = num_trainable(params.model)
+    # features * num_bin_configs + num_full_configs for bias
+    expected_params = 9 + 3 * 2
+    assert out_params == expected_params
+    inferencer = tx.BruteForce()
+    # sys = tx.System(model, )
+    loglikelihood, _ = inferencer.partition_with_change(factors)
+    print(loglikelihood)
+    loglikelihood.mean().backward()
+    print(list(params.model.parameters()))
+    print('done')
+
+
+def test_prop_odds_single():
+    env = Environment()
+    model = ProportionalOdds()
+    params = DummyParamNamespace()
+    input = torch.ones(5, 9)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    factors = list(model.factors(env, params, a, input=input))
+    densed = [f.dense for f in factors]
+    # one weight and one bias factor for each configuration that excludes 1;
+    # plus mapping factor for each label that excludes 1
+    assert len(factors) == 3 * 2 + 3
+    assert len(factors) == len(densed)
+    assert all(f.shape == (5, 2) for f in factors[:6])
+    assert all(f.shape == (5, 4, 2) for f in factors[6:])
+
+    out_params = num_trainable(params.model)
+    # features * num minimal bin configs = 9 * 1 plus bias for each label but zero (3)
+    expected_params = 9 + 3
+    assert out_params == expected_params
+
+    inferencer = tx.BruteForce()
+    # sys = tx.System(model, )
+    loglikelihood, _ = inferencer.partition_with_change(factors)
+    print(loglikelihood)
+    loglikelihood.mean().backward()
+    print(list(params.model.parameters()))
+    print('done')
+
+
 def test_prop_odds():
     env = Environment()
     model = ProportionalOdds()
@@ -199,17 +373,25 @@ def test_prop_odds():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     factors = list(model.factors(env, params, a, b, input=input))
-    [f.dense for f in factors]
-    # pairing 3 binary to other 2 binary and adding in mapping for each
-    assert len(factors) == 3 * 2 + 3 + 2
-    assert all(f.shape == (5, 2, 2) for f in factors[:-5])
-    assert all(f.shape == (5, 4, 2) for f in factors[6:9])
-    assert all(f.shape == (5, 3, 2) for f in factors[9:])
+    densed = [f.dense for f in factors]
+    # one weight and one bias factor for each configuration that excludes 1 (no
+    # mapping since len > 1)
+    assert len(factors) == (3 * 2) * 2
+    assert len(factors) == len(densed)
+    assert all(f.shape == (5, 2, 2) for f in factors[:6])
 
     out_params = num_trainable(params.model)
-    # features * num_bin_configs + num_full_configs for bias
-    expected_params = 9 * 4 + 4 * 3
+    # features * num minimal bin configs = 9 * 1 plus bias for each label but zero (3)
+    expected_params = 9 * 1 + (3 * 2)
     assert out_params == expected_params
+
+    inferencer = tx.BruteForce()
+    # sys = tx.System(model, )
+    loglikelihood, _ = inferencer.partition_with_change(factors)
+    print(loglikelihood)
+    loglikelihood.mean().backward()
+    print(list(params.model.parameters()))
+    print('done')
 
 
 def test_non_linear_stereotype():

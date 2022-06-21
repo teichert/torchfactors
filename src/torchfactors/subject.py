@@ -86,10 +86,14 @@ class Environment(object):
                 out = factory()
                 return self.variables.setdefault(key, out)
 
-    def factor(self, key: Hashable, factory: Optional[Callable[[], Factor]] = None) -> Factor:
+    def factor(self, key: Hashable, factory: Optional[Callable[[], Factor]] = None,
+               include_duplicates=False) -> Optional[Factor]:
         try:
             out = self.factors[key]
-            return out
+            if include_duplicates:
+                return out
+            else:
+                return None
         except KeyError:
             if factory is None:
                 raise KeyError(f"key {key} not found and no factory provided")
@@ -282,14 +286,12 @@ class Subject:
                           **kwargs)
 
     def clamp_annotated(self: SubjectType):
-        r"""Returns a clone of the input example with annotated variable cells
-        being marked as clamped"""
+        r"""annotated usages go to clamped"""
         for attr_name in tqdm(self.__varset, leave=False, delay=0.5, desc="Clamping ..."):
             cast(TensorVar, getattr(self, attr_name)).clamp_annotated()
 
     def unclamp_annotated(self: SubjectType):
-        r"""Returns a clone of the input example with clamped variable cells
-        being marked as annotated"""
+        r"""clamped usages go to annotated"""
         for attr_name in tqdm(self.__varset, leave=False, delay=0.5, desc="Unclamping ..."):
             cast(TensorVar, getattr(self, attr_name)).unclamp_annotated()
 

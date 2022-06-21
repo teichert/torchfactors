@@ -96,6 +96,76 @@ def _log_dot(tensors: List[Tuple[Tensor, List[int]]],
 
 
 @torch.jit.script
+def _slow_log_dot(tensors: List[Tuple[Tensor, List[int]]],
+                  ordered_queries: List[Tuple[List[int], List[int]]],
+                  full_shape: List[int],
+                  nan_to_num: bool = False) -> List[Tensor]:  # pragma: no cover
+    r"""
+    This version assumes that all ids are integers between 0 and len(full_shape),
+    and that all tensors and queries are in increasing order of those ids
+    """
+    permuted_answers = [torch.zeros([full_shape[d] for d in q], dtype=torch.float)
+                        for q, _ in ordered_queries]
+    config = [0 for _ in full_shape]
+    config[-1] = -1  # make it so we can advance on the first one
+    num_configs = 0
+    while True:
+        # move to the next config by incrementing the last possible dimension
+        # and then filling with zeros
+        while config:
+            dim = len(config) - 1
+            if config[dim] < full_shape[dim] - 1:
+                config[dim] += 1
+                while len(config) < len(full_shape):
+                    config.append(0)
+                break
+            else:
+                config.pop()
+        if not config:
+            break
+        num_configs += 1
+        if num_configs % 1000 == 0:
+            print(num_configs)
+        # get the score for this config
+        cell_score = torch.tensor(0.0)
+        for factor, dims in tensors:
+            sub_factor = factor
+            factor_dimensions_used = 0
+            for Y, y in enumerate(config):
+                if factor_dimensions_used == len(dims):
+                    break
+                if Y == dims[factor_dimensions_used]:
+                    sub_factor = sub_factor[y]
+                    factor_dimensions_used += 1
+            cell_score += sub_factor
+
+        # add the score to all relevant queries
+        for answer, (q, _) in zip(permuted_answers, ordered_queries):
+            # get the query-specific config by
+            sub_config = [config[ix] for ix in q]
+            answer[sub_config] = torch.logaddexp(answer[sub_config], cell_score)
+    answers = [orig.permute(unpermute)
+               if len(q) > 0 else orig
+               for orig, (q, unpermute) in zip(permuted_answers, ordered_queries)]
+    return answers
+
+
+@torch.jit.script
+def slow_log_dot(tensors: List[Tuple[Tensor, List[str]]],
+                 queries: List[List[str]],
+                 nan_to_num: bool = False) -> List[Tensor]:  # pragma: no cover
+    """
+    Carries out a generalized tensor dot product across multiple named
+    tensors.
+    """
+    name_to_ix: Dict[str, Tuple[int, int]] = {}
+    out_tensors = [_map_and_order_tensor(t, name_to_ix, names) for t, names in tensors]
+    shape = [size for _, size in name_to_ix.values()]
+    out_queries = [_map_and_order_names(name_to_ix, names) for names in queries]
+    return _slow_log_dot(out_tensors, out_queries, shape, nan_to_num)
+
+
+@torch.jit.script
 def log_dot(tensors: List[Tuple[Tensor, List[str]]],
             queries: List[List[str]],
             nan_to_num: bool = False) -> List[Tensor]:  # pragma: no cover

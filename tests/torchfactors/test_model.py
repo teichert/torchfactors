@@ -1,21 +1,24 @@
 import math
+import os
+import tempfile
 from dataclasses import dataclass
 from typing import Iterable
 
 import pytest
 import torch
 from pytest import approx
-from torch.functional import Tensor
+from torch import Tensor
 from torch.nn import functional as F
-from torchfactors.components.tensor_factor import TensorFactor
-from torchfactors.domain import FlexDomain
-from torchfactors.model import ParamNamespace
-from torchfactors.testing import DummyParamNamespace, DummySubject
 
 import torchfactors as tx
-from config import build_module
 from torchfactors import (BP, LATENT, Factor, Model, Range, Subject, System,
                           Var, VarField)
+from torchfactors.components.tensor_factor import TensorFactor
+from torchfactors.domain import FlexDomain
+from torchfactors.inferencers.brute_force import BruteForce
+from torchfactors.model import ParamNamespace
+from torchfactors.testing import DummyParamNamespace, DummySubject
+from torchfactors.variable import VarUsage
 
 
 @dataclass
@@ -113,7 +116,7 @@ def test_modules():
     params = list(module2.parameters())
     assert len(params) == 1
     assert params[0].T.shape == (4, 5)
-    module3 = build_module('torch.nn.Linear', in_features=4, out_features=5, bias=False)
+    module3 = tx.model.build_module('torch.nn.Linear', in_features=4, out_features=5, bias=False)
     params3 = list(module3.parameters())
     assert params3[0].T.shape == (4, 5)
 
@@ -170,42 +173,56 @@ def test_model_inferencer():
     assert (marg.exp() == torch.tensor([0, 0, 0, 1, 0])).all()
 
 
+@dataclass
+class MySubject_inferencer2(Subject):
+    items: Var = VarField(Range(5), LATENT, shape=(7,))
+
+
+class MyModel_inferencer2(Model[MySubject_inferencer2]):
+    def factors(self, s: MySubject_inferencer2):
+        first = s.items[..., 0]
+        dom_size = len(first.domain)
+        # the first one should be likely on 3
+        yield TensorFactor(first,
+                           tensor=(
+                               F.one_hot(torch.tensor(3), dom_size) +
+                               F.one_hot(torch.tensor(1), dom_size))
+                           .log())
+        n = s.items.shape[-1]
+        # all of them should be the same
+        for i in range(n - 1):
+            cur = s.items[..., i]
+            next = s.items[..., i + 1]
+            yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
+
+
 def test_model_inferencer2():
-
-    @dataclass
-    class MySubject(Subject):
-        items: Var = VarField(Range(5), LATENT, shape=(7,))
-
-    class MyModel(Model[MySubject]):
-        def factors(self, s: MySubject):
-            first = s.items[..., 0]
-            dom_size = len(first.domain)
-            # the first one should be likely on 3
-            yield TensorFactor(first,
-                               tensor=(
-                                   F.one_hot(torch.tensor(3), dom_size) +
-                                   F.one_hot(torch.tensor(1), dom_size))
-                               .log())
-            n = s.items.shape[-1]
-            # all of them should be the same
-            for i in range(n - 1):
-                cur = s.items[..., i]
-                next = s.items[..., i + 1]
-                yield TensorFactor(cur, next, tensor=torch.eye(dom_size).log())
-
-    model = MyModel()
+    model = MyModel_inferencer2()
     system = System(model=model, inferencer=BP())
-    out = system.predict(MySubject())
+    out = system.predict(MySubject_inferencer2())
     out_t = out.items.tensor
     assert (out_t == 1).logical_or(out_t == 3).all()
 
     # there are only 2 options since they all need to be the same
-    logz = system.product_marginal(MySubject())
+    logz = system.product_marginal(MySubject_inferencer2())
     assert float(logz) == approx(math.log(2))
 
-    x = MySubject()
+    x = MySubject_inferencer2()
     marg, = system.product_marginals(x, [x.items[..., 2]])
     assert (marg.exp() == torch.tensor([0, 0.5, 0, 0.5, 0])).all()
+
+    subj = MySubject_inferencer2()
+    subj.items.set_usage(VarUsage.ANNOTATED)
+    subj.items.tensor = torch.tensor(3)
+    assert system.log_likelihood(subj).exp() == approx(0.5)
+
+
+def test_model_inferencer2_brute():
+    model = MyModel_inferencer2()
+    system = System(model=model, inferencer=BruteForce())
+    out = system.predict(MySubject_inferencer2())
+    out_t = out.items.tensor
+    assert (out_t == 1).logical_or(out_t == 3).all()
 
 
 @dataclass
@@ -258,16 +275,18 @@ def test_model_domain_state_dict():
     ids2 = model.domain_ids(domain, values2).tolist()
     assert ids2 == [2, 4, 2, 5, 1, 3, 1]
     state = model.state_dict()
-    torch.save(state, 'test_model.pt')
-    loaded_state = torch.load('test_model.pt')
-    model2 = Model[DummySubject]()
-    model2.load_state_dict(loaded_state)
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = os.path.join(test_dir, '__test_model.pt')
+        torch.save(state, path)
+        loaded_state = torch.load(path)
+        model2 = Model[DummySubject]()
+        model2.load_state_dict(loaded_state)
 
-    domain2 = FlexDomain('test', unk=True)
-    out2 = model2.domain_ids(domain2, values2).tolist()
-    assert out2 == ids2
-    out1 = model2.domain_ids(domain2, values1).tolist()
-    assert out1 == ids1
+        domain2 = FlexDomain('test', unk=True)
+        out2 = model2.domain_ids(domain2, values2).tolist()
+        assert out2 == ids2
+        out1 = model2.domain_ids(domain2, values1).tolist()
+        assert out1 == ids1
 
 
 def test_model_domain_state_dict_with_params():
@@ -286,19 +305,31 @@ def test_model_domain_state_dict_with_params():
     paramsb = model.namespace('hi').parameter()
     assert (paramsb == params).all()
     state = model.state_dict()
-    torch.save(state, 'test_model.pt')
-    loaded_state = torch.load('test_model.pt')
-    model2 = Model[DummySubject]()
-    model2.load_state_dict(loaded_state)
-    params2 = model2.namespace('hi').parameter()
-    assert (params2 == params).all()
-    assert (params2 == torch.ones(3, 5) * 3).all()
 
-    domain2 = FlexDomain('test', unk=True)
-    out2 = model2.domain_ids(domain2, values2).tolist()
-    assert out2 == ids2
-    out1 = model2.domain_ids(domain2, values1).tolist()
-    assert out1 == ids1
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = os.path.join(test_dir, '__test_model.pt')
+        torch.save(state, path)
+        loaded_state = torch.load(path)
+        model2 = Model[DummySubject]()
+        model2.load_state_dict(loaded_state)
+        params2 = model2.namespace('hi').parameter()
+        assert (params2 == params).all()
+        assert (params2 == torch.ones(3, 5) * 3).all()
+
+        domain2 = FlexDomain('test', unk=True)
+        out2 = model2.domain_ids(domain2, values2).tolist()
+        assert out2 == ids2
+        out1 = model2.domain_ids(domain2, values1).tolist()
+        assert out1 == ids1
+
+        domain3: FlexDomain = model2.domain('testing')
+        assert domain3.get_id('test') == 0
+        assert domain3.get_id('test2') == 1
+        assert domain3.get_id('test') == 0
+
+        domain4: FlexDomain = model2.domain('testing')
+        assert domain4.get_id('test2') == 1
+        assert domain4.get_id('test') == 0
 
 
 def test_model_domain_state_dict_with_params_and_modules():
@@ -321,21 +352,23 @@ def test_model_domain_state_dict_with_params_and_modules():
     paramsb = model.namespace('hi').parameter()
     assert (paramsb == params).all()
     state = model.state_dict()
-    torch.save(state, 'test_model.pt')
-    loaded_state = torch.load('test_model.pt')
-    model2 = Model[DummySubject]()
-    model2.load_state_dict(loaded_state)
-    params2 = model2.namespace('hi').parameter()
-    assert (params2 == params).all()
-    assert (params2 == torch.ones(3, 5) * 3).all()
-    module2 = model2.namespace('hi2').module()
-    out_from_module2 = module2(params2)
-    assert (out_from_module2 == out_from_module).all()
-    domain2 = FlexDomain('test', unk=True)
-    out2 = model2.domain_ids(domain2, values2).tolist()
-    assert out2 == ids2
-    out1 = model2.domain_ids(domain2, values1).tolist()
-    assert out1 == ids1
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = os.path.join(test_dir, '__test_model.pt')
+        torch.save(state, path)
+        loaded_state = torch.load(path)
+        model2 = Model[DummySubject]()
+        model2.load_state_dict(loaded_state)
+        params2 = model2.namespace('hi').parameter()
+        assert (params2 == params).all()
+        assert (params2 == torch.ones(3, 5) * 3).all()
+        module2 = model2.namespace('hi2').module()
+        out_from_module2 = module2(params2)
+        assert (out_from_module2 == out_from_module).all()
+        domain2 = FlexDomain('test', unk=True)
+        out2 = model2.domain_ids(domain2, values2).tolist()
+        assert out2 == ids2
+        out1 = model2.domain_ids(domain2, values1).tolist()
+        assert out1 == ids1
 
 
 def test_load_model1():
@@ -358,20 +391,21 @@ def test_load_model1():
     paramsb = model.namespace('hi').parameter()
     assert (paramsb == params).all()
     state = model.state_dict()
-    path = '__test_model.pt'
-    torch.save(state, path)
-    model2 = Model[DummySubject](model_state_dict_path=path)
-    params2 = model2.namespace('hi').parameter()
-    assert (params2 == params).all()
-    assert (params2 == torch.ones(3, 5) * 3).all()
-    module2 = model2.namespace('hi2').module()
-    out_from_module2 = module2(params2)
-    assert (out_from_module2 == out_from_module).all()
-    domain2 = FlexDomain('test', unk=True)
-    out2 = model2.domain_ids(domain2, values2).tolist()
-    assert out2 == ids2
-    out1 = model2.domain_ids(domain2, values1).tolist()
-    assert out1 == ids1
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = os.path.join(test_dir, '__test_model.pt')
+        torch.save(state, path)
+        model2 = Model[DummySubject](model_state_dict_path=path)
+        params2 = model2.namespace('hi').parameter()
+        assert (params2 == params).all()
+        assert (params2 == torch.ones(3, 5) * 3).all()
+        module2 = model2.namespace('hi2').module()
+        out_from_module2 = module2(params2)
+        assert (out_from_module2 == out_from_module).all()
+        domain2 = FlexDomain('test', unk=True)
+        out2 = model2.domain_ids(domain2, values2).tolist()
+        assert out2 == ids2
+        out1 = model2.domain_ids(domain2, values1).tolist()
+        assert out1 == ids1
 
 
 def test_load_model2():
@@ -394,17 +428,18 @@ def test_load_model2():
     paramsb = model.namespace('hi').parameter()
     assert (paramsb == params).all()
     state = model.state_dict()
-    path = '__test_model2.pt'
-    torch.save(dict(state_dict=state), path)
-    model2 = Model[DummySubject](checkpoint_path=path)
-    params2 = model2.namespace('hi').parameter()
-    assert (params2 == params).all()
-    assert (params2 == torch.ones(3, 5) * 3).all()
-    module2 = model2.namespace('hi2').module()
-    out_from_module2 = module2(params2)
-    assert (out_from_module2 == out_from_module).all()
-    domain2 = FlexDomain('test', unk=True)
-    out2 = model2.domain_ids(domain2, values2).tolist()
-    assert out2 == ids2
-    out1 = model2.domain_ids(domain2, values1).tolist()
-    assert out1 == ids1
+    with tempfile.TemporaryDirectory() as test_dir:
+        path = os.path.join(test_dir, '__test_model2.pt')
+        torch.save(dict(state_dict=state), path)
+        model2 = Model[DummySubject](checkpoint_path=path)
+        params2 = model2.namespace('hi').parameter()
+        assert (params2 == params).all()
+        assert (params2 == torch.ones(3, 5) * 3).all()
+        module2 = model2.namespace('hi2').module()
+        out_from_module2 = module2(params2)
+        assert (out_from_module2 == out_from_module).all()
+        domain2 = FlexDomain('test', unk=True)
+        out2 = model2.domain_ids(domain2, values2).tolist()
+        assert out2 == ids2
+        out1 = model2.domain_ids(domain2, values1).tolist()
+        assert out1 == ids1

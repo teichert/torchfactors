@@ -34,6 +34,27 @@ def tnested(itr: Iterable[T], times: int, log_info=None, leave=True, **kwargs
                 t.set_postfix(**log_info, refresh=False)
 
 
+def inested(itr: Iterable[T], criteria) -> Iterable[Tuple[int, int, T]]:
+    items = list(itr)
+    i = 0
+    while criteria(i):
+        for j, obj in enumerate(items):
+            yield i, j, obj
+        i += 1
+
+
+def tinested(itr: Iterable[T], criteria, log_info=None, leave=True, **kwargs
+             ) -> Iterable[Tuple[int, int, T]]:
+    items = list(itr)
+    if log_info is None:
+        yield from tqdm(inested(items, criteria), leave=leave, **kwargs)
+    else:
+        with tqdm(inested(items, criteria), leave=leave, **kwargs) as t:
+            for i, j, obj in t:
+                yield i, j, obj
+                t.set_postfix(**log_info, refresh=False)
+
+
 class SystemRunner(Protocol):
 
     def __call__(self, system: System[SubjectType],
@@ -43,10 +64,12 @@ class SystemRunner(Protocol):
 
 def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType],
                       iterations: int = 10,
+                      criteria=None,
                       each_step: Optional[SystemRunner] = None,
                       each_epoch: Optional[SystemRunner] = None,
                       batch_size: int = -1, penalty_coeff=1, passes=3,
                       log_info: Union[None, dict, str] = None,
+                      inferencer=None,
                       optimizer_cls: Type[Optimizer] = torch.optim.Adam,
                       **optimizer_kwargs
                       ) -> System[SubjectType]:
@@ -59,33 +82,34 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
     logging.info('loading...')
     data_loader = examples[0].data_loader(list(examples), batch_size=batch_size)
     logging.info('done loading.')
-    system = System(model, BP(passes=passes))
+    if inferencer is None:
+        inferencer = BP(passes=passes)
+    system = System(model, inferencer)
     system.prime(data_loader)
     optimizer = optimizer_cls(model.parameters(), **optimizer_kwargs)
-    logging.info('staring training...')
+    logging.info('starting training...')
     if log_info is None:
         log_info = {}
     elif log_info == 'off':
         log_info = None
     data: SubjectType
-    for i, j, data in tnested(data_loader, iterations, log_info=log_info):
+    itr = tnested(data_loader, iterations, log_info=log_info) if criteria is None else tinested(
+        data_loader, criteria, log_info=log_info)
+    for i, j, data in itr:
         if isinstance(log_info, dict):
             log_info['i'] = i
             log_info['j'] = j
 
         def closure():
             optimizer.zero_grad()
-            data.clamp_annotated()
-            logz_clamped = system.product_marginal(data)
-            data.unclamp_annotated()
-            logz_free, penalty = system.partition_with_change(data)
-            loss = (logz_free - logz_clamped).clamp_min(0).sum()
-            penalty = penalty.sum()
+            ll, change = system.log_likelihood_with_change(data)
+            loss = -ll.sum()
+            penalty = change.sum()
             if isinstance(log_info, dict):
                 log_info['loss'] = float(loss)
-                log_info['penalty'] = float(penalty)
+                log_info['exp_penalty'] = float(penalty)
             if penalty_coeff != 0:
-                loss = loss + penalty_coeff * penalty.exp()
+                loss = torch.logaddexp(loss, penalty_coeff ** penalty)
             if isinstance(log_info, dict):
                 log_info['combo'] = float(loss)
             if loss.requires_grad:
@@ -97,4 +121,6 @@ def example_fit_model(model: Model[SubjectType], examples: Sequence[SubjectType]
             each_step(system, data_loader, data)
         if j == 0 and each_epoch is not None:
             each_epoch(system, data_loader, data)
+            # print('params')
+            # print([p.grad for p in system.model.parameters()])
     return system

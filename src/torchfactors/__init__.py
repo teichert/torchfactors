@@ -3,10 +3,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from config import Config
 from torch.nn.functional import one_hot
 
-from . import skip_some_warnings  # noqa
 from . import learning
 from .clique import CliqueModel
 from .components.linear_factor import LinearFactor, ShapedLinear
@@ -17,6 +15,7 @@ from .factor import Factor
 from .factor_graph import FactorGraph
 from .inferencer import Inferencer
 from .inferencers.bp import BP
+from .inferencers.brute_force import BruteForce
 from .model import Model
 from .model_inferencer import System
 from .strategies.bethe_graph import BetheGraph
@@ -59,5 +58,6 @@ __all__ = [
     'Inferencer',
     'System',
     'BP',
+    'BruteForce',
     'learning', 'log_dot'
 ]

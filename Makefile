@@ -6,28 +6,14 @@ check:
 check-all:
 	make lint type test --keep-going
 
-.PHONY: install
+.PHONY: installlin
 install: pyproject.lock
 
-.PHONY: install-python
-install-python:
-	wget -qO- https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
-	~/bin/micromamba shell init -s bash -p ~/micromamba
-	echo "micromamba activate"
-	source ~/.bashrc
-	micromamba install python=3.9
-
-.PHONY: install-poetry
-install-poetry:
-	python -m pip install --user -U pipx
-	# installing poetry with pipx allows env to be free of poetry dependencies
-	python -m pipx ensurepath
-	python -m pipx install poetry
-	python -m pipx upgrade poetry
 
 pyproject.lock: pyproject.toml
-	poetry update
-	poetry install --remove-untracked
+	# rm poetry.lock
+	poetry update -vvv
+	poetry install --sync -vvv
 	touch pyproject.lock
 
 .PHONY: test
@@ -35,17 +21,6 @@ cov :=
 test: pyproject.lock
 	@echo "running tests..."
 	poetry run python -m pytest --cov=src $(cov) --cov-branch --cov-report term-missing:skip-covered --cov-report html --codeblocks
-
-.PHONY: test-one
-test-one: pyproject.lock
-	@echo "running test..."
-	poetry run python -m pytest -x -s -vvv
-
-t := "."
-.PHONY: test1
-test1: pyproject.lock
-	@echo "running test..."
-	poetry run python -m pytest -x -s -vvv -k $t
 
 .PHONY: lint
 lint: pyproject.lock
@@ -57,21 +32,54 @@ type: pyproject.lock
 	@echo "running type checker..."
 	poetry run python -m mypy . --check-untyped-defs
 
+.PHONY: doc
+doc: pyproject.lock
+	poetry run python -m pdoc -o ./docs src
+
+examples/spr/protoroles_eng_ud1.2_11082016.tsv:
+	mkdir -p examples/spr
+	cd examples/spr; wget http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
+	cd examples/spr; tar xvf protoroles_eng_udewt.tar.gz
+
 # .PHONY: profile
 # profile: pyproject.lock
 # 	@echo "running profiler..."
 # 	# poetry run py-spy record -f speedscope --full-filenames --rate 200 -n -- python examples/unigram.py
 # 	cd examples; poetry run python -m scalene unigram.py --profile-all
 
-.PHONY: doc
-doc: pyproject.lock
-	poetry run python -m pdoc -o ./docs src
+.PHONY: install-python
+install-python:
+	mkdir -p ~/bin
+	cd ~; curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+	~/bin/micromamba shell init -s bash -p ~/micromamba
+	echo "micromamba activate"
+	source ~/.bashrc
+	micromamba -p ~/micromamba install -c conda-forge -y python=3.9
 
+# actually, I'm doing this (required following a couple of manual instructions with sude so as to avoid doing this command with sudo):
+# curl -sSL https://install.python-poetry.org | python3 - -preview
+.PHONY: install-poetry
+install-poetry:
+	echo "if you needed to install python via micromamba, use: micromamba activate"
+	curl -sSL https://install.python-poetry.org/ | POETRY_PREVIEW=1 python
+	. ~/.bashrc
+	# poetry self update --preview
+	# python -m pip install --user -U pipx
+	# installing poetry with pipx allows env to be free of poetry dependencies
+	# python -m pipx ensurepath
+	# python -m pipx install poetry
+	# python -m pipx upgrade poetry
 
-examples/spr/protoroles_eng_ud1.2_11082016.tsv:
-	mkdir -p examples/spr
-	cd examples/spr; wget http://decomp.io/projects/semantic-proto-roles/protoroles_eng_udewt.tar.gz
-	cd examples/spr; tar xvf protoroles_eng_udewt.tar.gz
+.PHONY: test-one
+test-one: pyproject.lock
+	@echo "running test..."
+	poetry run python -m pytest -x -s -vvv
+
+t := "."
+.PHONY: test1
+test1: pyproject.lock
+	@echo "running test..."
+	poetry run python -m pytest -x -s -vvv --pdb -k $t
 
 eargs := --batch_size 10000
 edeps := examples/spr/protoroles_eng_ud1.2_11082016.tsv
