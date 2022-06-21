@@ -308,6 +308,31 @@ def test_collapsed_prop_odds_single():
     print(list(params.model.parameters()))
     print('done')
 
+def test_collapsed_prop_odds_double():
+    env = Environment()
+    model = CollapsedProporionalOdds()
+    params = DummyParamNamespace()
+    input = torch.ones(5, 9)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+    factors = list(model.factors(env, params, a, b, input=input))
+    densed = [f.dense for f in factors]
+    # one weight and one bias for for the entire thing (the bias doesn't look at input and the weight doesn't look at the configuration);
+    assert len(factors) == 2
+    assert len(factors) == len(densed)
+    assert all(f.shape == (5, 4, 3) for f in factors[:2])
+    out_params = num_trainable(params.model)
+    # features * num_bin_configs + num_full_configs for bias
+    expected_params = 9 + 3 * 2
+    assert out_params == expected_params
+    inferencer = tx.BruteForce()
+    # sys = tx.System(model, )
+    loglikelihood, _ = inferencer.partition_with_change(factors)
+    print(loglikelihood)
+    loglikelihood.mean().backward()
+    print(list(params.model.parameters()))
+    print('done')
+
 def test_prop_odds_single():
     env = Environment()
     model = ProportionalOdds()
@@ -316,23 +341,22 @@ def test_prop_odds_single():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
     factors = list(model.factors(env, params, a, input=input))
     densed = [f.dense for f in factors]
-    # one weight and one bias for for the entire thing (the bias doesn't look at input and the weight doesn't look at the configuration);
-    # plus one ordinal to binary factor
-    assert len(factors) == 3
+    # one weight and one bias factor for each configuration that excludes 1; plus mapping factor for each label that excludes 1
+    assert len(factors) == 3 * 2 + 3
     assert len(factors) == len(densed)
-    assert all(f.shape == (5, 4) for f in factors[:2])
-    assert all(f.shape == (5, 4, 2) for f in factors[2:])
+    assert all(f.shape == (5, 2) for f in factors[:6])
+    assert all(f.shape == (5, 4, 2) for f in factors[6:])
 
     out_params = num_trainable(params.model)
-    # features * num_bin_configs + num_full_configs for bias
-    expected_params = 9 + 4
+    # features * num minimal bin configs = 9 * 1 plus bias for each label but zero (3)
+    expected_params = 9 + 3
     assert out_params == expected_params
 
     inferencer = tx.BruteForce()
     # sys = tx.System(model, )
     loglikelihood, _ = inferencer.partition_with_change(factors)
     print(loglikelihood)
-    loglikelihood.backward()
+    loglikelihood.mean().backward()
     print(list(params.model.parameters()))
     print('done')
 
@@ -345,23 +369,22 @@ def test_prop_odds():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     factors = list(model.factors(env, params, a, b, input=input))
-    [f.dense for f in factors]
-    # pairing 3 binary to other 2 binary and adding in mapping for each
-    assert len(factors) == 3 * 2 + 3 + 2
-    assert all(f.shape == (5, 2, 2) for f in factors[:-5])
-    assert all(f.shape == (5, 4, 2) for f in factors[6:9])
-    assert all(f.shape == (5, 3, 2) for f in factors[9:])
+    densed = [f.dense for f in factors]
+    # one weight and one bias factor for each configuration that excludes 1 (no mapping since len > 1)
+    assert len(factors) == (3 * 2) * 2
+    assert len(factors) == len(densed)
+    assert all(f.shape == (5, 2, 2) for f in factors[:6])
 
     out_params = num_trainable(params.model)
-    # features * num_bin_configs + num_full_configs for bias
-    expected_params = 9 * 4 + 4 * 3
+    # features * num minimal bin configs = 9 * 1 plus bias for each label but zero (3)
+    expected_params =  9 * 1 + (3 * 2)
     assert out_params == expected_params
 
     inferencer = tx.BruteForce()
     # sys = tx.System(model, )
     loglikelihood, _ = inferencer.partition_with_change(factors)
     print(loglikelihood)
-    loglikelihood.backward()
+    loglikelihood.mean().backward()
     print(list(params.model.parameters()))
     print('done')
 
