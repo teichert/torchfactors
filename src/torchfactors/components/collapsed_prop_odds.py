@@ -17,7 +17,7 @@ from ..subject import Environment
 from ..variable import Var
 from torchfactors.components.binary import make_binary_factor
 
-class ProportionalOdds(CliqueModel):
+class CollapsedProporionalOdds(CliqueModel):
     """
     Models a group of ordinal variables via a separate binary variable for
     each value of each variable (except the zero): the probability

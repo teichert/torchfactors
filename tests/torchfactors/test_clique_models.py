@@ -10,6 +10,7 @@ from torchfactors.clique import (BinaryScoresModule,
                                  make_binary_threshold_variables)
 from torchfactors.components.at_least import KIsAtLeastJ
 from torchfactors.components.binary import Binary
+from torchfactors.components.collapsed_prop_odds import CollapsedProporionalOdds
 from torchfactors.components.nominal import Nominal
 from torchfactors.components.prop_odds import ProportionalOdds
 from torchfactors.components.stereotype import Stereotype
@@ -175,8 +176,8 @@ def test_binary():
     # expected_params = 4 * (7 + 1) + 2 * (4 + 3)
     # expected_params = 4 * (7 + 1) + 2 * (4 + 3)
 
-    # just a single param saying how much for both to be on
-    assert out_params == 1
+    # 7 features + 1 bias
+    assert out_params == 8
 
 
 def test_linear_binary_to_ordinal_2():
@@ -283,6 +284,30 @@ def test_nominal():
     assert v1 is a
     assert v2 is b
 
+def test_collapsed_prop_odds_single():
+    env = Environment()
+    model = CollapsedProporionalOdds()
+    params = DummyParamNamespace()
+    input = torch.ones(5, 9)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    factors = list(model.factors(env, params, a, input=input))
+    densed = [f.dense for f in factors]
+    # one weight and one bias for for the entire thing (the bias doesn't look at input and the weight doesn't look at the configuration);
+    assert len(factors) == 2
+    assert len(factors) == len(densed)
+    assert all(f.shape == (5, 4) for f in factors[:2])
+    out_params = num_trainable(params.model)
+    # features * num_bin_configs + num_full_configs for bias
+    expected_params = 9 + 3
+    assert out_params == expected_params
+    inferencer = tx.BruteForce()
+    # sys = tx.System(model, )
+    loglikelihood, _ = inferencer.partition_with_change(factors)
+    print(loglikelihood)
+    loglikelihood.mean().backward()
+    print(list(params.model.parameters()))
+    print('done')
+
 def test_prop_odds_single():
     env = Environment()
     model = ProportionalOdds()
@@ -291,16 +316,16 @@ def test_prop_odds_single():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
     factors = list(model.factors(env, params, a, input=input))
     densed = [f.dense for f in factors]
-    # one bias for for the entire thing; one binary and mapping for all but one value
-    assert len(factors) == 1 + 3 * 2
+    # one weight and one bias for for the entire thing (the bias doesn't look at input and the weight doesn't look at the configuration);
+    # plus one ordinal to binary factor
+    assert len(factors) == 3
     assert len(factors) == len(densed)
-    assert all(f.shape == (5, 4) for f in factors[:1])
-    assert all(f.shape == (5, 2) for f in factors[1::2])
-    assert all(f.shape == (5, 4, 2) for f in factors[2::2])
+    assert all(f.shape == (5, 4) for f in factors[:2])
+    assert all(f.shape == (5, 4, 2) for f in factors[2:])
 
     out_params = num_trainable(params.model)
     # features * num_bin_configs + num_full_configs for bias
-    expected_params = 9 + 9
+    expected_params = 9 + 4
     assert out_params == expected_params
 
     inferencer = tx.BruteForce()

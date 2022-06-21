@@ -12,7 +12,7 @@ from ..clique import CliqueModel, make_binary_threshold_variables
 from ..model import ParamNamespace
 from ..subject import Environment
 from ..variable import Var
-from .linear_factor import LinearFactor, MinimalLinear, ShapedLinear
+from .linear_factor import LinearFactor, LinearTensorAux, MinimalLinear, ShapedLinear
 
 
 class Binary(CliqueModel):
@@ -58,11 +58,11 @@ def make_binary_factor(params, *variables, **kwargs):
 
 
 def make_binary_tensor(params, *variables, input, minimal: bool, binary_bias: bool, get_threshold):
-    make_binary_tensor = params.module(
-        (MinimalLinear if minimal else ShapedLinear),
-        output_shape=(2,) * len(variables), bias=binary_bias)
-    binary_tensor = make_binary_tensor(input)
-    for dim, v in enumerate(variables):
+    binary_tensor = LinearTensorAux(params, *variables, out_shape=(2,) * len(variables),
+        bias=binary_bias, minimal=minimal)(input)
+    batch_dims = len(binary_tensor.shape) - len(variables)
+    for i, v in enumerate(variables):
+        dim = batch_dims + i
         num_negative = get_threshold(v)
         num_positive = len(v.domain) - num_negative
         repeats = torch.tensor([num_negative, num_positive])

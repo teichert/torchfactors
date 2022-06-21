@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Optional, Union, cast
+from typing import List, Optional, Union, cast
 
 import torch
 from torch import Tensor
@@ -125,14 +125,21 @@ def LinearTensor(params: ParamNamespace,
                  *variables: Var,
                  bias: bool = True,
                  minimal: bool = False):
+    return LinearTensorAux(params, *variables, out_shape=Factor.out_shape_from_variables(variables), bias=bias, minimal=minimal)
+
+def LinearTensorAux(params: ParamNamespace,
+                 *variables_for_in_shape: List[Var],
+                 out_shape: ShapeType,
+                 bias: bool = True,
+                 minimal: bool = False):
     def f(input: Optional[Tensor]) -> Tensor:
-        batch_shape = Factor.batch_shape_from_variables(variables)
+        batch_shape = Factor.batch_shape_from_variables(variables_for_in_shape)
         in_shape = None if input is None else input.shape[len(batch_shape):]
         m = params.module(
-            (MinimalLinear if minimal else ShapedLinear), output_shape=Factor.out_shape_from_variables(variables),
+            (MinimalLinear if minimal else ShapedLinear), output_shape=out_shape,
             input_shape=in_shape, bias=bias)
         if input is None:
-            x = variables[0].tensor.new_empty(0, dtype=torch.float)
+            x = variables_for_in_shape[0].tensor.new_empty(0, dtype=torch.float)
         else:
             x = input
         return m(x)

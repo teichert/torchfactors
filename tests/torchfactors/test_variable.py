@@ -713,7 +713,7 @@ def test_environment_vars():
 def test_environment_factors():
     env = Environment()
     model = tx.Model[Any]()
-    v: Var = tx.vtensor([3, 4, 5])
+    v: Var = tx.TensorVar(torch.tensor([3, 4, 5]), Range(6))
     f: Factor = tx.LinearFactor(model.namespace('a'), v)
     f2: Factor = tx.LinearFactor(model.namespace('b'), v)
     assert f is not f2
