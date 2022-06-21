@@ -1,4 +1,4 @@
-from typing import Dict, Hashable, Iterable, Optional, Sequence, Tuple, cast
+from typing import Dict, Hashable, Iterable, Optional, Sequence, Tuple
 
 from torch import Tensor
 import torch
@@ -113,4 +113,4 @@ def BinaryScoresModule(params: ParamNamespace, variables: Sequence[Var],
         module_type, input_shape=input_shape,
         output_shape=(2,) * len(variables),
         bias=bias)
-    return cast(module_type, out)
+    return out

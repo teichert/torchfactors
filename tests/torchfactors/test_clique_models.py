@@ -4,7 +4,6 @@ import pytest
 import torch
 
 import torchfactors as tx
-from torchfactors import inferencer
 from torchfactors.clique import (BinaryScoresModule,
                                  make_binary_label_variables,
                                  make_binary_threshold_variables)
@@ -19,7 +18,6 @@ from torchfactors.components.tensor_factor import \
 from torchfactors.subject import Environment
 from torchfactors.testing import DummyParamNamespace, DummyVar
 from torchfactors.utils import num_trainable
-from torchfactors.variable import VarField
 
 
 def test_make_binary_label_variables():
@@ -284,6 +282,7 @@ def test_nominal():
     assert v1 is a
     assert v2 is b
 
+
 def test_collapsed_prop_odds_single():
     env = Environment()
     model = CollapsedProporionalOdds()
@@ -292,7 +291,8 @@ def test_collapsed_prop_odds_single():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
     factors = list(model.factors(env, params, a, input=input))
     densed = [f.dense for f in factors]
-    # one weight and one bias for for the entire thing (the bias doesn't look at input and the weight doesn't look at the configuration);
+    # one weight and one bias for for the entire thing (the bias doesn't
+    # look at input and the weight doesn't look at the configuration);
     assert len(factors) == 2
     assert len(factors) == len(densed)
     assert all(f.shape == (5, 4) for f in factors[:2])
@@ -308,6 +308,7 @@ def test_collapsed_prop_odds_single():
     print(list(params.model.parameters()))
     print('done')
 
+
 def test_collapsed_prop_odds_double():
     env = Environment()
     model = CollapsedProporionalOdds()
@@ -317,7 +318,8 @@ def test_collapsed_prop_odds_double():
     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     factors = list(model.factors(env, params, a, b, input=input))
     densed = [f.dense for f in factors]
-    # one weight and one bias for for the entire thing (the bias doesn't look at input and the weight doesn't look at the configuration);
+    # one weight and one bias for for the entire thing (the bias doesn't look at
+    # input and the weight doesn't look at the configuration);
     assert len(factors) == 2
     assert len(factors) == len(densed)
     assert all(f.shape == (5, 4, 3) for f in factors[:2])
@@ -333,6 +335,7 @@ def test_collapsed_prop_odds_double():
     print(list(params.model.parameters()))
     print('done')
 
+
 def test_prop_odds_single():
     env = Environment()
     model = ProportionalOdds()
@@ -341,7 +344,8 @@ def test_prop_odds_single():
     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
     factors = list(model.factors(env, params, a, input=input))
     densed = [f.dense for f in factors]
-    # one weight and one bias factor for each configuration that excludes 1; plus mapping factor for each label that excludes 1
+    # one weight and one bias factor for each configuration that excludes 1;
+    # plus mapping factor for each label that excludes 1
     assert len(factors) == 3 * 2 + 3
     assert len(factors) == len(densed)
     assert all(f.shape == (5, 2) for f in factors[:6])
@@ -370,14 +374,15 @@ def test_prop_odds():
     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
     factors = list(model.factors(env, params, a, b, input=input))
     densed = [f.dense for f in factors]
-    # one weight and one bias factor for each configuration that excludes 1 (no mapping since len > 1)
+    # one weight and one bias factor for each configuration that excludes 1 (no
+    # mapping since len > 1)
     assert len(factors) == (3 * 2) * 2
     assert len(factors) == len(densed)
     assert all(f.shape == (5, 2, 2) for f in factors[:6])
 
     out_params = num_trainable(params.model)
     # features * num minimal bin configs = 9 * 1 plus bias for each label but zero (3)
-    expected_params =  9 * 1 + (3 * 2)
+    expected_params = 9 * 1 + (3 * 2)
     assert out_params == expected_params
 
     inferencer = tx.BruteForce()

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import List, Optional, Union, cast
+from typing import Optional, Union, cast
 
 import torch
 from torch import Tensor
@@ -121,17 +121,20 @@ class MinimalLinear(torch.nn.Module):
         #     reshaped[(None,)*d + (0,) + (None,) * rest] = 0.0
         # return reshaped
 
+
 def LinearTensor(params: ParamNamespace,
                  *variables: Var,
                  bias: bool = True,
                  minimal: bool = False):
-    return LinearTensorAux(params, *variables, out_shape=Factor.out_shape_from_variables(variables), bias=bias, minimal=minimal)
+    return LinearTensorAux(params, *variables, out_shape=Factor.out_shape_from_variables(variables),
+                           bias=bias, minimal=minimal)
+
 
 def LinearTensorAux(params: ParamNamespace,
-                 *variables_for_in_shape: List[Var],
-                 out_shape: ShapeType,
-                 bias: bool = True,
-                 minimal: bool = False):
+                    *variables_for_in_shape: Var,
+                    out_shape: ShapeType,
+                    bias: bool = True,
+                    minimal: bool = False):
     def f(input: Optional[Tensor]) -> Tensor:
         batch_shape = Factor.batch_shape_from_variables(variables_for_in_shape)
         in_shape = None if input is None else input.shape[len(batch_shape):]

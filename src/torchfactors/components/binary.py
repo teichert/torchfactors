@@ -1,5 +1,4 @@
 
-from gc import get_threshold
 from typing import Optional
 
 import torch
@@ -12,7 +11,7 @@ from ..clique import CliqueModel, make_binary_threshold_variables
 from ..model import ParamNamespace
 from ..subject import Environment
 from ..variable import Var
-from .linear_factor import LinearFactor, LinearTensorAux, MinimalLinear, ShapedLinear
+from .linear_factor import LinearFactor, LinearTensorAux
 
 
 class Binary(CliqueModel):
@@ -48,9 +47,9 @@ class Binary(CliqueModel):
                                                       minimal=self.minimal)
                 yield env.factor((ordinal, 'binary-to-ordinal'), factor)
         else:
-            yield make_binary_factor(params.namespace('binary'),
-                minimal=self.minimal, *variables, input=input,
-                binary_bias=True, get_threshold=lambda v: binarization(len(v.domain))[0])
+            yield make_binary_factor(params.namespace('binary'), minimal=self.minimal,
+                                     *variables, input=input, binary_bias=True,
+                                     get_threshold=lambda v: binarization(len(v.domain))[0])
 
 
 def make_binary_factor(params, *variables, **kwargs):
@@ -59,7 +58,7 @@ def make_binary_factor(params, *variables, **kwargs):
 
 def make_binary_tensor(params, *variables, input, minimal: bool, binary_bias: bool, get_threshold):
     binary_tensor = LinearTensorAux(params, *variables, out_shape=(2,) * len(variables),
-        bias=binary_bias, minimal=minimal)(input)
+                                    bias=binary_bias, minimal=minimal)(input)
     batch_dims = len(binary_tensor.shape) - len(variables)
     for i, v in enumerate(variables):
         dim = batch_dims + i
@@ -68,6 +67,7 @@ def make_binary_tensor(params, *variables, input, minimal: bool, binary_bias: bo
         repeats = torch.tensor([num_negative, num_positive])
         binary_tensor = binary_tensor.repeat_interleave(repeats, dim=dim)
     return binary_tensor
+
 
 def binarization(domain_size: int):
     """
