@@ -4,6 +4,7 @@ import pytest
 import torch
 
 import torchfactors as tx
+from torchfactors import inferencer
 from torchfactors.clique import (BinaryScoresModule,
                                  make_binary_label_variables,
                                  make_binary_threshold_variables)
@@ -17,6 +18,7 @@ from torchfactors.components.tensor_factor import \
 from torchfactors.subject import Environment
 from torchfactors.testing import DummyParamNamespace, DummyVar
 from torchfactors.utils import num_trainable
+from torchfactors.variable import VarField
 
 
 def test_make_binary_label_variables():
@@ -281,6 +283,34 @@ def test_nominal():
     assert v1 is a
     assert v2 is b
 
+def test_prop_odds_single():
+    env = Environment()
+    model = ProportionalOdds()
+    params = DummyParamNamespace()
+    input = torch.ones(5, 9)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    factors = list(model.factors(env, params, a, input=input))
+    densed = [f.dense for f in factors]
+    # one bias for for the entire thing; one binary and mapping for all but one value
+    assert len(factors) == 1 + 3 * 2
+    assert len(factors) == len(densed)
+    assert all(f.shape == (5, 4) for f in factors[:1])
+    assert all(f.shape == (5, 2) for f in factors[1::2])
+    assert all(f.shape == (5, 4, 2) for f in factors[2::2])
+
+    out_params = num_trainable(params.model)
+    # features * num_bin_configs + num_full_configs for bias
+    expected_params = 9 + 9
+    assert out_params == expected_params
+
+    inferencer = tx.BruteForce()
+    # sys = tx.System(model, )
+    loglikelihood, _ = inferencer.partition_with_change(factors)
+    print(loglikelihood)
+    loglikelihood.backward()
+    print(list(params.model.parameters()))
+    print('done')
+
 
 def test_prop_odds():
     env = Environment()
@@ -301,6 +331,14 @@ def test_prop_odds():
     # features * num_bin_configs + num_full_configs for bias
     expected_params = 9 * 4 + 4 * 3
     assert out_params == expected_params
+
+    inferencer = tx.BruteForce()
+    # sys = tx.System(model, )
+    loglikelihood, _ = inferencer.partition_with_change(factors)
+    print(loglikelihood)
+    loglikelihood.backward()
+    print(list(params.model.parameters()))
+    print('done')
 
 
 def test_non_linear_stereotype():

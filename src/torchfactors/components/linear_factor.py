@@ -121,6 +121,23 @@ class MinimalLinear(torch.nn.Module):
         #     reshaped[(None,)*d + (0,) + (None,) * rest] = 0.0
         # return reshaped
 
+def LinearTensor(params: ParamNamespace,
+                 *variables: Var,
+                 bias: bool = True,
+                 minimal: bool = False):
+    def f(input: Optional[Tensor]) -> Tensor:
+        batch_shape = Factor.batch_shape_from_variables(variables)
+        in_shape = None if input is None else input.shape[len(batch_shape):]
+        m = params.module(
+            (MinimalLinear if minimal else ShapedLinear), output_shape=Factor.out_shape_from_variables(variables),
+            input_shape=in_shape, bias=bias)
+        if input is None:
+            x = variables[0].tensor.new_empty(0, dtype=torch.float)
+        else:
+            x = input
+        return m(x)
+    return f
+
 
 class LinearFactor(Factor):
     r"""
@@ -156,6 +173,7 @@ class LinearFactor(Factor):
         self.minimal = minimal
         self.bias = bias
         self.params = params
+        self.get_tensor = LinearTensor(params, *variables, minimal=minimal, bias=bias)
         if input is not None and input.shape:
             if share:
                 # repeat the input across each replicate in the batch element graph
@@ -174,12 +192,12 @@ class LinearFactor(Factor):
                 raise ValueError("prefix dimensions of input must match batch_dims")
         self.input = input
 
-    @property
-    def in_shape(self) -> Optional[ShapeType]:
-        if self.input is None:
-            return None
-        else:
-            return self.input.shape[len(self.batch_shape):]
+    # @property
+    # def in_shape(self) -> Optional[ShapeType]:
+    #     if self.input is None:
+    #         return None
+    #     else:
+    #         return self.input.shape[len(self.batch_shape):]
 
     def dense_(self) -> torch.Tensor:
         r"""returns a tensor that characterizes this factor;
@@ -189,11 +207,12 @@ class LinearFactor(Factor):
         the variables themselves, then, know how many batch
         dimensions there are.
         """
-        m = self.params.module(
-            (MinimalLinear if self.minimal else ShapedLinear), output_shape=self.out_shape,
-            input_shape=self.in_shape, bias=self.bias)
-        if self.input is None:
-            x = self.variables[0].tensor.new_empty(0, dtype=torch.float)
-        else:
-            x = self.input
-        return m(x)
+        # m = self.params.module(
+        #     (MinimalLinear if self.minimal else ShapedLinear), output_shape=self.out_shape,
+        #     input_shape=self.in_shape, bias=self.bias)
+        # if self.input is None:
+        #     x = self.variables[0].tensor.new_empty(0, dtype=torch.float)
+        # else:
+        #     x = self.input
+        # return m(x)
+        return self.get_tensor(self.input)

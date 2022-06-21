@@ -1,4 +1,5 @@
 
+from gc import get_threshold
 from typing import Optional
 
 import torch
@@ -47,16 +48,26 @@ class Binary(CliqueModel):
                                                       minimal=self.minimal)
                 yield env.factor((ordinal, 'binary-to-ordinal'), factor)
         else:
-            make_binary_tensor = params.namespace('binary').module(
-                (MinimalLinear if self.minimal else ShapedLinear),
-                output_shape=(2,) * len(variables))
-            binary_tensor = make_binary_tensor(input)
-            for dim, v in enumerate(variables):
-                num_negative, num_positive = binarization(len(v.domain))
-                repeats = torch.tensor([num_negative, num_positive])
-                binary_tensor = binary_tensor.repeat_interleave(repeats, dim=dim)
-            yield TensorFactor(*variables, tensor=binary_tensor)
+            yield make_binary_factor(params.namespace('binary'),
+                minimal=self.minimal, *variables, input=input,
+                binary_bias=True, get_threshold=lambda v: binarization(len(v.domain))[0])
 
+
+def make_binary_factor(params, *variables, **kwargs):
+    return TensorFactor(*variables, tensor=make_binary_tensor(params, *variables, **kwargs))
+
+
+def make_binary_tensor(params, *variables, input, minimal: bool, binary_bias: bool, get_threshold):
+    make_binary_tensor = params.module(
+        (MinimalLinear if minimal else ShapedLinear),
+        output_shape=(2,) * len(variables), bias=binary_bias)
+    binary_tensor = make_binary_tensor(input)
+    for dim, v in enumerate(variables):
+        num_negative = get_threshold(v)
+        num_positive = len(v.domain) - num_negative
+        repeats = torch.tensor([num_negative, num_positive])
+        binary_tensor = binary_tensor.repeat_interleave(repeats, dim=dim)
+    return binary_tensor
 
 def binarization(domain_size: int):
     """
