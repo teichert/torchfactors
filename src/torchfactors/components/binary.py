@@ -36,29 +36,26 @@ class Binary(CliqueModel):
             # TODO: no key is being passed here so there there is coupling
             # between  (could be a source of bugs)
             ordinal_to_binary_variable = make_binary_threshold_variables(
-                env, *variables, latent=True)
+                env, *variables, latent=True, key='binary-clique-model')
             yield LinearFactor(params.namespace('latent-binary'),
                                *ordinal_to_binary_variable.values(),
                                input=input, minimal=self.minimal, bias=self.binary_bias)
-            for i, (ordinal, binary) in enumerate(ordinal_to_binary_variable.items()):
+            if len(variables) == 1:
+                [(ordinal, binary)] = ordinal_to_binary_variable.items()
                 if self.linear:
                     t = linear_binary_to_ordinal_tensor(len(ordinal.domain))
-                    def factor(): return TensorFactor(binary, ordinal, tensor=t)
+                    yield TensorFactor(binary, ordinal, tensor=t)
                 else:
-                    def factor(): return LinearFactor(params.namespace((i, 'binary-to-ordinal')),
-                                                      binary, ordinal, bias=True,
-                                                      minimal=self.minimal)
-                yield env.factor(((ordinal, 'bias'), 'binary-to-ordinal'), factor)
+                    yield LinearFactor(params.namespace('binary-to-ordinal'),
+                                       binary, ordinal, bias=True,
+                                       minimal=self.minimal)
         else:
             yield make_binary_factor(params.namespace('binary'), minimal=self.minimal,
                                      *variables, input=input, binary_bias=self.binary_bias,
                                      get_threshold=lambda v: binarization(len(v.domain))[0])
-        for i, ordinal in enumerate(variables):
-            if self.nominal_bias:
-                def nominal_bias_factor():
-                    return LinearFactor(params.namespace((i, 'nominal-bias')), ordinal,
-                                        input=None, bias=True, minimal=self.minimal)
-                yield env.factor((ordinal, 'nominal-bias-factor'), nominal_bias_factor)
+        if self.nominal_bias:
+            yield LinearFactor(params.namespace(('nominal-bias')), *variables,
+                               input=None, bias=True, minimal=self.minimal)
 
 
 def make_binary_factor(params, *variables, **kwargs):

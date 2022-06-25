@@ -138,25 +138,58 @@ def testKIsAtLeastJ():
     assert out3.exp().allclose(expected3)
 
 
-# def test_binary_nominal_bias():
-#     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
-#     assert tuple(a.marginal_shape) == (5, 4)
-#     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
-#     assert tuple(b.marginal_shape) == (5, 3)
+def test_binary_nominal_bias():
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    assert tuple(a.marginal_shape) == (5, 4)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+    assert tuple(b.marginal_shape) == (5, 3)
 
-#     env = Environment()
-#     params = DummyParamNamespace()
-#     model = Binary(latent=False, nominal_bias=True, binary_bias=True)
-#     input = torch.ones(5, 7)
-#     factors = list(model.factors(env, params, a, b, input=input))
-#     assert len(factors) == 1
-#     # single binary factor
-#     assert factors[0].shape == (5, 4, 3)
-#     # same for all inputs (which are the same)
-#     d = factors[0].dense
-#     assert d.allclose(d.mean(dim=0))
-#     out_params = num_trainable(params.model)
-#     assert out_params == (4 - 1) * (3 - 1) + (2 - 1) * (2 - 1) * 7
+    env = Environment()
+    params = DummyParamNamespace()
+    model = Binary(latent=False, nominal_bias=True, binary_bias=True)
+    input = torch.ones(5, 7)
+    factors = list(model.factors(env, params, a, b, input=input))
+    assert len(factors) == 2
+    # binary factor (expanded)
+    assert factors[0].shape == (5, 4, 3)
+    # nominal bias
+    assert factors[1].shape == (5, 4, 3)
+    # same for all inputs (which are the same)
+    densed = [f.dense for f in factors]
+    assert len(densed) == len(factors)
+    out_params = num_trainable(params.model)
+    # nominal bias, binary bias, binary weights
+    expected = (4 - 1) * (3 - 1) + (2 - 1) * (2 - 1) + (2 - 1) * (2 - 1) * 7
+    assert out_params == expected
+
+
+def test_latent_binary_nominal_bias():
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    assert tuple(a.marginal_shape) == (5, 4)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+    assert tuple(b.marginal_shape) == (5, 3)
+
+    env = Environment()
+    params = DummyParamNamespace()
+    model = Binary(latent=True, nominal_bias=True, binary_bias=False)
+    input = torch.ones(5, 7)
+    factors = (list(model.factors(env, params.namespace('a-b'), a, b, input=input)) +
+               list(model.factors(env, params.namespace('a'), a, input=input)) +
+               list(model.factors(env, params.namespace('b'), b, input=input)))
+    # joint and individual nominal biases, joint and individual binary weights, and binary mappings
+    expected_length = 3 + 3 + 2
+    assert len(factors) == expected_length
+    # binary factor (expanded)
+    assert factors[0].shape == (5, 2, 2)
+    # nominal bias
+    assert factors[1].shape == (5, 4, 3)
+    # same for all inputs (which are the same)
+    densed = [f.dense for f in factors]
+    assert len(densed) == len(factors)
+    out_params = num_trainable(params.model)
+    # joint and individual nominal bias + joint and individual binary weights + mappings
+    expected = (4 - 1) * (3 - 1) + (4 - 1) + (3 - 1) + 7 * 3 + (4 - 1) + (3 - 1)
+    assert out_params == expected
 
 
 def test_binary():
