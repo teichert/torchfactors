@@ -5,7 +5,7 @@ from torch import Tensor
 from torchfactors.components.at_least import KIsAtLeastJ
 from torchfactors.components.linear_factor import LinearFactor, LinearTensor
 
-from ..clique import (CliqueModel, make_binary_label_variables)
+from ..clique import CliqueModel, make_binary_label_variables
 from ..components.tensor_factor import TensorFactor
 from ..model import ParamNamespace
 from ..subject import Environment
@@ -23,7 +23,8 @@ class ProportionalOdds(CliqueModel):
                 *variables: Var, input: Optional[Tensor] = None):
 
         # make a binary variable for each label of each variable (except 0)
-        binary_variables = make_binary_label_variables(env, *variables)
+        binary_variables = make_binary_label_variables(
+            env, *variables, key='prop-odds-clique-model')
         # weights are the same for all values (but different for different variable subsets)
         weight_tensor = LinearTensor(params.namespace(
             'binary-config-weight'), *[binary_variables[v, 1] for v in variables],
