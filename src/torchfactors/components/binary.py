@@ -3,7 +3,7 @@ from typing import Optional
 
 import torch
 from torch import Tensor
-from torchfactors import TensorFactor
+from torchfactors import LinearFactor, TensorFactor
 from torchfactors.components.tensor_factor import \
     linear_binary_to_ordinal_tensor
 
@@ -11,7 +11,7 @@ from ..clique import CliqueModel, make_binary_threshold_variables
 from ..model import ParamNamespace
 from ..subject import Environment
 from ..variable import Var
-from .linear_factor import LinearFactor, LinearTensorAux
+from .linear_factor import LinearTensorAux
 
 
 class Binary(CliqueModel):
@@ -20,11 +20,14 @@ class Binary(CliqueModel):
     the mapping from binaries to observed actual lables is also learned
     """
 
-    def __init__(self, latent: bool = True, linear: bool = False, minimal=True):
+    def __init__(self, latent: bool = True, linear: bool = False, minimal=True,
+                 binary_bias: bool = True, nominal_bias: bool = False):
         super().__init__()
         self.latent = latent
         self.linear = linear
         self.minimal = minimal
+        self.binary_bias = binary_bias
+        self.nominal_bias = nominal_bias
 
     # TODO: allow no bias?
     def factors_(self, env: Environment, params: ParamNamespace,
@@ -36,7 +39,7 @@ class Binary(CliqueModel):
                 env, *variables, latent=True)
             yield LinearFactor(params.namespace('latent-binary'),
                                *ordinal_to_binary_variable.values(),
-                               input=input, minimal=self.minimal)
+                               input=input, minimal=self.minimal, bias=self.binary_bias)
             for i, (ordinal, binary) in enumerate(ordinal_to_binary_variable.items()):
                 if self.linear:
                     t = linear_binary_to_ordinal_tensor(len(ordinal.domain))
@@ -45,11 +48,17 @@ class Binary(CliqueModel):
                     def factor(): return LinearFactor(params.namespace((i, 'binary-to-ordinal')),
                                                       binary, ordinal, bias=True,
                                                       minimal=self.minimal)
-                yield env.factor((ordinal, 'binary-to-ordinal'), factor)
+                yield env.factor(((ordinal, 'bias'), 'binary-to-ordinal'), factor)
         else:
             yield make_binary_factor(params.namespace('binary'), minimal=self.minimal,
-                                     *variables, input=input, binary_bias=True,
+                                     *variables, input=input, binary_bias=self.binary_bias,
                                      get_threshold=lambda v: binarization(len(v.domain))[0])
+        for i, ordinal in enumerate(variables):
+            if self.nominal_bias:
+                def nominal_bias_factor():
+                    return LinearFactor(params.namespace((i, 'nominal-bias')), ordinal,
+                                        input=None, bias=True, minimal=self.minimal)
+                yield env.factor((ordinal, 'nominal-bias-factor'), nominal_bias_factor)
 
 
 def make_binary_factor(params, *variables, **kwargs):

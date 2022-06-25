@@ -17,10 +17,13 @@ class Nominal(CliqueModel):
     times number of features)
     """
 
-    def __init__(self, bias: bool = True):
+    def __init__(self, bias: bool = True, minimal: bool = False, features: bool = True):
         super().__init__()
         self.has_bias = bias
+        self.minimal = minimal
+        self.features = features
 
     def factors(self, env: Environment, params: ParamNamespace,
                 *variables: Var, input: Optional[Tensor] = None):
-        yield LinearFactor(params, *variables, input=input, bias=self.has_bias)
+        yield LinearFactor(params, *variables, input=input if self.features else None,
+                           bias=self.has_bias, minimal=self.minimal)

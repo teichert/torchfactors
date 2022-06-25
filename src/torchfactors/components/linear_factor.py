@@ -19,7 +19,8 @@ class OptionalBiasLinear(torch.nn.Module):
     """
 
     def __init__(self, input_features: int, output_features: int,
-                 bias: bool = True, device=None, dtype=None):
+                 bias: bool = True, device=None, dtype=None,
+                 fix_last: Optional[float] = None):
         factory_kwargs = dict(device=device, dtype=dtype)
         super().__init__()
         # self.initialized = False
@@ -28,19 +29,25 @@ class OptionalBiasLinear(torch.nn.Module):
         self.bias = bias
         self.bias_only: Union[torch.nn.parameter.Parameter, torch.Tensor, None] = None
         self.with_features: Optional[torch.nn.Module] = None
+        self.fix_last = None if fix_last is None else torch.tensor([fix_last], dtype=torch.float)
         # def lazy_init(self, exemplar: Tensor):
         # if not self.initialized:
+        if self.fix_last is None:
+            effective_output_features = self.output_features
+        else:
+            effective_output_features = self.output_features - 1
         if self.input_features == 0:
             if self.bias:
-                new_bias = torch.empty(self.output_features, **factory_kwargs)
+                new_bias = torch.empty(effective_output_features,
+                                       **factory_kwargs)
                 torch.nn.init.uniform_(new_bias, -1., 1.)
                 self.bias_only = torch.nn.parameter.Parameter(new_bias)
             else:
                 self.bias_only = torch.tensor(0.0, **factory_kwargs).expand(
-                    (self.output_features,))
+                    (effective_output_features,))
         else:
             self.with_features = torch.nn.Linear(
-                self.input_features, self.output_features, bias=self.bias)
+                self.input_features, effective_output_features, bias=self.bias)
         # self.initialized = True
 
     def forward(self, x: Tensor) -> Tensor:
@@ -50,6 +57,8 @@ class OptionalBiasLinear(torch.nn.Module):
             out = self.bias_only
         else:
             out = cast(torch.nn.Module, self.with_features)(x)
+        if self.fix_last is not None:
+            out = torch.cat([out, self.fix_last], dim=-1)
         return out
 
 # def register_module_for_state_dict(cls):
@@ -66,7 +75,8 @@ class ShapedLinear(torch.nn.Module):
     """
 
     def __init__(self, output_shape: ShapeType,
-                 bias: bool = True, input_shape: ShapeType = None):
+                 bias: bool = True, input_shape: ShapeType = None,
+                 fix_last: Optional[float] = None):
         super().__init__()
         self.input_shape = input_shape
         if input_shape is None:
@@ -75,8 +85,9 @@ class ShapedLinear(torch.nn.Module):
             input_features = math.prod(input_shape)
         self.output_shape = output_shape
         output_features = math.prod(output_shape)
-        self.wrapped_linear = OptionalBiasLinear(input_features, output_features,
-                                                 bias=bias)
+        self.wrapped_linear = OptionalBiasLinear(
+            input_features, output_features,
+            bias=bias, fix_last=fix_last)
 
     def forward(self, x: Tensor) -> Tensor:
         flattened_in: Tensor
@@ -96,10 +107,12 @@ def inner_shape(shape: ShapeType) -> ShapeType:
 class MinimalLinear(torch.nn.Module):
 
     def __init__(self, output_shape: ShapeType,
-                 bias: bool = True, input_shape: ShapeType = None):
+                 bias: bool = True, input_shape: ShapeType = None,
+                 fix_last: Optional[float] = None):
         super().__init__()
         self.output_shape = output_shape
-        self.inner = ShapedLinear(inner_shape(output_shape), bias=bias, input_shape=input_shape)
+        self.inner = ShapedLinear(inner_shape(output_shape), bias=bias, input_shape=input_shape,
+                                  fix_last=fix_last)
 
     def forward(self, x: Tensor) -> Tensor:
         t = self.inner(x)
@@ -125,22 +138,24 @@ class MinimalLinear(torch.nn.Module):
 def LinearTensor(params: ParamNamespace,
                  *variables: Var,
                  bias: bool = True,
-                 minimal: bool = False):
+                 minimal: bool = False,
+                 fix_last: Optional[float] = None):
     return LinearTensorAux(params, *variables, out_shape=Factor.out_shape_from_variables(variables),
-                           bias=bias, minimal=minimal)
+                           bias=bias, minimal=minimal, fix_last=fix_last)
 
 
 def LinearTensorAux(params: ParamNamespace,
                     *variables_for_in_shape: Var,
                     out_shape: ShapeType,
                     bias: bool = True,
-                    minimal: bool = False):
+                    minimal: bool = False,
+                    fix_last: Optional[float] = None):
     def f(input: Optional[Tensor]) -> Tensor:
         batch_shape = Factor.batch_shape_from_variables(variables_for_in_shape)
         in_shape = None if input is None else input.shape[len(batch_shape):]
         m = params.module(
             (MinimalLinear if minimal else ShapedLinear), output_shape=out_shape,
-            input_shape=in_shape, bias=bias)
+            input_shape=in_shape, bias=bias, fix_last=fix_last)
         if input is None:
             x = variables_for_in_shape[0].tensor.new_empty(0, dtype=torch.float)
         else:

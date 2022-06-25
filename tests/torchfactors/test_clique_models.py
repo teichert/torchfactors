@@ -9,7 +9,8 @@ from torchfactors.clique import (BinaryScoresModule,
                                  make_binary_threshold_variables)
 from torchfactors.components.at_least import KIsAtLeastJ
 from torchfactors.components.binary import Binary
-from torchfactors.components.collapsed_prop_odds import CollapsedProporionalOdds
+from torchfactors.components.collapsed_prop_odds import \
+    CollapsedProporionalOdds
 from torchfactors.components.nominal import Nominal
 from torchfactors.components.prop_odds import ProportionalOdds
 from torchfactors.components.stereotype import Stereotype
@@ -135,6 +136,27 @@ def testKIsAtLeastJ():
     out3 = factor3.dense
     assert out3.shape == (5, 4, 2)
     assert out3.exp().allclose(expected3)
+
+
+# def test_binary_nominal_bias():
+#     a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+#     assert tuple(a.marginal_shape) == (5, 4)
+#     b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+#     assert tuple(b.marginal_shape) == (5, 3)
+
+#     env = Environment()
+#     params = DummyParamNamespace()
+#     model = Binary(latent=False, nominal_bias=True, binary_bias=True)
+#     input = torch.ones(5, 7)
+#     factors = list(model.factors(env, params, a, b, input=input))
+#     assert len(factors) == 1
+#     # single binary factor
+#     assert factors[0].shape == (5, 4, 3)
+#     # same for all inputs (which are the same)
+#     d = factors[0].dense
+#     assert d.allclose(d.mean(dim=0))
+#     out_params = num_trainable(params.model)
+#     assert out_params == (4 - 1) * (3 - 1) + (2 - 1) * (2 - 1) * 7
 
 
 def test_binary():
@@ -283,6 +305,29 @@ def test_nominal():
     assert v2 is b
 
 
+def test_nominal_minimal():
+    env = Environment()
+    model = Nominal(minimal=True)
+    params = DummyParamNamespace()
+    input = torch.ones(5, 8)
+    a = tx.TensorVar(torch.tensor([3, 0, 2, 1, 3]), tx.ANNOTATED, tx.Range(4), ndims=0)
+    b = tx.TensorVar(torch.tensor([1, 1, 2, 2, 0]), tx.ANNOTATED, tx.Range(3), ndims=0)
+    factors = list(model.factors(env, params, a, b, input=input))
+    [f.dense for f in factors]
+
+    out_params = num_trainable(params.model)
+    # configs times (labels plus bias)
+    expected_params = (4 - 1) * (3 - 1) * (8 + 1)
+    assert out_params == expected_params
+
+    assert len(factors) == 1
+    f, = factors
+    assert len(f) == 2
+    v1, v2 = f.variables
+    assert v1 is a
+    assert v2 is b
+
+
 def test_collapsed_prop_odds_single():
     env = Environment()
     model = CollapsedProporionalOdds()
@@ -406,7 +451,7 @@ def test_non_linear_stereotype():
 
     out_params = num_trainable(params.model)
     # features * num_bin_configs + num_full_configs for bias + scale for each config
-    expected_params = 9 * 4 + 4 * 3 + 4 * 3
+    expected_params = 9 * (2 - 1) * (2 - 1) + (4 - 1) * (3 - 1) + (4 - 1) * (3 - 1) - 1
     assert out_params == expected_params
 
 
@@ -421,8 +466,8 @@ def test_linear_stereotype():
     assert len(factors) == 2
 
     out_params = num_trainable(params.model)
-    # features * num_bin_configs + num_full_configs for bias
-    expected_params = 9 * 4 + 4 * 3
+    # features * num_minimal_bin_configs + num_full_configs for bias
+    expected_params = 9 * (2 - 1) * (2 - 1) + (4 - 1) * (3 - 1)
     assert out_params == expected_params
 
 
@@ -437,5 +482,5 @@ def test_linear_stereotyp_bias_only():
 
     out_params = num_trainable(params.model)
     # num_full_configs for bias
-    expected_params = 4 * 3
+    expected_params = (4 - 1) * (3 - 1)
     assert out_params == expected_params
