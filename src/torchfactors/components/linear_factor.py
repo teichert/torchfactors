@@ -57,8 +57,9 @@ class OptionalBiasLinear(torch.nn.Module):
             out = self.bias_only
         else:
             out = cast(torch.nn.Module, self.with_features)(x)
-        if self.fix_last is not None:
-            out = torch.cat([out, self.fix_last], dim=-1)
+        fixed = getattr(self, 'fix_last', None)
+        if fixed is not None:
+            out = torch.cat([out, fixed], dim=-1)
         return out
 
 # def register_module_for_state_dict(cls):

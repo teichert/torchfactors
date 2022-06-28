@@ -25,5 +25,6 @@ class Nominal(CliqueModel):
 
     def factors(self, env: Environment, params: ParamNamespace,
                 *variables: Var, input: Optional[Tensor] = None):
-        yield LinearFactor(params, *variables, input=input if self.features else None,
-                           bias=self.has_bias, minimal=self.minimal)
+        yield LinearFactor(params, *variables,
+                           input=input if getattr(self, 'features', True) else None,
+                           bias=self.has_bias, minimal=getattr(self, 'minimal', False))
